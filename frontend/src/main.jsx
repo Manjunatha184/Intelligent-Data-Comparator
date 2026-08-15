@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import "@fontsource/montserrat/latin-400.css";
+import "@fontsource/montserrat/latin-500.css";
+import "@fontsource/montserrat/latin-600.css";
+import "@fontsource/montserrat/latin-700.css";
 
 import {
   Activity,
@@ -8,7 +12,6 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  CircleHelp,
   Database,
   Download,
   Eye,
@@ -28,6 +31,7 @@ import {
 } from "lucide-react";
 
 import "./styles.css";
+import lumeraLogo from "./assets/lumera-logo.svg";
 
 /* ============================================================
    CONSTANTS
@@ -133,9 +137,19 @@ const COMPARISON_LEVELS = [
   {
     id: "L7",
     name: "Analysis",
-    description: "Automated root-cause analysis and recommendations",
+    description: "Plain-language analysis of findings and cross-level evidence",
   },
 ];
+
+const COMPARISON_LEVEL_ICONS = {
+  L1: Database,
+  L2: Activity,
+  L3: GitCompare,
+  L4: Eye,
+  L5: SlidersHorizontal,
+  L6: ShieldCheck,
+  L7: Zap,
+};
 
 const CONNECTORS = {
   csv: {
@@ -545,8 +559,8 @@ function Sidebar({ page, setPage, hasResults, onOpenResultsHistory }) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div>
-          <b>Comparator</b>
+        <div className="brandLogo">
+          <img src={lumeraLogo} alt="Lumera Data Comparator" />
         </div>
       </div>
 
@@ -1454,6 +1468,8 @@ function ComparisonBuilder({
   const [targetSchemaError, setTargetSchemaError] = useState(null);
   const [sourceFilters, setSourceFilters] = useState([]);
   const [targetFilters, setTargetFilters] = useState([]);
+  const [ignoredSourceColumns, setIgnoredSourceColumns] = useState([]);
+  const [ignoredTargetColumns, setIgnoredTargetColumns] = useState([]);
 
   useEffect(() => {
     apiRequest("/rules").then(data => setAvailableRules(data || [])).catch(() => { });
@@ -1541,6 +1557,8 @@ function ComparisonBuilder({
 
     setSourceFilters((current) => current.filter((item) => sourceColumns.includes(item.field)));
     setTargetFilters((current) => current.filter((item) => targetColumns.includes(item.field)));
+    setIgnoredSourceColumns((current) => current.filter((column) => sourceColumns.includes(column)));
+    setIgnoredTargetColumns((current) => current.filter((column) => targetColumns.includes(column)));
   }, [sourceSchema, targetSchema]);
 
   const [running, setRunning] = useState(false);
@@ -1691,6 +1709,11 @@ function ComparisonBuilder({
       targetProperties.table = targetDbTable;
     }
 
+    const ignoredColumnsPayload = Array.from(new Set([
+      ...ignoredSourceColumns,
+      ...ignoredTargetColumns,
+    ]));
+
     const comparisonKeyPayload = (comparisonKeys || [])
       .slice(0, 1)
       .filter((key) => key.source_column && key.target_column)
@@ -1707,6 +1730,15 @@ function ComparisonBuilder({
 
       setStep(2);
 
+      return;
+    }
+
+    if (comparisonKeyPayload.some((key) =>
+      ignoredColumnsPayload.includes(key.source_column) ||
+      ignoredColumnsPayload.includes(key.target_column)
+    )) {
+      notify("A record-matching key cannot also be an ignored column.", "error");
+      setStep(2);
       return;
     }
 
@@ -1732,6 +1764,12 @@ function ComparisonBuilder({
       }
       if (groupingAttributes.length !== new Set(groupingAttributes.map(item => item.source_column)).size || groupingAttributes.length !== new Set(groupingAttributes.map(item => item.target_column)).size) {
         notify("Grouping fields cannot be duplicated.", "error"); setStep(2); return;
+      }
+      if ([...groupingAttributes, ...aggregationColumns].some((item) =>
+        ignoredColumnsPayload.includes(item.source_column) ||
+        ignoredColumnsPayload.includes(item.target_column)
+      )) {
+        notify("Grouping and aggregation fields cannot also be ignored columns.", "error"); setStep(2); return;
       }
     }
 
@@ -1781,7 +1819,7 @@ function ComparisonBuilder({
 
       column_mappings: columnMappingPayload,
 
-      ignored_columns: [],
+      ignored_columns: ignoredColumnsPayload,
 
       aggregate_rules: availableRules
         .filter(r => selectedAggRuleIds.some(id => String(id) === String(r.rule_id)))
@@ -1979,6 +2017,10 @@ function ComparisonBuilder({
           setSourceFilters={setSourceFilters}
           targetFilters={targetFilters}
           setTargetFilters={setTargetFilters}
+          ignoredSourceColumns={ignoredSourceColumns}
+          setIgnoredSourceColumns={setIgnoredSourceColumns}
+          ignoredTargetColumns={ignoredTargetColumns}
+          setIgnoredTargetColumns={setIgnoredTargetColumns}
         />
       )}
 
@@ -1990,6 +2032,7 @@ function ComparisonBuilder({
           comparisonKeys={comparisonKeys}
           sourceFiltersCount={sourceFilters.length}
           targetFiltersCount={targetFilters.length}
+          ignoredColumnsCount={new Set([...ignoredSourceColumns, ...ignoredTargetColumns]).size}
           mappingsCount={columnMappings.length}
           dqRulesCount={selectedDqRuleIds.length}
           aggregateRulesCount={selectedAggRuleIds.length}
@@ -2054,7 +2097,14 @@ function SourceStep({
   reloadConnections,
 }) {
   return (
-    <div className="grid2 scopeSourceGrid">
+    <section className="scopeSourceSection">
+      <div className="scopeSectionIntro">
+        <div>
+          <h2>Choose what you want to compare</h2>
+        </div>
+      </div>
+
+      <div className="grid2 scopeSourceGrid">
       <Panel title="Source dataset" className="scopeDatasetCard">
         <ConnectionSelector
           label="Source connection"
@@ -2102,7 +2152,8 @@ function SourceStep({
           />
         )}
       </Panel>
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -2280,47 +2331,6 @@ function ConnectionSelector({
   );
 }
 
-function ConnectionPreview({
-  connection,
-}) {
-  const Icon =
-    CONNECTORS[
-      connection.connector_type
-    ]?.icon || Database;
-
-  return (
-    <div className="selectedSource">
-      <div className="sourceIcon">
-        <Icon size={16} />
-      </div>
-
-      <div className="grow">
-        <b>{connection.name}</b>
-
-        <span>
-          {
-            CONNECTORS[
-              connection.connector_type
-            ]?.label
-          }
-        </span>
-      </div>
-
-      <Status status={connection.status} />
-    </div>
-  );
-}
-
-function SelectionHint({ text }) {
-  return (
-    <div className="selectHint">
-      <CircleHelp size={16} />
-
-      <span>{text}</span>
-    </div>
-  );
-}
-
 /* ============================================================
    LEVELS
 ============================================================ */
@@ -2331,16 +2341,19 @@ function LevelsStep({
 }) {
   return (
     <Panel title="Comparison depth" className="scopeLevelsPanel">
-      <p className="helper">
-        Select the validation levels that the execution
-        planner should create.
-      </p>
+      <div className="scopeLevelIntro">
+        <p className="helper">
+          Build the validation path from structural checks through plain-language analysis.
+        </p>
+        <span className="scopeSelectionCount">{levels.length} of {COMPARISON_LEVELS.length} selected</span>
+      </div>
 
       <div className="levelGrid">
         {COMPARISON_LEVELS.map((level) => {
           const selected = levels.includes(
             level.id
           );
+          const LevelIcon = COMPARISON_LEVEL_ICONS[level.id];
 
           return (
             <button
@@ -2349,8 +2362,9 @@ function LevelsStep({
               className={`level ${selected ? "selected" : ""} level-${level.id}`}
               onClick={() => toggleLevel(level.id)}
             >
-              <span className="levelCode">
-                {level.id}
+              <span className="levelVisual">
+                <LevelIcon size={17} />
+                <span className="levelCode">{level.id}</span>
               </span>
 
               <div>
@@ -2539,6 +2553,10 @@ function RulesStep({
   setSourceFilters,
   targetFilters,
   setTargetFilters,
+  ignoredSourceColumns,
+  setIgnoredSourceColumns,
+  ignoredTargetColumns,
+  setIgnoredTargetColumns,
 }) {
   const [dqModalOpen, setDqModalOpen] = React.useState(false);
   const [aggModalOpen, setAggModalOpen] = React.useState(false);
@@ -2660,7 +2678,22 @@ function RulesStep({
         <FilterSection title="Source Filters" schema={sourceSchema} filters={sourceFilters} setFilters={setSourceFilters} />
         <FilterSection title="Target Filters" schema={targetSchema} filters={targetFilters} setFilters={setTargetFilters} />
       </div>
-      <Panel title="Record matching" className="reviewRunCard">
+      <Panel title="Ignored columns" className="reviewRunCard ignoredColumnsCard">
+        <p className="helper">Selected columns are excluded from every applicable comparison level.</p>
+        <div className="formGrid">
+          <div className="mappingPickerBlock">
+            <label>Source columns to ignore</label>
+            <MultiSelectField options={sourceColumnOptions} selected={ignoredSourceColumns} onChange={setIgnoredSourceColumns} placeholder="Select source columns" />
+            <FieldChips values={ignoredSourceColumns} onRemove={(index) => setIgnoredSourceColumns(ignoredSourceColumns.filter((_, itemIndex) => itemIndex !== index))} />
+          </div>
+          <div className="mappingPickerBlock">
+            <label>Target columns to ignore</label>
+            <MultiSelectField options={targetColumnOptions} selected={ignoredTargetColumns} onChange={setIgnoredTargetColumns} placeholder="Select target columns" />
+            <FieldChips values={ignoredTargetColumns} onRemove={(index) => setIgnoredTargetColumns(ignoredTargetColumns.filter((_, itemIndex) => itemIndex !== index))} />
+          </div>
+        </div>
+      </Panel>
+      <Panel title="Record matching" className="reviewRunCard recordMatchingCard">
         <div className="formGrid">
           <SelectField
             label="Source key"
@@ -2920,6 +2953,7 @@ function ReviewModal({
   comparisonKeys,
   sourceFiltersCount,
   targetFiltersCount,
+  ignoredColumnsCount,
   mappingsCount,
   dqRulesCount,
   aggregateRulesCount,
@@ -2975,6 +3009,7 @@ function ReviewModal({
 
               <ReviewRow label="Source filters" value={String(sourceFiltersCount)} />
               <ReviewRow label="Target filters" value={String(targetFiltersCount)} />
+              <ReviewRow label="Ignored columns" value={String(ignoredColumnsCount)} />
               <ReviewRow label="Column mappings" value={String(mappingsCount)} />
 
               <ReviewRow
@@ -3152,7 +3187,7 @@ function Results({ runId, onOpenRun, onBack, onOpenAnalysis, notify }) {
     <div className="resultsPage">
       <div className="wizardFooter">
         <h1 className="pageTitle" style={{ margin: 0 }}>
-          Comparison results <small style={{ fontSize: "12px", color: "var(--muted)", fontWeight: "normal", marginLeft: "6px" }}>({runId})</small>
+          Comparison results <small className="runIdText" style={{ fontSize: "12px", color: "var(--muted)", fontWeight: "normal", marginLeft: "6px" }}>({runId})</small>
         </h1>
         <div className="actionRow">
           <button type="button" className="secondary small" onClick={onBack}>
@@ -3241,8 +3276,16 @@ function L7AnalysisReportView({
   const privacy = sanitized.privacy_policy || {};
 
   const execFindings = report.key_findings || [];
-  const rootCauseAnalysis = report.root_cause_analysis || [];
-  const recommendations = report.recommendations || [];
+  const readableEvidence = (value) => {
+    if (value === null || value === undefined) return "â€”";
+    if (["string", "number", "boolean"].includes(typeof value)) return String(value);
+    if (Array.isArray(value)) return value.map(readableEvidence).join(", ");
+    if (typeof value === "object") {
+      if (value.statement) return String(value.statement);
+      return Object.entries(value).map(([key, item]) => `${key.replace(/_/g, " ")}: ${readableEvidence(item)}`).join("; ");
+    }
+    return String(value);
+  };
 
   return (
     <div className="stack">
@@ -3251,7 +3294,7 @@ function L7AnalysisReportView({
         <div>
           <span className="sectionEyebrow">ANALYSIS REPORT</span>
           <h2>Comparison analysis</h2>
-          <p>{runId}</p>
+          <p className="runIdText">{runId}</p>
         </div>
 
         <div className="actionRow">
@@ -3329,6 +3372,9 @@ function L7AnalysisReportView({
                   {levelKey === "L6" && "Data Quality"}
                 </strong>
                 <Status status={levelData.status || "UNKNOWN"} />
+                <span className="analysisValidationSummary">
+                  {levelData.summary || "No summary was recorded for this validation level."}
+                </span>
               </div>
             );
           })}
@@ -3378,9 +3424,18 @@ function L7AnalysisReportView({
               {finding.likely_explanation && (
                 <div style={{ marginTop: "1rem" }}>
                   <h5 style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: "4px" }}>
-                    Engineering Interpretation
+                    What this means
                   </h5>
                   <p style={{ margin: 0, fontSize: "0.9rem" }}>{finding.likely_explanation}</p>
+                </div>
+              )}
+
+              {finding.impact && (
+                <div style={{ marginTop: "1rem" }}>
+                  <h5 style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: "4px" }}>
+                    Why this matters
+                  </h5>
+                  <p style={{ margin: 0, fontSize: "0.9rem" }}>{finding.impact}</p>
                 </div>
               )}
 
@@ -3389,38 +3444,7 @@ function L7AnalysisReportView({
         </div>
       </AnalysisReportSection>
 
-      <AnalysisReportSection title="Root-Cause Hypotheses" count={rootCauseAnalysis.length}>
-        {rootCauseAnalysis.length === 0 ? (
-          <div className="analysisEmpty">No evidence-supported root-cause hypothesis was reported.</div>
-        ) : (
-          <div className="analysisFindingList">
-            {rootCauseAnalysis.map((item, index) => (
-              <article className="analysisFindingCard" key={item.statement || index}>
-                <p style={{ margin: 0, fontSize: "0.9rem" }}>{item.statement}</p>
-                {(item.levels || []).length > 0 && (
-                  <div className="analysisLevelLinks" style={{ marginTop: "12px" }}>
-                    {item.levels.map((level) => <span key={level}>{level}</span>)}
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
-        )}
-      </AnalysisReportSection>
-
-      <AnalysisReportSection title="Recommended Actions" count={recommendations.length}>
-        {recommendations.length === 0 ? (
-          <div className="analysisEmpty">No recommended actions were reported.</div>
-        ) : (
-          <ol className="analysisBulletList">
-            {recommendations.map((recommendation, index) => (
-              <li key={`${recommendation}-${index}`}>{recommendation}</li>
-            ))}
-          </ol>
-        )}
-      </AnalysisReportSection>
-
-      <AnalysisReportSection title="Cross-Level Evidence" count={correlations.length}>
+      <AnalysisReportSection title="How the validation levels relate" count={correlations.length}>
         {correlations.length === 0 ? (
           <div className="analysisEmpty">No cross-level correlations were established.</div>
         ) : (
@@ -3429,15 +3453,22 @@ function L7AnalysisReportView({
               <article className="analysisCorrelationCard" key={index}>
                 <div className="analysisFindingTop">
                   <div>
-                    <h4>{item.type}</h4>
+                    <h4>{item.title || item.type || `Cross-level comparison ${index + 1}`}</h4>
                   </div>
                 </div>
-                <p>{item.interpretation}</p>
+                <p>{item.conclusion || item.interpretation || "The supplied evidence shows a relationship between these validation levels."}</p>
+                {(item.evidence || []).length > 0 && (
+                  <ul className="analysisBulletList">
+                    {item.evidence.map((evidenceItem, evidenceIndex) => (
+                      <li key={evidenceIndex}>{readableEvidence(evidenceItem)}</li>
+                    ))}
+                  </ul>
+                )}
                 <ul className="analysisBulletList">
                   {Object.entries(item)
-                    .filter(([k, v]) => !["type", "interpretation", "levels"].includes(k))
+                    .filter(([k]) => !["correlation_id", "title", "type", "conclusion", "interpretation", "evidence", "levels"].includes(k))
                     .map(([k, v]) => (
-                      <li key={k}>{k.replace(/_/g, " ")}: {String(v)}</li>
+                      <li key={k}>{k.replace(/_/g, " ")}: {readableEvidence(v)}</li>
                     ))}
                 </ul>
                 <div className="analysisLevelLinks" style={{ marginTop: "12px" }}>

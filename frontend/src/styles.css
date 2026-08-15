@@ -1,6 +1,7 @@
 :root {
-  --font-ui: Inter, "Aptos", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: "Aptos Display", Inter, "Aptos", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-ui: "Montserrat", "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Montserrat", "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-technical: Inter, "Aptos", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-family: var(--font-ui);
   color: #191c1e;
   background: #f8fafc;
@@ -51,6 +52,12 @@ input, select, button, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.runIdText {
+  font-family: var(--font-technical) !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
 button,
 input,
 select {
@@ -80,8 +87,22 @@ button {
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
   padding: 3px 8px 28px
+}
+
+.brandLogo {
+  width: 148px;
+  height: 38px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.brandLogo img {
+  display: block;
+  width: 148px;
+  height: 35px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .brandIcon {
@@ -1133,6 +1154,17 @@ body {
     justify-content: center;
     padding-left: 0;
     padding-right: 0;
+  }
+
+  .brandLogo {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brandLogo img {
+    width: 148px;
+    height: 34px;
+    max-width: none;
   }
 
   .brand b,
@@ -3080,10 +3112,10 @@ body {
 
 .analysisValidationRow {
   display: grid;
-  grid-template-columns: 42px 1fr auto;
+  grid-template-columns: 42px minmax(120px, 180px) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid #eef0f3;
 }
 
@@ -3097,9 +3129,26 @@ body {
 }
 
 .analysisValidationRow strong {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
   color: #344054;
+}
+
+.analysisValidationSummary {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .analysisValidationRow {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+  }
+
+  .analysisValidationSummary {
+    grid-column: 2 / -1;
+  }
 }
 
 .analysisFindingList,
@@ -5209,4 +5258,1044 @@ textarea {
   width: min(100%, 1200px) !important;
   margin-left: auto !important;
   margin-right: auto !important;
+}
+
+/* Richer visual hierarchy for comparison scope; controls and behavior stay unchanged. */
+.scopeSourceSection {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #d6e0ed;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(23, 105, 238, .08), transparent 28%),
+    linear-gradient(180deg, #fbfdff 0%, #f4f7fb 100%);
+  box-shadow: 0 10px 30px rgba(24, 49, 82, .055);
+}
+
+.scopeSectionIntro {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 0 2px 2px;
+}
+
+.scopeIntroIcon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #c9d9f3;
+  border-radius: 10px;
+  color: #1769ee;
+  background: #edf4ff;
+}
+
+.scopeSectionIntro h2 {
+  margin: 2px 0 3px;
+  color: #102a4b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.scopeSectionIntro p {
+  margin: 0;
+  color: #647793;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.scopeFlowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid #d6e1ef;
+  border-radius: 999px;
+  color: #45617f;
+  background: rgba(255, 255, 255, .8);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.scopeDatasetCard {
+  position: relative;
+  overflow: hidden;
+  min-height: 176px !important;
+  border: 1px solid #d4deeb !important;
+  border-radius: 9px !important;
+  background: rgba(255, 255, 255, .94) !important;
+  box-shadow: 0 5px 16px rgba(33, 55, 86, .045) !important;
+}
+
+.scopeDatasetCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #1769ee, #35a5ef);
+}
+
+.scopeDatasetCard:nth-child(2)::before {
+  background: linear-gradient(90deg, #35a5ef, #1769ee);
+}
+
+.scopeDatasetCard .selectHint {
+  margin-top: 12px;
+  padding: 9px 10px;
+  border: 1px dashed #d7e1ee;
+  border-radius: 6px;
+  color: #73839a;
+  background: #f8fafc;
+}
+
+.scopeDatasetCard .selectedSource {
+  margin-top: 12px;
+  padding: 9px 10px;
+  border: 1px solid #dce7f5;
+  border-radius: 7px;
+  background: #f6f9fe;
+}
+
+.scopeLevelsPanel {
+  padding: 18px !important;
+  border: 1px solid #d6e0ed !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: 0 10px 30px rgba(24, 49, 82, .045) !important;
+}
+
+.scopeLevelsPanel > .panelHead {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e6ebf2;
+}
+
+.scopeLevelIntro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 2px 0 14px;
+}
+
+.scopeLevelIntro .helper {
+  margin: 0;
+}
+
+.scopeSelectionCount {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #4e6583;
+  background: #edf2f8;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.scopeLevelsPanel .level {
+  position: relative;
+  min-height: 104px;
+  align-items: flex-start;
+  border-radius: 9px;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+.scopeLevelsPanel .level:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(23, 54, 94, .075);
+}
+
+.scopeLevelsPanel .level.selected {
+  box-shadow: inset 0 0 0 1px rgba(23, 105, 238, .12), 0 7px 16px rgba(23, 105, 238, .07);
+}
+
+.scopeLevelsPanel .levelVisual {
+  width: 34px;
+  min-width: 34px;
+  height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 7px;
+  color: #3f6798;
+  background: #edf3fb;
+}
+
+.scopeLevelsPanel .selected .levelVisual {
+  color: #fff;
+  background: linear-gradient(145deg, #1769ee, #315fbd);
+}
+
+.scopeLevelsPanel .levelVisual .levelCode {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 7px;
+}
+
+.scopeLevelsPanel .level > div {
+  padding-top: 3px;
+}
+
+.scopeLevelsPanel .level b {
+  font-size: 11px;
+}
+
+.scopeLevelsPanel .level small {
+  max-width: 220px;
+  margin-top: 6px;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .scopeSourceSection,
+  .scopeLevelsPanel {
+    padding: 14px !important;
+    border-radius: 9px !important;
+  }
+
+  .scopeSectionIntro {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .scopeFlowLabel {
+    display: none;
+  }
+
+  .scopeDatasetCard {
+    min-height: auto !important;
+  }
+
+  .scopeLevelIntro {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .scopeLevelsPanel .level {
+    min-height: 88px;
+  }
+}
+
+@media (width < 0px) {
+/* ============================================================
+   LUMERA DARK WORKSPACE
+   Restrained product surfaces, quiet borders, color reserved for state.
+============================================================ */
+:root {
+  color-scheme: dark;
+  --background: #0f171d;
+  --nav: #182229;
+  --nav2: #222f38;
+  --text: #f2f5f7;
+  --muted: #9aabb7;
+  --line: #2c3942;
+  --panel: #151f26;
+  --surface: #1a252d;
+  --surface-raised: #1d2932;
+  --accent: #35a5ef;
+  --accent2: #178bdf;
+  --green: #43b581;
+  --red: #f06a73;
+  --amber: #e6a84a;
+}
+
+body,
+.main,
+.body {
+  background: var(--background);
+  color: var(--text);
+}
+
+.sidebar {
+  width: 188px;
+  padding: 16px 10px;
+  background: var(--nav);
+  border-right: 1px solid #2a363e;
+}
+
+.brand {
+  padding: 4px 7px 18px;
+}
+
+.workspace {
+  color: #83939f;
+  padding: 13px 8px 5px;
+}
+
+.nav {
+  min-height: 32px;
+  color: #c4cfd6;
+  border-radius: 5px;
+}
+
+.nav:hover {
+  color: #fff;
+  background: #202d35;
+}
+
+.nav.active {
+  color: #fff;
+  background: #293944;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.sidebarBottom {
+  border-color: #2b3942;
+  background: transparent;
+}
+
+.apiState b { color: #edf3f6; }
+.apiState span { color: #82949f; }
+.apiState i { box-shadow: 0 0 0 3px rgba(67, 181, 129, .14); }
+
+h1, h2, h3, h4, h5, h6,
+.pageTitle,
+.panelHead h3,
+.metric strong,
+.resultSummaryCard strong {
+  color: #f4f7f9;
+}
+
+.helper,
+.builderHeading p,
+.dashboardIntro p,
+.pageActions p,
+.reviewEmptyState,
+.analysisEmpty,
+.analysisValidationSummary {
+  color: var(--muted) !important;
+}
+
+.sectionEyebrow,
+.overline,
+.crumb,
+.workspace {
+  color: #7fa9c4;
+}
+
+.panel,
+.stat,
+.connectorCard,
+.metric,
+.resultSummaryCard,
+.resultLevel,
+.analysisReportSection,
+.analysisFindingCard,
+.analysisCorrelationCard,
+.reviewRunCard,
+.ruleSelectorBox,
+.ruleRepositorySection,
+.scopeDatasetCard,
+.scopeLevelsPanel,
+.selectedSource,
+.modal,
+.empty {
+  color: var(--text);
+  background: var(--panel) !important;
+  border-color: var(--line) !important;
+  box-shadow: none !important;
+}
+
+.panel:hover,
+.connectorCard:hover,
+.resultSummaryCard:hover {
+  border-color: #40515d !important;
+  box-shadow: none !important;
+}
+
+.panelHead,
+.modalHead,
+.modalFooter,
+.resultLevelHead,
+.ruleRepositorySection > .panelHead,
+.scopeDatasetCard > .panelHead,
+.scopeLevelsPanel > .panelHead {
+  border-color: var(--line) !important;
+}
+
+/* Remove decorative container-edge strips; hierarchy comes from spacing. */
+.scopeDatasetCard::before,
+.comparisonBuilder > .panel .panelHead::before,
+.comparisonBuilder > .ruleSelectorBox::before {
+  display: none !important;
+}
+
+.wizardFooter {
+  background: rgba(15, 23, 29, .92);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.comparisonBuilder .builderHeading .pageTitle,
+.dashboardIntro h1,
+.pageActions h2,
+.builderTop h2 {
+  color: #f4f7f9;
+}
+
+.comparisonProgress { color: #738691; }
+.comparisonProgress span.active,
+.comparisonProgress span.active b { color: #78c7f6; }
+.comparisonProgress i { background: #34434d; }
+
+input,
+select,
+textarea {
+  color: #edf3f6 !important;
+  background: #101920 !important;
+  border-color: #34434d !important;
+}
+
+input::placeholder,
+textarea::placeholder { color: #71838f; }
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #4ba9e4 !important;
+  outline: 2px solid rgba(53, 165, 239, .15);
+  outline-offset: 0;
+}
+
+select option {
+  color: #edf3f6;
+  background: #172129;
+}
+
+.field > span,
+.field > label,
+label {
+  color: #bdc9d0;
+}
+
+.primary {
+  color: #07131a;
+  background: #57b6ef;
+  border-color: #57b6ef;
+  box-shadow: none;
+}
+
+.primary:hover:not(:disabled) {
+  color: #061117;
+  background: #72c3f3;
+  border-color: #72c3f3;
+}
+
+.primary:disabled {
+  color: #788892;
+  background: #2a3740;
+  border-color: #34434c;
+}
+
+.secondary,
+.iconButton,
+.pageBtn,
+.textBtn {
+  color: #c8d5dc;
+  background: #1a252d;
+  border-color: #34434d;
+  box-shadow: none;
+}
+
+.secondary:hover,
+.iconButton:hover,
+.pageBtn:hover:not(:disabled) {
+  color: #fff;
+  background: #24323b;
+  border-color: #465965;
+}
+
+.scopeSourceSection {
+  border-color: var(--line);
+  background: #121c23;
+  box-shadow: none;
+}
+
+.scopeSectionIntro h2 { color: #f1f5f7; }
+.scopeSectionIntro p { color: #95a7b3; }
+
+.scopeIntroIcon {
+  color: #68bdf0;
+  background: #192a35;
+  border-color: #304754;
+}
+
+.scopeFlowLabel,
+.scopeSelectionCount {
+  color: #a9bac4;
+  background: #1b272f;
+  border-color: #34434d;
+}
+
+.scopeDatasetCard .selectHint {
+  color: #899ba6;
+  background: #111a20;
+  border-color: #34434d;
+}
+
+.scopeDatasetCard .selectedSource {
+  background: #18242c !important;
+  border-color: #30414b !important;
+}
+
+.sourceIcon {
+  color: #6dc2f3;
+  background: #20333e;
+}
+
+.scopeLevelsPanel .level {
+  color: var(--text);
+  background: #172129;
+  border-color: #2f3d46;
+}
+
+.scopeLevelsPanel .level:hover {
+  transform: translateY(-1px);
+  background: #1a2730;
+  border-color: #455965;
+  box-shadow: none;
+}
+
+.scopeLevelsPanel .level.selected {
+  background: #1a2a34;
+  border-color: #3e718e;
+  box-shadow: inset 0 0 0 1px rgba(53, 165, 239, .08);
+}
+
+.scopeLevelsPanel .levelVisual,
+.scopeLevelsPanel .selected .levelVisual {
+  color: #75c4f2;
+  background: #20313b;
+}
+
+.scopeLevelsPanel .level b { color: #edf3f6; }
+.scopeLevelsPanel .level small { color: #94a6b2; }
+.scopeLevelsPanel .checkCircle { border-color: #50616b; background: transparent; }
+.scopeLevelsPanel .selected .checkCircle { color: #08151c; background: #64bced; border-color: #64bced; }
+
+.tableWrapper,
+.dataTable,
+.rulesRepositorySections,
+.ruleRepositoryTable,
+.levelSummaryPanel,
+.resultLevelClean,
+.resultLevelHeader,
+.resultMetric,
+.evidenceTableWrap,
+.evidenceEmpty,
+.analysisReportModal,
+.analysisReportHeader,
+.analysisReportScroll,
+.wizard,
+.progressPill,
+.connectorPicker button,
+.rowButtons button,
+.dropdownSelect,
+.dropdownMenu,
+.multiSelectTrigger,
+.multiSelectMenu,
+.resultLevelContent {
+  color: var(--text);
+  background: var(--panel);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.resultLevelHeader:hover,
+.connectorPicker button:hover,
+.dropdownOption:hover,
+.multiSelectOption:hover {
+  color: #fff;
+  background: #1d2a32;
+}
+
+.resultMetric span,
+.resultSummaryCard span,
+.metric span,
+.evidenceEmpty,
+.levelSummaryFinding {
+  color: #91a3ae;
+}
+
+.resultMetric strong,
+.resultLevelHeader b,
+.levelSummaryPanel b {
+  color: #edf3f6;
+}
+
+.multiSelectOption,
+.dropdownOption {
+  color: #cbd7de;
+  background: transparent;
+}
+
+.multiSelectCheck {
+  color: #69bced;
+  border-color: #42545f;
+}
+
+.dataTable th,
+.ruleRepositoryTable .dataTable th,
+.thead {
+  color: #9eb0bb;
+  background: #1b262e;
+  border-color: var(--line);
+}
+
+.dataTable td,
+.ruleRepositoryTable .dataTable td,
+.trow > div,
+.trow > code {
+  color: #dce5ea;
+  background: transparent;
+  border-color: var(--line);
+}
+
+.dataTable tbody tr:hover,
+.trow:hover { background: #19242b; }
+
+.modalBackdrop { background: rgba(3, 8, 11, .74); }
+.modal { box-shadow: 0 24px 70px rgba(0, 0, 0, .42) !important; }
+
+.analysisReportStatus > div,
+.analysisValidation,
+.analysisValidationRow,
+.analysisEmpty {
+  color: var(--text);
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.analysisValidationRow strong,
+.analysisLead,
+.analysisReportSection p { color: #d7e1e6 !important; }
+.analysisLevelCode { color: #78bce5; }
+
+.status,
+.typeTag,
+.countPill {
+  border-color: #3a4953;
+}
+
+.status.pass,
+.status.connected,
+.status.completed {
+  color: #73d3a6;
+  background: rgba(67, 181, 129, .1);
+}
+
+.status.fail,
+.status.failed {
+  color: #ff939a;
+  background: rgba(240, 106, 115, .1);
+}
+
+.status.review,
+.status.warning {
+  color: #efbd69;
+  background: rgba(230, 168, 74, .1);
+}
+
+.metricIcon {
+  color: #73c3f1;
+  background: #20313b;
+}
+
+.step,
+.connLine,
+.reviewRow,
+.diffHead,
+.diffBlock pre {
+  border-color: var(--line);
+}
+
+.step span,
+.connLine span,
+.grow span { color: #8fa1ad; }
+.step svg { color: #657984; }
+
+.welcome,
+.resultBanner,
+.reviewHero {
+  color: #f3f7f9;
+  background: #17232b;
+  border: 1px solid #2c3a43;
+  box-shadow: none;
+}
+
+.rawEvidence,
+pre,
+code {
+  color: #c9d8e0;
+  background: #0d151a;
+  border-color: #29363e;
+}
+
+.toast {
+  color: #f2f6f8;
+  background: #24313a;
+  border: 1px solid #3a4b55;
+}
+
+@media (max-width: 760px) {
+  .sidebar { width: 62px; padding: 14px 8px; }
+}
+}
+
+/* Requested refinement: retain the prior light UI and current sidebar width. */
+.sidebar {
+  width: 188px;
+}
+
+.scopeSourceSection {
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.scopeDatasetCard::before {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    width: 58px;
+  }
+
+  .scopeSourceSection {
+    padding: 0 !important;
+  }
+}
+
+/* Final scope refinements. */
+.scopeSectionIntro {
+  display: block;
+  padding: 0 1px;
+}
+
+.scopeSectionIntro h2 {
+  margin: 0;
+  color: #102a4b;
+  font-size: 14px;
+}
+
+.scopeLevelsPanel .level.selected {
+  color: #fff;
+  background: var(--nav);
+  border-color: var(--nav);
+  box-shadow: 0 6px 14px rgba(28, 44, 66, .12);
+}
+
+.scopeLevelsPanel .level.selected b,
+.scopeLevelsPanel .level.selected small {
+  color: #fff;
+}
+
+.scopeLevelsPanel .level.selected small {
+  opacity: .72;
+}
+
+.scopeLevelsPanel .selected .levelVisual {
+  color: #fff;
+  background: rgba(255, 255, 255, .11);
+}
+
+.scopeLevelsPanel .selected .checkCircle {
+  color: var(--nav);
+  background: #fff;
+  border-color: #fff;
+}
+
+/* Review-and-run page: depth from neutral surfaces and structured headers. */
+.reviewRunStep {
+  gap: 22px;
+}
+
+.reviewRunStep > .filtersGrid {
+  gap: 18px;
+}
+
+.reviewRunStep .reviewRunCard {
+  overflow: hidden;
+  border-color: #d6e0eb !important;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 5px 16px rgba(31, 55, 86, .045);
+}
+
+.reviewRunStep .reviewRunCard > .panelHead {
+  margin: -18px -18px 16px;
+  padding: 13px 18px;
+  border-bottom: 1px solid #dce4ed;
+  background: #edf2f7;
+}
+
+.reviewRunStep .reviewRunCard > .panelHead h3 {
+  color: #1c2c42;
+  font-size: 11px;
+  letter-spacing: .01em;
+}
+
+.reviewRunStep .filterCard {
+  background: #fbfcfe;
+}
+
+.reviewRunStep .filterCard > .panelHead {
+  background: #eaf0f6;
+}
+
+.reviewRunStep .filterCard .secondary {
+  width: 100%;
+  justify-content: center;
+  border-style: dashed;
+  color: #38536f;
+  background: #f6f8fb;
+}
+
+.reviewRunStep .ignoredColumnsCard {
+  background: #f9fbfd;
+}
+
+.reviewRunStep .ignoredColumnsCard > .panelHead {
+  background: #e8eef5;
+}
+
+.reviewRunStep .recordMatchingCard > .panelHead {
+  background: #eef2f6;
+}
+
+.reviewRunStep .reconciliationCard {
+  background: #fbfcfd;
+}
+
+.reviewRunStep .reconciliationCard > .panelHead {
+  background: #e7edf4;
+}
+
+.reviewRunStep .reconciliationSection {
+  padding: 15px 16px;
+  border: 1px solid #dce4ed;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.reviewRunStep .reconciliationSection + .reconciliationSection {
+  margin-top: 12px;
+}
+
+.reviewRunStep .reconciliationSection h4 {
+  margin-top: 0;
+  color: #233c59;
+}
+
+.reviewRunStep .reviewRunSummaryGrid {
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid #d7e0ea;
+  border-radius: 9px;
+  background: #f1f4f8;
+}
+
+.reviewRunStep .reviewRunSummaryGrid .reviewRunCard {
+  background: #fff;
+}
+
+.reviewRunStep .reviewRunSummaryGrid .reviewRunCard > .panelHead {
+  background: #e9eef4;
+}
+
+.reviewRunStep .multiSelectTrigger,
+.reviewRunStep select,
+.reviewRunStep input {
+  background: #fff;
+}
+
+@media (max-width: 760px) {
+  .reviewRunStep,
+  .reviewRunStep > .filtersGrid {
+    gap: 14px;
+  }
+
+  .reviewRunStep .reviewRunSummaryGrid {
+    padding: 12px;
+  }
+}
+
+/* Selection, dropdown, stacking, and modal corrections. */
+.scopeDatasetCard {
+  min-height: 136px !important;
+}
+
+.scopeLevelsPanel .level.selected {
+  color: #1c2c42;
+  background: #e3eaf2;
+  border-color: #aebdcb;
+  box-shadow: 0 3px 9px rgba(28, 44, 66, .07);
+}
+
+.scopeLevelsPanel .level.selected b {
+  color: #1c2c42;
+}
+
+.scopeLevelsPanel .level.selected small {
+  color: #53687d;
+  opacity: 1;
+}
+
+.scopeLevelsPanel .selected .levelVisual {
+  color: #1c2c42;
+  background: #cfd9e4;
+}
+
+.scopeLevelsPanel .selected .checkCircle {
+  color: #fff;
+  background: #1c2c42;
+  border-color: #1c2c42;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px !important;
+  color: #263f5f !important;
+  background-color: #fff !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2339516d' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 11px center !important;
+  background-size: 12px !important;
+  border-color: #cbd7e4 !important;
+}
+
+select:hover {
+  border-color: #9dafc1 !important;
+}
+
+select:focus {
+  border-color: #526b86 !important;
+  outline: 2px solid rgba(28, 44, 66, .1);
+  box-shadow: none !important;
+}
+
+select option {
+  color: #263f5f;
+  background: #fff;
+}
+
+select option:checked {
+  color: #fff;
+  background: #38536f linear-gradient(0deg, #38536f 0%, #38536f 100%);
+}
+
+.multiSelectTrigger {
+  color: #263f5f;
+  background: #fff;
+  border-color: #cbd7e4;
+}
+
+.multiSelectTrigger:hover,
+.multiSelectTrigger[aria-expanded="true"] {
+  border-color: #9dafc1;
+  background: #fbfcfe;
+}
+
+.multiSelectMenu {
+  z-index: 120;
+  padding: 5px;
+  border-color: #bdcad8;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(28, 44, 66, .16);
+}
+
+.multiSelectOption {
+  color: #263f5f;
+  background: #fff;
+}
+
+.multiSelectOption:hover {
+  color: #1c2c42;
+  background: #edf2f7;
+}
+
+.multiSelectOption[aria-selected="true"] {
+  color: #fff;
+  background: #38536f;
+}
+
+.multiSelectOption[aria-selected="true"] .multiSelectCheck {
+  color: #fff;
+}
+
+.reviewRunStep .reviewRunCard,
+.reviewRunStep .reconciliationSection,
+.reviewRunStep .reviewRunSummaryGrid {
+  overflow: visible;
+}
+
+.reviewRunStep .reviewRunCard:has(.multiSelectMenu),
+.reviewRunStep .reconciliationSection:has(.multiSelectMenu) {
+  position: relative;
+  z-index: 40;
+}
+
+.multiSelectField:has(.multiSelectMenu) {
+  z-index: 80;
+}
+
+.modalBackdrop {
+  left: 188px;
+  background: rgba(28, 44, 66, .48);
+  -webkit-backdrop-filter: blur(1.5px);
+  backdrop-filter: blur(1.5px);
+}
+
+.modal {
+  color: #102442;
+  background: #fff;
+  border: 1px solid #d4dee9;
+  box-shadow: 0 24px 70px rgba(18, 36, 58, .22);
+}
+
+.modalHead,
+.modalFooter {
+  background: #f8fafc;
+  border-color: #dce4ed;
+}
+
+.modalBody {
+  background: #fff;
+}
+
+.modal .empty {
+  color: #5f7290;
+  background: #f8fafc;
+}
+
+@media (max-width: 760px) {
+  .modalBackdrop {
+    left: 0;
+  }
+}
+
+/* Optically center the Lumera artwork within the sidebar. */
+.sidebar .brand {
+  width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+  justify-content: center;
+}
+
+.sidebar .brandLogo {
+  margin-left: auto;
+  margin-right: auto;
 }

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="102 240 1450 340" role="img" aria-labelledby="title description">
+  <title id="title">Lumera Data Comparator</title>
+  <description id="description">Lumera data-node symbol and wordmark</description>
+
+  <g transform="translate(138 269)">
+    <path d="M130 10 A130 130 0 0 0 130 270" fill="none" stroke="#F8FAFC" stroke-width="27"/>
+    <path d="M168 10 A130 130 0 0 1 168 270" fill="none" stroke="#F8FAFC" stroke-width="27"/>
+    <circle cx="149" cy="54" r="10" fill="#F8FAFC"/>
+    <circle cx="149" cy="90" r="12" fill="#178BDF"/>
+    <circle cx="149" cy="138" r="18" fill="#35A5EF"/>
+    <circle cx="149" cy="186" r="12" fill="#178BDF"/>
+    <circle cx="149" cy="222" r="10" fill="#F8FAFC"/>
+  </g>
+
+  <text x="529" y="459" fill="#F8FAFC"
+        font-family="Montserrat, Avenir Next, Gotham, Arial, Helvetica, sans-serif"
+        font-weight="600" font-size="193" letter-spacing="31">LUMER</text>
+
+  <!-- The custom A is pulled closer to R for visually consistent spacing. -->
+  <g transform="translate(1390 319)">
+    <path d="M0 141 L70 0 L140 141 H111 L70 54 L29 141 Z" fill="#F8FAFC"/>
+    <circle cx="70" cy="112" r="12" fill="#35A5EF"/>
+  </g>
+
+  <text x="539" y="544" fill="#9FB0C8"
+        font-family="Montserrat, Avenir Next, Gotham, Arial, Helvetica, sans-serif"
+        font-weight="500" font-size="54" letter-spacing="28">DATA COMPARATOR</text>
+</svg>

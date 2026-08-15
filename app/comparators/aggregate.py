@@ -32,6 +32,11 @@ class AggregateComparator:
             "aggregate_rules",
             [],
         )
+        ignored_columns = set(configuration.get("ignored_columns", []))
+        aggregate_rules = [
+            rule for rule in aggregate_rules
+            if not self._uses_ignored_column(rule, ignored_columns)
+        ]
 
         if source_records is None:
             raise ValueError(
@@ -44,14 +49,36 @@ class AggregateComparator:
             )
 
         if not aggregate_rules:
-            raise ValueError(
-                "L5 requires aggregate_rules"
-            )
+            return {
+                "metrics": {
+                    "status": "NOT_APPLICABLE",
+                    "rules_total": 0,
+                    "checks_total": 0,
+                    "checks_passed": 0,
+                    "checks_failed": 0,
+                },
+                "evidence": {"aggregate_results": []},
+            }
 
         return self.compare(
             source_records=source_records,
             target_records=target_records,
             aggregate_rules=aggregate_rules,
+        )
+
+    @staticmethod
+    def _uses_ignored_column(rule: dict[str, Any], ignored: set[str]) -> bool:
+        if not ignored:
+            return False
+        scalar_fields = ("source_column", "target_column", "column")
+        collection_fields = (
+            "group_by", "group_by_columns", "source_group_by", "target_group_by"
+        )
+        if any(rule.get(field) in ignored for field in scalar_fields):
+            return True
+        return any(
+            any(column in ignored for column in (rule.get(field) or []))
+            for field in collection_fields
         )
 
     # ============================================================

@@ -243,10 +243,14 @@ class SchemaComparator:
         mappings = mappings or {}
         ignored_columns = ignored_columns or set()
 
-        source_columns = self._filter_columns(
-            source_schema.columns,
-            ignored_columns,
-        )
+        # Ignoring either side of a mapped pair ignores the logical column
+        # completely.  This is important when source and target names differ.
+        source_columns = [
+            column
+            for column in source_schema.columns
+            if column.name not in ignored_columns
+            and mappings.get(column.name, column.name) not in ignored_columns
+        ]
 
         target_columns = self._filter_columns(
             target_schema.columns,

@@ -31,7 +31,6 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
-    PageBreak,
 )
 
 from app.domain.context import RuntimeConfiguration
@@ -1840,6 +1839,14 @@ def download_analysis_pdf(run_id: str):
         leading=11,
     )
 
+    label_style = ParagraphStyle(
+        "ReportLabel",
+        parent=small_style,
+        textColor=colors.HexColor("#667085"),
+        fontSize=7,
+        leading=9,
+    )
+
     story = []
 
     # --------------------------------------------------
@@ -1848,33 +1855,26 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            "COMPARISON ANALYSIS REPORT",
+            "Data Comparison Analysis",
             title_style,
         )
     )
 
-    story.append(
-        Paragraph(
-            f"<b>Run ID:</b> {run_id}",
-            body_style,
-        )
+    header_table = Table(
+        [
+            [Paragraph("RUN ID", label_style), Paragraph("OVERALL STATUS", label_style), Paragraph("SEVERITY", label_style), Paragraph("GENERATED", label_style)],
+            [Paragraph(str(run_id), small_style), Paragraph(str(report.get("overall_status", "UNKNOWN")), body_style), Paragraph(str(report.get("severity", "UNKNOWN")), body_style), Paragraph(str(report.get("generated_at", "Not available")), small_style)],
+        ],
+        colWidths=[75 * mm, 30 * mm, 25 * mm, 44 * mm],
     )
-
-    story.append(
-        Paragraph(
-            f"<b>Overall Status:</b> "
-            f"{report.get('overall_status', 'UNKNOWN')}",
-            body_style,
-        )
-    )
-
-    story.append(
-        Paragraph(
-            f"<b>Severity:</b> "
-            f"{report.get('severity', 'UNKNOWN')}",
-            body_style,
-        )
-    )
+    header_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D0D5DD")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#EAECF0")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(header_table)
 
     story.append(Spacer(1, 6))
 
@@ -1884,7 +1884,7 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            "EXECUTIVE SUMMARY",
+            "Executive Summary",
             heading_style,
         )
     )
@@ -1907,7 +1907,7 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            "OVERALL ASSESSMENT",
+            "Overall Assessment",
             heading_style,
         )
     )
@@ -1926,7 +1926,12 @@ def download_analysis_pdf(run_id: str):
 
     sanitized = report.get("technical_evidence", {}).get("sanitized_evidence", {})
     levels = sanitized.get("levels", {})
-    correlations = sanitized.get("cross_level_correlations", [])
+    correlations = report.get("cross_level_analysis") or sanitized.get("cross_level_correlations", [])
+    validation_summary = {
+        str(item.get("level")): item
+        for item in report.get("validation_summary", [])
+        if isinstance(item, dict) and item.get("level")
+    }
 
     # --------------------------------------------------
     # VALIDATION SUMMARY
@@ -1934,13 +1939,13 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            "VALIDATION SUMMARY",
+            "Validation Summary",
             heading_style,
         )
     )
 
     summary_rows = [
-        ["Level", "Validation", "Status"]
+        ["Level", "Validation", "Summary", "Status"]
     ]
 
     level_names = {
@@ -1955,18 +1960,20 @@ def download_analysis_pdf(run_id: str):
     for level_key in ["L1", "L2", "L3", "L4", "L5", "L6"]:
         level_data = levels.get(level_key, {})
         if level_data:
+            summary = validation_summary.get(level_key, {})
             summary_rows.append(
                 [
-                    level_key,
-                    level_names.get(level_key, level_key),
-                    str(level_data.get("status", "UNKNOWN")),
+                    Paragraph(level_key, small_style),
+                    Paragraph(level_names.get(level_key, level_key), small_style),
+                    Paragraph(str(summary.get("summary") or "No summary was recorded."), small_style),
+                    Paragraph(str(summary.get("status") or level_data.get("status", "UNKNOWN")), small_style),
                 ]
             )
 
     if len(summary_rows) > 1:
         table = Table(
             summary_rows,
-            colWidths=[20 * mm, 60 * mm, 30 * mm],
+            colWidths=[15 * mm, 38 * mm, 92 * mm, 25 * mm],
             repeatRows=1,
         )
 
@@ -1992,7 +1999,7 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            "KEY EVIDENCE",
+            "Key Findings",
             heading_style,
         )
     )
@@ -2024,35 +2031,15 @@ def download_analysis_pdf(run_id: str):
             
             interpretation = f_dict.get("likely_explanation")
             if interpretation:
-                story.append(Paragraph("<b>Engineering Interpretation:</b>", body_style))
+                story.append(Paragraph("<b>What this means:</b>", body_style))
                 story.append(Paragraph(f"• {interpretation}", small_style))
             
+            impact = f_dict.get("impact")
+            if impact:
+                story.append(Paragraph("<b>Why this matters:</b>", body_style))
+                story.append(Paragraph(f"- {impact}", small_style))
+
             story.append(Spacer(1, 8))
-
-    # --------------------------------------------------
-    # ROOT-CAUSE HYPOTHESES AND RECOMMENDED ACTIONS
-    # --------------------------------------------------
-
-    root_causes = report.get("root_cause_analysis", [])
-    story.append(Paragraph("ROOT-CAUSE HYPOTHESES", heading_style))
-    if root_causes:
-        for item in root_causes:
-            item_dict = item if isinstance(item, dict) else {}
-            story.append(Paragraph(str(item_dict.get("statement", "")), body_style))
-            levels = item_dict.get("levels", [])
-            if levels:
-                story.append(Paragraph(f"<b>Levels:</b> {', '.join(levels)}", small_style))
-            story.append(Spacer(1, 4))
-    else:
-        story.append(Paragraph("No evidence-supported root-cause hypothesis was reported.", body_style))
-
-    recommendations = report.get("recommendations", [])
-    story.append(Paragraph("RECOMMENDED ACTIONS", heading_style))
-    if recommendations:
-        for index, recommendation in enumerate(recommendations, start=1):
-            story.append(Paragraph(f"{index}. {recommendation}", body_style))
-    else:
-        story.append(Paragraph("No recommended actions were reported.", body_style))
 
     # --------------------------------------------------
     # CROSS LEVEL ANALYSIS
@@ -2060,17 +2047,21 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            "CROSS-LEVEL EVIDENCE",
+            "How the Validation Levels Relate",
             heading_style,
         )
     )
 
     if correlations:
         for corr in correlations:
-            story.append(Paragraph(f"<b>{corr.get('type', 'Correlation')}</b>", body_style))
-            story.append(Paragraph(str(corr.get("interpretation", "")), body_style))
+            story.append(Paragraph(f"<b>{corr.get('title') or corr.get('type', 'Cross-level comparison')}</b>", body_style))
+            story.append(Paragraph(str(corr.get("conclusion") or corr.get("interpretation", "")), body_style))
+            for evidence_item in corr.get("evidence", []):
+                if isinstance(evidence_item, dict):
+                    evidence_item = evidence_item.get("statement") or json.dumps(evidence_item, default=str)
+                story.append(Paragraph(f"- {evidence_item}", small_style))
             for k, v in corr.items():
-                if k not in ("type", "interpretation", "levels"):
+                if k not in ("correlation_id", "title", "type", "conclusion", "interpretation", "evidence", "levels"):
                     story.append(Paragraph(f"• {str(k).replace('_', ' ').capitalize()}: {str(v)}", small_style))
             story.append(Paragraph(f"<b>Levels:</b> {', '.join(corr.get('levels', []))}", body_style))
             story.append(Spacer(1, 6))
@@ -2084,7 +2075,7 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            "PRIVACY",
+            "Privacy",
             heading_style,
         )
     )
@@ -2093,34 +2084,6 @@ def download_analysis_pdf(run_id: str):
         Paragraph(
             "Privacy-safe analysis: raw client records, matched pairs, record keys and raw field values were not provided to the LLM. "
             "Analysis uses only derived structural and statistical evidence.",
-            body_style,
-        )
-    )
-
-    # --------------------------------------------------
-    # TECHNICAL EVIDENCE
-    # --------------------------------------------------
-
-    story.append(
-        PageBreak()
-    )
-
-    story.append(
-        Paragraph(
-            "TECHNICAL EVIDENCE (COLLAPSED JSON)",
-            heading_style,
-        )
-    )
-
-    technical = report.get(
-        "technical_evidence",
-        {},
-    )
-
-    story.append(
-        Paragraph(
-            "<i>To view raw JSON technical evidence, please see the web report. "
-            "The JSON payload is not rendered in this PDF for readability.</i>",
             body_style,
         )
     )

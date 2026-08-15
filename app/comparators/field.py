@@ -874,6 +874,9 @@ class FieldComparator:
                 source_column,
             )
 
+            if target_column in ignored_columns:
+                continue
+
             if target_column not in target_record:
                 continue
 

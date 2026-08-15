@@ -89,6 +89,7 @@ class VolumeComparator:
         null_counts = self._compare_null_counts(
             source.get("null_counts", {}),
             target.get("null_counts", {}),
+            configuration,
         )
 
         checks = {
@@ -284,16 +285,28 @@ class VolumeComparator:
     def _compare_null_counts(
         source: dict[str, Any],
         target: dict[str, Any],
+        configuration: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-
-        columns = (
-            set(source.keys())
-            | set(target.keys())
-        )
+        configuration = configuration or {}
+        ignored = set(configuration.get("ignored_columns", []))
+        mappings = {
+            item.get("source_column"): item.get("target_column")
+            for item in configuration.get("column_mappings", [])
+            if isinstance(item, dict)
+            and item.get("source_column")
+            and item.get("target_column")
+        }
 
         results: dict[str, Any] = {}
 
-        for column in sorted(columns):
+        for column in sorted(source):
+            target_column = mappings.get(column, column)
+            if column in ignored or target_column in ignored:
+                continue
+            # L1 owns missing/unexpected columns. L2 only compares null
+            # statistics for logical columns present on both sides.
+            if target_column not in target:
+                continue
 
             source_value = source.get(
                 column,
@@ -301,7 +314,7 @@ class VolumeComparator:
             )
 
             target_value = target.get(
-                column,
+                target_column,
                 0,
             )
 
@@ -311,6 +324,8 @@ class VolumeComparator:
 
             results[column] = {
                 "matched": difference == 0,
+                "source_column": column,
+                "target_column": target_column,
                 "source": source_value,
                 "target": target_value,
                 "difference": difference,

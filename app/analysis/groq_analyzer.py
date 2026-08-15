@@ -186,22 +186,10 @@ class GroqL7Analyzer:
             )
         )
 
-        normalized[
-            "root_cause_analysis"
-        ] = self._normalize_evidence_list(
-            raw.get(
-                "root_cause_analysis"
-            ),
-            kind="LIKELY_EXPLANATION",
-        )
-
-        normalized[
-            "recommendations"
-        ] = self._normalize_recommendations(
-            raw.get(
-                "recommendations"
-            )
-        )
+        # These speculative sections are intentionally excluded from the
+        # enterprise report. Keep empty compatibility fields for older clients.
+        normalized["root_cause_analysis"] = []
+        normalized["recommendations"] = []
 
         normalized[
             "technical_evidence"
@@ -314,8 +302,6 @@ class GroqL7Analyzer:
             explanations = extract_strings(finding.get("likely_explanation", finding.get("likely_explanations")))
             likely_explanation = explanations[0] if explanations else None
 
-            recommendations = extract_strings(finding.get("recommendations", finding.get("recommended_actions")))
-
             result.append(
                 {
                     "finding_id": finding.get("finding_id", f"F-{index:03d}"),
@@ -326,7 +312,7 @@ class GroqL7Analyzer:
                     "derived_statistics": derived,
                     "likely_explanation": likely_explanation,
                     "impact": self._string_value(finding.get("impact"), "Potential comparison impact requires investigation."),
-                    "recommended_actions": recommendations,
+                    "recommended_actions": [],
                     "related_levels": self._normalize_levels(finding.get("related_levels"))
                 }
             )
@@ -378,12 +364,7 @@ class GroqL7Analyzer:
                             "levels"
                         )
                     ),
-                    "evidence": self._normalize_evidence_list(
-                        item.get(
-                            "evidence"
-                        ),
-                        kind="CORRELATION",
-                    ),
+                    "evidence": self._correlation_evidence(item.get("evidence")),
                     "conclusion": self._string_value(
                         item.get(
                             "conclusion"
@@ -394,6 +375,24 @@ class GroqL7Analyzer:
             )
 
         return result
+
+    @staticmethod
+    def _correlation_evidence(value: Any) -> list[str]:
+        if isinstance(value, str):
+            return [value] if value.strip() else []
+        if isinstance(value, list):
+            statements = []
+            for item in value:
+                if isinstance(item, str) and item.strip():
+                    statements.append(item)
+                elif isinstance(item, dict):
+                    statement = item.get("statement") or item.get("evidence")
+                    if statement:
+                        statements.append(str(statement))
+            return statements
+        if isinstance(value, dict):
+            return [f"{key}: {item}" for key, item in value.items()]
+        return []
 
     # ==========================================================
     # EVIDENCE
@@ -725,9 +724,9 @@ class GroqL7Analyzer:
         }
         if not failed:
             return "INFO"
-        if failed & {"L1", "L2", "L3"}:
+        if failed & {"L2", "L3"}:
             return "CRITICAL"
-        if failed & {"L4", "L5"}:
+        if failed & {"L1", "L4", "L5"}:
             return "HIGH"
         return "MEDIUM"
 

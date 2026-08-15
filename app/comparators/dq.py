@@ -26,6 +26,11 @@ class DQComparator:
             configuration.get("target"),
         )
         rules = configuration.get("dq_rules", [])
+        ignored_columns = set(configuration.get("ignored_columns", []))
+        rules = [
+            rule for rule in rules
+            if not self._uses_ignored_column(rule, ignored_columns)
+        ]
 
 
         if not isinstance(rules, list):
@@ -86,6 +91,21 @@ class DQComparator:
             },
         }
         return output
+
+    @staticmethod
+    def _uses_ignored_column(rule: dict[str, Any], ignored: set[str]) -> bool:
+        if not ignored:
+            return False
+        scalar_fields = (
+            "column", "source_column", "target_column", "reference_column"
+        )
+        collection_fields = ("columns", "source_columns", "target_columns")
+        if any(rule.get(field) in ignored for field in scalar_fields):
+            return True
+        return any(
+            any(column in ignored for column in (rule.get(field) or []))
+            for field in collection_fields
+        )
 
     # ============================================================
     # DATA ACCESS

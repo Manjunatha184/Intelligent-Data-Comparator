@@ -293,6 +293,7 @@ class LocalExecutor(ExecutionExecutor):
         ] = self._build_statistics(
             source_records,
             comparison_keys,
+            "source_column",
         )
 
         configuration[
@@ -300,6 +301,7 @@ class LocalExecutor(ExecutionExecutor):
         ] = self._build_statistics(
             target_records,
             comparison_keys,
+            "target_column",
         )
 
         # ====================================================
@@ -1816,6 +1818,7 @@ class LocalExecutor(ExecutionExecutor):
     def _build_statistics(
         records: list[dict[str, Any]],
         comparison_keys: list[dict[str, str]],
+        key_side: str = "source_column",
     ) -> dict[str, Any]:
 
         total_rows = len(records)
@@ -1832,7 +1835,7 @@ class LocalExecutor(ExecutionExecutor):
 
                 key = tuple(
                     record.get(
-                        column["source_column"]
+                        column[key_side]
                     )
                     for column in comparison_keys
                 )

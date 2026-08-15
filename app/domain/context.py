@@ -290,6 +290,44 @@ class RuntimeConfiguration(BaseModel):
     aggregation_columns: list[dict[str, str]] = Field(default_factory=list)
 
     @model_validator(mode="after")
+    def expand_ignored_mapped_columns(self):
+        """Treat either side of a mapping as one logical ignored column."""
+        ignored = set(self.ignored_columns)
+        changed = True
+        while changed:
+            changed = False
+            for mapping in self.column_mappings:
+                source_column = mapping.source_column
+                target_column = mapping.target_column
+                if source_column in ignored or target_column in ignored:
+                    before = len(ignored)
+                    ignored.update((source_column, target_column))
+                    changed = changed or len(ignored) != before
+        self.ignored_columns = sorted(ignored)
+
+        for key in self.comparison_keys:
+            if key.source_column in ignored or key.target_column in ignored:
+                raise ValueError(
+                    "Comparison keys cannot be ignored columns"
+                )
+
+        for pair in self.grouping_attributes:
+            if pair.source_column in ignored or pair.target_column in ignored:
+                raise ValueError(
+                    "Grouping fields cannot be ignored columns"
+                )
+
+        for pair in self.aggregation_columns:
+            if (
+                pair.get("source_column") in ignored
+                or pair.get("target_column") in ignored
+            ):
+                raise ValueError(
+                    "Aggregation fields cannot be ignored columns"
+                )
+        return self
+
+    @model_validator(mode="after")
     def validate_group_reconciliation(self):
         if self.matching_mode != "GROUP_RECONCILIATION":
             return self

@@ -5,27 +5,27 @@ SANITIZED EVIDENCE
 
 Return this exact JSON shape:
 {
-  "executive_summary": "2-4 sentences with the overall result, the most material observed variances, and the operational implication.",
-  "overall_assessment": "2-4 sentences covering data integrity, affected validation levels, and any limitation on conclusions.",
+  "executive_summary": "2-4 plain-language sentences stating what passed, what failed, and the most important quantified difference.",
+  "overall_assessment": "2-4 plain-language sentences explaining what the results mean, the scale of impact shown by the evidence, and any limitation on conclusions.",
   "validation_summary": [
     {
       "level": "L1",
       "name": "Schema",
       "status": "PASS|FAIL|WARNING|UNKNOWN",
-      "summary": "One evidence-grounded sentence."
+      "summary": "One clear sentence explaining the result and its main metric."
     }
   ],
   "key_findings": [
     {
       "finding_id": "F-001",
-      "title": "Short audit-ready title",
+      "title": "Short, clear title",
       "category": "SCHEMA|VOLUME|RECORD_POPULATION|FIELD_CONFORMITY|AGGREGATE|DATA_QUALITY",
       "severity": "INFO|LOW|MEDIUM|HIGH|CRITICAL",
-      "observed_evidence": ["Only direct facts from the supplied evidence."],
-      "derived_statistics": ["Only arithmetic reproducible from supplied numeric evidence."],
-      "likely_explanation": "Qualified hypothesis, or null when evidence is insufficient.",
-      "impact": "Specific operational or analytical risk stated without unsupported claims.",
-      "recommended_actions": ["Prioritized, concrete action."],
+      "observed_evidence": ["Direct fact written in plain language with exact supplied numbers."],
+      "derived_statistics": ["Simple calculation reproducible from supplied numeric evidence."],
+      "likely_explanation": "Plain-language explanation of what the finding means; do not speculate about its cause.",
+      "impact": "Evidence-supported significance of the finding, without invented business impact.",
+      "recommended_actions": [],
       "related_levels": ["L1"]
     }
   ],
@@ -34,23 +34,17 @@ Return this exact JSON shape:
       "correlation_id": "C-001",
       "title": "Short correlation title",
       "levels": ["L2", "L3"],
-      "evidence": ["Evidence-grounded relationship."],
-      "conclusion": "State whether evidence reconciles, partially reconciles, or does not establish causality."
+      "evidence": ["Plain-language statement containing the exact metrics being compared."],
+      "conclusion": "Clearly state whether the numbers fully reconcile, partly reconcile, do not reconcile, or provide insufficient evidence."
     }
-  ],
-  "root_cause_analysis": [
-    {
-      "kind": "LIKELY_EXPLANATION",
-      "statement": "Qualified explanation tied to supplied evidence.",
-      "levels": ["L1"],
-      "data": {}
-    }
-  ],
-  "recommendations": ["Ordered action statement"]
+  ]
 }
 
 Requirements:
 - Include only findings supported by supplied evidence. Use an empty list when no finding is supported.
-- Separate observed facts from hypotheses. Do not claim a root cause is confirmed unless the evidence explicitly proves it.
+- Separate observed facts, calculated statistics, and interpretation. Do not claim or imply a root cause.
 - Reference validation levels and exact supplied metrics where useful.
+- Prefer common wording: say "rows" instead of "record population", "different values" instead of "field conformity issue", and "column structure" instead of "schema contract" where possible.
+- Never use vague phrases such as "data quality problems", "pipeline changes", "potential risks", or "requires investigation" without an exact supporting metric and explanation.
+- Do not return root-cause hypotheses or recommendations.
 - Do not mention or request raw records, keys, source values, target values, or client data.

@@ -9,6 +9,8 @@ from time import perf_counter
 from typing import Any
 
 from app.execution.models import ComparisonLevel, ExecutionTask
+from app.comparators.aggregate import AggregateComparator
+from app.comparators.dq import DQComparator
 from app.metrics import safe_percent_change, safe_rate_pct
 
 
@@ -441,7 +443,7 @@ class SparkExecutor:
 
     def _l1(self, s, t, cfg):
         maps, ignored = self._maps(cfg), set(cfg.get("ignored_columns", []))
-        sf = {f.name: f.dataType.simpleString() for f in s.schema.fields if f.name not in ignored}
+        sf = {f.name: f.dataType.simpleString() for f in s.schema.fields if f.name not in ignored and maps.get(f.name, f.name) not in ignored}
         tf = {f.name: f.dataType.simpleString() for f in t.schema.fields if f.name not in ignored}
         source_nullable = {f.name: f.nullable for f in s.schema.fields if f.name not in ignored}
         target_nullable = {f.name: f.nullable for f in t.schema.fields if f.name not in ignored}
@@ -827,6 +829,8 @@ class SparkExecutor:
                 continue
             mapping = explicit_mappings.get(source_column, {})
             target_column = mapping.get("target_column", source_column)
+            if target_column in ignored:
+                continue
             if target_column not in target_set:
                 continue
             resolved.append((source_column, target_column, mapping))
@@ -1002,7 +1006,10 @@ class SparkExecutor:
         from pyspark.sql import functions as F
 
         rules = []
+        ignored = set(cfg.get("ignored_columns", []))
         for r in cfg.get("aggregate_rules",[]):
+            if AggregateComparator._uses_ignored_column(r, ignored):
+                continue
             op=str(r.get("function",r.get("operation",""))).upper(); sc=r.get("source_column"); tc=r.get("target_column") or sc
             if op not in {"SUM","AVG","MIN","MAX","COUNT"}: continue
             sg=r.get("source_group_by") or r.get("group_by_columns") or []; tg=r.get("target_group_by") or r.get("group_by_columns") or []
@@ -1223,7 +1230,10 @@ class SparkExecutor:
         from pyspark.sql import functions as F
         out=[]
         rules_by_side={"SOURCE":[],"TARGET":[]}
+        ignored = set(cfg.get("ignored_columns", []))
         for r in cfg.get("dq_rules",[]):
+            if DQComparator._uses_ignored_column(r, ignored):
+                continue
             if not r.get("enabled",True): continue
             typ=str(r.get("rule_type","")).upper(); apply=str(r.get("apply_to","BOTH")).upper()
             for side,df in (("SOURCE",s),("TARGET",t)):

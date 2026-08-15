@@ -155,19 +155,29 @@ class RecordComparator:
     def _compare_pairs(self, pairs: list[dict[str, Any]], configuration: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         mappings = {item["source_column"]: item["target_column"] for item in configuration.get("column_mappings", []) if isinstance(item, dict) and item.get("source_column") and item.get("target_column")}
         ignored = set(configuration.get("ignored_columns", []))
+        ignored_source = ignored | {
+            source_column
+            for source_column, target_column in mappings.items()
+            if target_column in ignored
+        }
+        ignored_target = ignored | {
+            target_column
+            for source_column, target_column in mappings.items()
+            if source_column in ignored
+        }
         execution_mode = str(configuration.get("execution_mode", "HASH")).upper()
         hash_mismatches: list[dict[str, Any]] = []
         exact_mismatches: list[dict[str, Any]] = []
         for pair in pairs:
             source, target = pair["source_record"], pair["target_record"]
             if execution_mode == "EXACT":
-                source_value = self._canonical_record(source, ignored, mappings)
-                target_value = self._canonical_record(target, ignored, {})
+                source_value = self._canonical_record(source, ignored_source, mappings)
+                target_value = self._canonical_record(target, ignored_target, {})
                 if source_value != target_value:
                     exact_mismatches.append({"key": pair["signature"], "source_record": source_value, "target_record": target_value})
             elif configuration.get("full_row_hash", True):
-                source_value = self._hash_record(source, ignored, mappings)
-                target_value = self._hash_record(target, ignored, {})
+                source_value = self._hash_record(source, ignored_source, mappings)
+                target_value = self._hash_record(target, ignored_target, {})
                 if source_value != target_value:
                     hash_mismatches.append({"key": pair["signature"], "source_hash": source_value, "target_hash": target_value})
             else:
