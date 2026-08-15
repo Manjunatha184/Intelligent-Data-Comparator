@@ -395,4 +395,6 @@ For an integration smoke test, start Docker Compose, confirm `/health` returns a
 
 ## License
 
-No license file is currently included. Unless the project owner adds one, no rights should be assumed beyond the permissions explicitly granted by the owner.
+[![License](https://shields.io)](LICENSE)
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
