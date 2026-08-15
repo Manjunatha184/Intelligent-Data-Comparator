@@ -56,7 +56,6 @@ flowchart LR
     UI[React web application] -->|/api/v1| API[FastAPI service]
     API --> PLAN[Strategy planner]
     PLAN --> EXEC[Execution engine]
-    EXEC --> LOCAL[Local and chunked execution]
     EXEC --> SPARK[Apache Spark cluster]
     LOCAL --> COMP[L1-L6 comparators]
     SPARK --> COMP
