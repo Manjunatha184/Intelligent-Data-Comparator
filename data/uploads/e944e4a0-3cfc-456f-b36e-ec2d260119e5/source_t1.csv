@@ -1,0 +1,11 @@
+ID,Name,Sales,Quantity,Email,Status,Region
+K001,Alpha,100,10,alpha@test.com,ACTIVE,North
+K002,Beta,200,20,beta@test.com,ACTIVE,North
+K003,Gamma,300,30,gamma@test.com,INACTIVE,South
+K004,Delta,400,40,delta@test.com,ACTIVE,South
+K005,Echo,500,50,echo@test.com,ACTIVE,East
+D100,DuplicateA,600,60,dupa1@test.com,ACTIVE,East
+D100,DuplicateA,700,70,dupa2@test.com,ACTIVE,East
+,DuplicateB,800,80,dupb@test.com,ACTIVE,West
+,NoKeyCustomer,900,90,,ACTIVE,West
+K008,MissingTarget,1000,100,missing@test.com,INACTIVE,North

@@ -1,0 +1,56 @@
+Generate the L7 enterprise comparison report for run {{RUN_ID}}.
+
+SANITIZED EVIDENCE
+{{SANITIZED_EVIDENCE_JSON}}
+
+Return this exact JSON shape:
+{
+  "executive_summary": "2-4 sentences with the overall result, the most material observed variances, and the operational implication.",
+  "overall_assessment": "2-4 sentences covering data integrity, affected validation levels, and any limitation on conclusions.",
+  "validation_summary": [
+    {
+      "level": "L1",
+      "name": "Schema",
+      "status": "PASS|FAIL|WARNING|UNKNOWN",
+      "summary": "One evidence-grounded sentence."
+    }
+  ],
+  "key_findings": [
+    {
+      "finding_id": "F-001",
+      "title": "Short audit-ready title",
+      "category": "SCHEMA|VOLUME|RECORD_POPULATION|FIELD_CONFORMITY|AGGREGATE|DATA_QUALITY",
+      "severity": "INFO|LOW|MEDIUM|HIGH|CRITICAL",
+      "observed_evidence": ["Only direct facts from the supplied evidence."],
+      "derived_statistics": ["Only arithmetic reproducible from supplied numeric evidence."],
+      "likely_explanation": "Qualified hypothesis, or null when evidence is insufficient.",
+      "impact": "Specific operational or analytical risk stated without unsupported claims.",
+      "recommended_actions": ["Prioritized, concrete action."],
+      "related_levels": ["L1"]
+    }
+  ],
+  "cross_level_analysis": [
+    {
+      "correlation_id": "C-001",
+      "title": "Short correlation title",
+      "levels": ["L2", "L3"],
+      "evidence": ["Evidence-grounded relationship."],
+      "conclusion": "State whether evidence reconciles, partially reconciles, or does not establish causality."
+    }
+  ],
+  "root_cause_analysis": [
+    {
+      "kind": "LIKELY_EXPLANATION",
+      "statement": "Qualified explanation tied to supplied evidence.",
+      "levels": ["L1"],
+      "data": {}
+    }
+  ],
+  "recommendations": ["Ordered action statement"]
+}
+
+Requirements:
+- Include only findings supported by supplied evidence. Use an empty list when no finding is supported.
+- Separate observed facts from hypotheses. Do not claim a root cause is confirmed unless the evidence explicitly proves it.
+- Reference validation levels and exact supplied metrics where useful.
+- Do not mention or request raw records, keys, source values, target values, or client data.

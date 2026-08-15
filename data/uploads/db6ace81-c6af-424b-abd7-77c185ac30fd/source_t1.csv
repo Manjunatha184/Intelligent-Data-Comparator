@@ -1,0 +1,15 @@
+ID,Name,Sales,Quantity,Email,Status,Region
+A001,Product A,100,10,a@test.com,ACTIVE,North
+A002,Product A,200,20,a@test.com,ACTIVE,North
+,Product B,500,50,b@test.com,ACTIVE,South
+,Product C,600,60,c@test.com,INACTIVE,East
+,Product D Source,700,70,d.source@test.com,ACTIVE,West
+,Product E,800,80,e@test.com,ACTIVE,North
+,Product F,900,90,,ACTIVE,South
+G001,Product G,1000,100,g@test.com,ACTIVE,East
+I001,Product I,100,10,i@test.com,ACTIVE,Central
+I002,Product I,300,30,i@test.com,ACTIVE,Central
+J_SRC,Product J,400,40,j@test.com,ACTIVE,North
+J_SRC2,Product J,600,60,j@test.com,ACTIVE,North
+K001,Product K,1000,100,k@test.com,ACTIVE,West
+K002,Product K,1200,120,k@test.com,ACTIVE,West

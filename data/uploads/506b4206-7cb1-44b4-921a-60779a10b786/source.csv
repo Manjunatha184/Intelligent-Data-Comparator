@@ -1,0 +1,9 @@
+ID,Name,Sales,Quantity,Email,Status,Region
+P001,Product A,100,10,a@test.com,ACTIVE,North
+P002,Product B,200,20,b@test.com,ACTIVE,South
+P003,Product C,300,30,c@test.com,INACTIVE,East
+P004,Product D,400,40,d@test.com,ACTIVE,West
+P005,Product E,500,50,e@test.com,ACTIVE,North
+P006,Product F,600,60,f@test.com,ACTIVE,South
+P007,Product G,700,70,g@test.com,INACTIVE,East
+P008,Product H,800,80,h@test.com,ACTIVE,West
