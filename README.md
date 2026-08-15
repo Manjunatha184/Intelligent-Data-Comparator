@@ -31,7 +31,7 @@ The platform is designed for reconciliation workflows such as migration validati
 - Ignore intentional source-only or target-only columns throughout applicable comparison levels.
 - Reconcile grouped datasets and compare configured aggregations.
 - Define reusable aggregate and data-quality rules in the rule repository.
-- Choose execution strategies based on dataset size and connector capabilities.
+- Execute comparison workloads consistently through Apache Spark.
 - Track progress, cancel active runs, inspect paginated evidence, and retain run history.
 - Generate a plain-language L7 report and downloadable PDF without sending raw records to the LLM.
 
@@ -55,9 +55,8 @@ L1-L6 are deterministic comparison layers. L7 is optional and requires a Groq AP
 flowchart LR
     UI[React web application] -->|/api/v1| API[FastAPI service]
     API --> PLAN[Strategy planner]
-    PLAN --> EXEC[Execution engine]
+    PLAN --> EXEC[Spark execution engine]
     EXEC --> SPARK[Apache Spark cluster]
-    LOCAL --> COMP[L1-L6 comparators]
     SPARK --> COMP
     CSV[CSV files] --> EXEC
     DBX[Databricks] --> EXEC
@@ -68,7 +67,7 @@ flowchart LR
     LLM --> REPORT[Web and PDF report]
 ```
 
-The browser is served by Nginx, which proxies `/api/` requests to FastAPI. PostgreSQL stores connections, configurations, rules, execution plans, run state, results, evidence, and analysis reports. Spark provides distributed execution, while the planner can also select local, chunked, sampled, hash, aggregate, or connector-pushdown strategies where supported.
+The browser is served by Nginx, which proxies `/api/` requests to FastAPI. PostgreSQL stores connections, configurations, rules, execution plans, run state, results, evidence, and analysis reports. All L1-L6 comparison workloads are executed through Apache Spark; there is no separate local comparison executor.
 
 ## Quick start with Docker
 
@@ -142,8 +141,8 @@ Sample CSV datasets are available in [`data/`](data/).
 
 The application currently registers two user-facing connector types:
 
-- **CSV** — schema discovery, record iteration, chunked reads, and file-based execution.
-- **Databricks** — connection testing, catalog/schema/table discovery, SQL data access, and supported pushdown operations.
+- **CSV** — schema discovery and Spark-based file comparison.
+- **Databricks** — connection testing, catalog/schema/table discovery, SQL data access, and Spark-based comparison.
 
 Saved secret fields such as tokens and passwords are masked in API responses and restored internally when a saved connection is used. Keep deployment logs and the PostgreSQL instance access-controlled because connection metadata is operationally sensitive.
 
@@ -183,7 +182,7 @@ L7 output is an explanatory aid; deterministic L1-L6 results remain the system o
 
 ## Local development
 
-Docker Compose is the recommended full-stack workflow because the backend requires PostgreSQL and initializes Spark during startup. For direct development, run the infrastructure first and then start each application separately.
+Docker Compose is the recommended full-stack workflow because the backend requires PostgreSQL and initializes Spark during startup. For direct development, run PostgreSQL and the Spark cluster first, then start each application separately.
 
 ### Backend
 
@@ -296,7 +295,7 @@ The API returns a `run_id`, `plan_id`, task count, and task IDs. Poll the status
 | `POSTGRES_PASSWORD` | Recommended | `comparator` in Compose | Password used by the bundled PostgreSQL service. |
 | `GROQ_API_KEY` | For L7 | None | API credential for language-model analysis. |
 | `GROQ_MODEL` | No | `llama-3.3-70b-versatile` | Groq model used by L7. |
-| `SPARK_MASTER_URL` | For clustered Spark | Set by Compose | Spark master URL; omitted execution may use the local Spark default. |
+| `SPARK_MASTER_URL` | Yes | Set by Compose | Spark master URL used for all comparison execution. |
 | `SPARK_DRIVER_HOST` | In Compose | `backend` | Host advertised by the Spark driver. |
 | `SPARK_APP_NAME` | No | `V1-Comparator` | Spark application name. |
 | `SPARK_SQL_SHUFFLE_PARTITIONS` | No | `16` in code, `8` in Compose | Default Spark SQL shuffle partition count. |
@@ -320,7 +319,7 @@ The API returns a `run_id`, `plan_id`, task count, and task IDs. Poll the status
 |   |-- comparators/       # L1-L6 deterministic comparison implementations
 |   |-- connectors/        # CSV, Databricks, metadata, filters, and provider registry
 |   |-- domain/            # Validated runtime configuration models
-|   |-- execution/         # Planning dispatch, workers, Spark/local execution, retries
+|   |-- execution/         # Planning dispatch, workers, Spark execution, and retries
 |   |-- persistence/       # PostgreSQL models and repository
 |   `-- strategy/          # Dataset analysis and execution-strategy selection
 |-- data/                  # Sample and container-accessible datasets
