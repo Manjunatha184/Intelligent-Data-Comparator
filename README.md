@@ -44,7 +44,7 @@ The platform is designed for reconciliation workflows such as migration validati
 | L3 | Record Matching | Source-only, target-only, duplicate, and matched records using configured keys or record hashes. |
 | L4 | Field Comparison | Field-by-field conformity across matched records, including mappings, normalization, and tolerance. |
 | L5 | Aggregate | Configured aggregate functions, grouping fields, and permitted differences. |
-| L6 | Data Quality | Completeness, validity, patterns, consistency, timeliness, referential integrity, distribution, conditional, and transformation rules. |
+| L6 | Data Quality | Pattern, validity, and completeness rules for configured source and target fields. |
 | L7 | Analysis | A privacy-safe, plain-language interpretation of the derived evidence from L1-L6. |
 
 L1-L6 are deterministic comparison layers. L7 is optional and requires a Groq API key. The selected levels are converted into an immutable execution plan, with eligible tasks executed concurrently.

@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 
 import "./styles.css";
-import lumeraLogo from "./assets/lumera-logo.svg";
 
 /* ============================================================
    CONSTANTS
@@ -559,9 +558,7 @@ function Sidebar({ page, setPage, hasResults, onOpenResultsHistory }) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brandLogo">
-          <img src={lumeraLogo} alt="Lumera Data Comparator" />
-        </div>
+        <div className="brandWordmark">DATA COMPARATOR</div>
       </div>
 
       <div className="workspace">WORKSPACE</div>
@@ -3085,6 +3082,37 @@ function renderVal(value) {
   return String(value);
 }
 
+function RowDataLink({ record }) {
+  const [open, setOpen] = useState(false);
+  if (!record || typeof record !== "object") return "N/A";
+
+  return <>
+    <button type="button" className="rowDataLink" onClick={() => setOpen(true)}>View row</button>
+    {open && <div className="modalBackdrop" onClick={() => setOpen(false)}>
+      <div className="modal rowDataModal" onClick={event => event.stopPropagation()}>
+        <div className="modalHead">
+          <div>
+            <h2>Row data</h2>
+            <p>Values captured for this comparison result</p>
+          </div>
+          <button type="button" className="iconButton" onClick={() => setOpen(false)}><X size={18} /></button>
+        </div>
+        <div className="rowDataTableWrap">
+          <table className="rowDataTable">
+            <thead><tr><th>Column</th><th>Value</th></tr></thead>
+            <tbody>
+              {Object.entries(record).map(([column, value]) => <tr key={column}>
+                <td><b>{column}</b></td>
+                <td>{renderVal(value)}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
 function formatMetricPercent(value) {
   if (value === undefined || value === null || value === "") return "N/A";
   if (typeof value === "string" && value.trim().endsWith("%")) return value;
@@ -3097,6 +3125,7 @@ function getLevelSummary(level) {
   const d = level?.differences || {};
   if (status === "NOT_APPLICABLE") return m.reason || "Not applicable for this comparison strategy";
   if (status === "PASS") {
+    if (level.level === "L3") return "All records were reconciled by business key or configured grouping fields";
     if (level.level === "L5") return "All aggregate rules matched";
     if (level.level === "L6") return Number(m.rules_total || 0) > 0 ? "All data-quality rules passed" : "No DQ rules executed";
     return "No differences detected";
@@ -3113,11 +3142,23 @@ function getLevelSummary(level) {
   }
   if (level.level === "L3") {
     if (m.comparison_mode === "GROUP_RECONCILIATION" || m.matching_mode === "GROUP_RECONCILIATION") {
+      const missingBusinessKeys = Number(m.missing_business_key_count || 0);
+      if (missingBusinessKeys) return `${missingBusinessKeys} business key${missingBusinessKeys === 1 ? " is" : "s are"} missing on one side`;
       const differences = m.group_difference_count;
       if (differences === undefined || differences === null) return "Group reconciliation results unavailable";
       return `${differences} group difference${differences === 1 ? "" : "s"} detected`;
     }
-   
+    const missing = Number(m.missing_key_count || 0);
+    const extra = Number(m.extra_key_count || 0);
+    const sourceDuplicates = Number(m.source_duplicate_key_count || 0);
+    const targetDuplicates = Number(m.target_duplicate_key_count || 0);
+    const issues = [];
+    if (missing) issues.push(`${missing} business key${missing === 1 ? "" : "s"} missing in target`);
+    if (extra) issues.push(`${extra} extra business key${extra === 1 ? "" : "s"} in target`);
+    if (sourceDuplicates) issues.push(`${sourceDuplicates} duplicate key${sourceDuplicates === 1 ? "" : "s"} in source`);
+    if (targetDuplicates) issues.push(`${targetDuplicates} duplicate key${targetDuplicates === 1 ? "" : "s"} in target`);
+    if (issues.length) return issues.join("; ");
+    return "Business-key reconciliation failed";
   }
   if (level.level === "L4") {
     const n = d.field_mismatches?.items?.length ?? m.mismatch_count ?? 0;
@@ -3670,9 +3711,9 @@ function L2DetailsClean({ level }) {
       ["Total rows", `${renderVal(m.total_rows_source)} → ${renderVal(m.total_rows_target)}`],
       ["Row count change", formatMetricPercent(m.row_count_percent_change)],
       ["Volume coverage", formatMetricPercent(m.volume_coverage_pct)],
-      ["Distinct keys", `${renderVal(m.distinct_key_count_source)} → ${renderVal(m.distinct_key_count_target)}`],
-      ["Distinct key change", formatMetricPercent(m.distinct_key_percent_change)],
-      ["Duplicate keys", `${renderVal(m.duplicate_key_count_source)} → ${renderVal(m.duplicate_key_count_target)}`],
+      ["Distinct business keys", `${renderVal(m.distinct_key_count_source)} → ${renderVal(m.distinct_key_count_target)}`],
+      ["Distinct business-key change", formatMetricPercent(m.distinct_key_percent_change)],
+      ["Duplicate business-key rows", `${renderVal(m.duplicate_key_count_source)} → ${renderVal(m.duplicate_key_count_target)}`],
       ["Source duplicate rate", formatMetricPercent(m.source_duplicate_key_rate_pct)],
       ["Target duplicate rate", formatMetricPercent(m.target_duplicate_key_rate_pct)]
     ]} />
@@ -3692,7 +3733,15 @@ function L2DetailsClean({ level }) {
 }
 
 function getRecordKey(r) {
-  const rec = r.source_record || r.target_record || (r.source_records ? r.source_records[0] : null) || (r.target_records ? r.target_records[0] : null);
+  if (r.key) {
+    try {
+      const parsed = JSON.parse(r.key);
+      if (parsed && typeof parsed === "object") return Object.values(parsed).join(" + ");
+    } catch {
+      return r.key;
+    }
+  }
+  const rec = r.record || r.source_record || r.target_record || (r.source_records ? r.source_records[0] : null) || (r.target_records ? r.target_records[0] : null);
   if (!rec) return r.key || r.signature || r.record_key || r.id || "N/A";
   const keys = ["id", "key", "ID", "Key", "uid", "uuid", "name", "Name", "email", "Email", "customer_id", "Customer_ID"];
   for (let k of keys) {
@@ -3702,12 +3751,30 @@ function getRecordKey(r) {
 }
 
 function extractRecord(r) {
-  return r.source_record || r.target_record || (r.source_records ? r.source_records[0] : null) || (r.target_records ? r.target_records[0] : null) || {};
+  return r.record || r.source_record || r.target_record || (r.source_records ? r.source_records[0] : null) || (r.target_records ? r.target_records[0] : null) || {};
 }
+
+function duplicateEvidenceColumns(rows, side) {
+  const columns = getDynamicColumns(rows, `Duplicate key in ${side}`);
+  return [
+    columns[0],
+    { key: "duplicate_count", label: "Occurrences", render: row => `${row.duplicate_count} times` },
+    ...columns.slice(1),
+  ];
+}
+
+const duplicateReconciliationColumns = [
+  { key: "key", label: "Business key", render: r => <CopyableKey text={getRecordKey(r)} /> },
+  { key: "source_occurrences", label: "Source occurrences" },
+  { key: "target_occurrences", label: "Target occurrences" },
+  { key: "compared_pairs", label: "Rows compared", render: r => renderVal(r.compared_pairs) },
+  { key: "source_record", label: "Source row", render: r => <RowDataLink record={r.source_record} /> },
+  { key: "target_record", label: "Target row", render: r => <RowDataLink record={r.target_record} /> },
+];
 
 function getDynamicColumns(rows, typeLabel, includeReason = true) {
   const baseCols = [
-    { key: "key", label: "Key", render: r => <CopyableKey text={getRecordKey(r)} /> }
+    { key: "key", label: "Business key", render: r => <CopyableKey text={getRecordKey(r)} /> }
   ];
 
   if (!rows || rows.length === 0) {
@@ -3740,14 +3807,19 @@ function L3DetailsClean({ level }) {
   const m = level.metrics || {}, d = level.differences || {};
 
   if (m.comparison_mode === "GROUP_RECONCILIATION" || m.matching_mode === "GROUP_RECONCILIATION") {
+    const groupRows = d.group_reconciliation?.items || d.group_reconciliation || [];
     return <>
-      <GroupReconciliationDetails level={level} />
-      {m.row_reconciliation && <RowReconciliationDetails metrics={m.row_reconciliation} differences={d.row_reconciliation || {}} />}
+      <L3SummaryCards metrics={m} groupRows={groupRows} />
+      {m.row_reconciliation && <RowReconciliationDetails metrics={m.row_reconciliation} differences={d} showMetrics={false} showPrimaryDuplicates={false} />}
+      <GroupReconciliationDetails level={level} showMetrics={false} />
     </>;
   }
 
   const missingRows = d.missing_records?.items || d.missing_keys?.items || [];
   const extraRows = d.extra_records?.items || d.extra_keys?.items || [];
+  const duplicateSourceRows = d.duplicate_source_records?.items || [];
+  const duplicateTargetRows = d.duplicate_target_records?.items || [];
+  const duplicateKeyRows = d.duplicate_key_reconciliation?.items || [];
   const mismatchRows = d.record_mismatches?.items || d.mismatches?.items || [];
   const unmatchableSourceRows = d.unmatchable_source_records?.items || d.unmatchable_source_records || [];
   const unmatchableTargetRows = d.unmatchable_target_records?.items || d.unmatchable_target_records || [];
@@ -3761,60 +3833,95 @@ function L3DetailsClean({ level }) {
     <ResultMetricGrid items={[
       ["Source records", m.source_record_count],
       ["Target records", m.target_record_count],
-      ["Matched keys", m.matched_key_count],
+      ["Matched business keys", m.matched_key_count],
       ["Source coverage", formatMetricPercent(m.source_record_coverage_pct)],
       ["Target coverage", formatMetricPercent(m.target_record_coverage_pct)],
       ["Missing in target", m.missing_key_count],
       ["Missing rate", formatMetricPercent(m.missing_record_rate_pct)],
       ["Extra in target", m.extra_key_count],
       ["Extra rate", formatMetricPercent(m.extra_record_rate_pct)],
+      ["Duplicate business-key rows in source", m.source_duplicate_key_count || 0],
+      ["Duplicate business-key rows in target", m.target_duplicate_key_count || 0],
       ["Manual review", (m.unmatchable_source_count || 0) + (m.unmatchable_target_count || 0)]
     ]} />
 
     {missingRows.length > 0 && <EvidenceTable title="Missing in Target" rows={missingRows} columns={getDynamicColumns(missingRows, "Missing in target")} />}
-    {extraRows.length > 0 && <EvidenceTable title="Extra in Target" rows={extraRows} columns={getDynamicColumns(extraRows, "Extra in target")} />}
+    {extraRows.length > 0 && <EvidenceTable title="Extra in Target (Missing in Source)" rows={extraRows} columns={getDynamicColumns(extraRows, "Extra in target")} />}
+    {duplicateKeyRows.length > 0 && <EvidenceTable title="Duplicate business-key reconciliation" rows={duplicateKeyRows} columns={duplicateReconciliationColumns} />}
+    {!duplicateKeyRows.length && duplicateSourceRows.length > 0 && <EvidenceTable title="Duplicate Business Keys in Source" rows={duplicateSourceRows} columns={duplicateEvidenceColumns(duplicateSourceRows, "source")} />}
+    {!duplicateKeyRows.length && duplicateTargetRows.length > 0 && <EvidenceTable title="Duplicate Business Keys in Target" rows={duplicateTargetRows} columns={duplicateEvidenceColumns(duplicateTargetRows, "target")} />}
     {mismatchRows.length > 0 && <EvidenceTable title="Record issues" rows={mismatchRows} columns={getDynamicColumns(mismatchRows, "MISMATCH")} />}
 
     {unmatchableRows.length > 0 && <EvidenceTable title="Unmatchable Records" rows={unmatchableRows} columns={[
       { key: "side", label: "Side", render: r => <b>{r.side}</b> },
       { key: "reason", label: "Reason", render: r => r.reason || "No usable matching attributes" },
-      { key: "record", label: "Record", render: r => <span style={{ color: "var(--color-primary)", cursor: "pointer" }}>Expand to view record</span> }
+      { key: "record", label: "Record", render: r => <RowDataLink record={r.record} /> }
     ]} />}
 
-    {!missingRows.length && !extraRows.length && !mismatchRows.length && !unmatchableRows.length && <div className="evidenceEmpty success"><Check size={16} /> No record mismatches detected.</div>}
+    {!missingRows.length && !extraRows.length && !duplicateSourceRows.length && !duplicateTargetRows.length && !mismatchRows.length && !unmatchableRows.length && <div className="evidenceEmpty success"><Check size={16} /> No record mismatches detected.</div>}
   </div>;
 }
 
-function RowReconciliationDetails({ metrics: m, differences: d }) {
+function L3SummaryCards({ metrics: m, groupRows }) {
+  const unmatchedRows = groupRows.filter(r => ["MISSING_GROUP_IN_TARGET", "EXTRA_GROUP_IN_TARGET"].includes(r.status)).length;
+  const duplicateGroups = groupRows.filter(r => r.status === "GROUP_DUPLICATE_ROWS").length;
+  const aggregateMismatches = groupRows.filter(r => ["GROUP_VALUE_MISMATCH", "GROUP_ROW_COUNT_MISMATCH"].includes(r.status)).length;
+  return <ResultMetricGrid items={[
+    ["Source records", m.source_record_count],
+    ["Target records", m.target_record_count],
+    ["Matched business keys", m.row_reconciliation?.matched_key_count ?? m.matched_key_count],
+    ["Missing in target", m.row_reconciliation?.missing_key_count ?? m.missing_key_count],
+    ["Extra in target", m.row_reconciliation?.extra_key_count ?? m.extra_key_count],
+    ["Missing business keys", m.missing_business_key_count || 0],
+    ["Common groups", m.common_group_count],
+    ["Groups with mismatch", m.groups_with_mismatch],
+    ["Grouped duplicates", duplicateGroups],
+    ["Unmatched rows", unmatchedRows],
+    ["Aggregate mismatches", aggregateMismatches],
+    ["Group coverage", `${formatMetricPercent(m.source_group_coverage)} / ${formatMetricPercent(m.target_group_coverage)}`],
+  ]} />;
+}
+
+function RowReconciliationDetails({ metrics: m, differences: d, showMetrics = true, showPrimaryDuplicates = true }) {
   const missingRows = d.missing_records?.items || d.missing_keys?.items || [];
   const extraRows = d.extra_records?.items || d.extra_keys?.items || [];
+  const duplicateSourceRows = d.duplicate_source_records?.items || [];
+  const duplicateTargetRows = d.duplicate_target_records?.items || [];
+  const duplicateKeyRows = d.duplicate_key_reconciliation?.items || [];
   return <div className="detailsClean">
     <h4>Row reconciliation</h4>
-    <ResultMetricGrid items={[
+    {showMetrics && <ResultMetricGrid items={[
       ["Source records", m.source_record_count],
       ["Target records", m.target_record_count],
-      ["Matched keys", m.matched_key_count],
+      ["Matched business keys", m.matched_key_count],
       ["Missing in target", m.missing_key_count],
       ["Extra in target", m.extra_key_count],
-    ]} />
+      ["Duplicate business-key rows in source", m.source_duplicate_key_count || 0],
+      ["Duplicate business-key rows in target", m.target_duplicate_key_count || 0],
+    ]} />}
     {missingRows.length > 0 && <EvidenceTable title="Missing in Target" rows={missingRows} columns={getDynamicColumns(missingRows, "Missing in target")} />}
-    {extraRows.length > 0 && <EvidenceTable title="Extra in Target" rows={extraRows} columns={getDynamicColumns(extraRows, "Extra in target")} />}
+    {extraRows.length > 0 && <EvidenceTable title="Extra in Target (Missing in Source)" rows={extraRows} columns={getDynamicColumns(extraRows, "Extra in target")} />}
+    {showPrimaryDuplicates && duplicateKeyRows.length > 0 && <EvidenceTable title="Duplicate business-key reconciliation" rows={duplicateKeyRows} columns={duplicateReconciliationColumns} />}
+    {showPrimaryDuplicates && !duplicateKeyRows.length && duplicateSourceRows.length > 0 && <EvidenceTable title="Duplicate Business Keys in Source" rows={duplicateSourceRows} columns={duplicateEvidenceColumns(duplicateSourceRows, "source")} />}
+    {showPrimaryDuplicates && !duplicateKeyRows.length && duplicateTargetRows.length > 0 && <EvidenceTable title="Duplicate Business Keys in Target" rows={duplicateTargetRows} columns={duplicateEvidenceColumns(duplicateTargetRows, "target")} />}
   </div>;
 }
 
-function GroupReconciliationDetails({ level }) {
+function GroupReconciliationDetails({ level, showMetrics = true }) {
   const m = level.metrics || {};
   const rows = level.differences?.group_reconciliation?.items || level.differences?.group_reconciliation || [];
-  const aggregateRows = rows.filter(r => r.status === "GROUP_VALUE_MISMATCH");
+  const missingBusinessKeys = level.differences?.missing_business_keys?.items || [];
+  const aggregateRows = rows.filter(r => ["GROUP_VALUE_MISMATCH", "GROUP_ROW_COUNT_MISMATCH"].includes(r.status));
+  const duplicateGroupRows = rows.filter(r => r.status === "GROUP_DUPLICATE_ROWS");
   const notApplicableCount = aggregateRows.filter(r => r.status === "NOT_APPLICABLE").length;
   const applicableChecks = m.aggregate_checks_total ?? aggregateRows.length - notApplicableCount;
   const passedChecks = m.aggregate_checks_passed ?? aggregateRows.filter(r => r.status === "PASS").length;
-  const failedChecks = m.aggregate_checks_failed ?? aggregateRows.filter(r => r.status === "GROUP_VALUE_MISMATCH").length;
+  const failedChecks = m.aggregate_checks_failed ?? aggregateRows.filter(r => ["GROUP_VALUE_MISMATCH", "GROUP_ROW_COUNT_MISMATCH", "GROUP_DUPLICATE_ROWS"].includes(r.status)).length;
   const groupLabel = (row) => Array.isArray(row.group_key) ? row.group_key.map(value => value === null || value === undefined || value === "" ? "[NULL]" : value).join(" + ") : renderVal(row.group_key);
   const mismatchCount = (m.missing_group_count ?? 0) + (m.extra_group_count ?? 0) + (m.group_mismatch_count ?? 0);
 
   return <div className="detailsClean">
-    <ResultMetricGrid items={[
+    {showMetrics && <ResultMetricGrid items={[
       ["Source groups", m.source_group_count],
       ["Target groups", m.target_group_count],
       ["Common groups", m.common_group_count],
@@ -3826,7 +3933,16 @@ function GroupReconciliationDetails({ level }) {
       ["Failed", failedChecks],
       ["Source group coverage", formatMetricPercent(m.source_group_coverage)],
       ["Target group coverage", formatMetricPercent(m.target_group_coverage)]
-    ]} />
+    ]} />}
+    {duplicateGroupRows.length > 0 && <EvidenceTable title="Grouped duplicate reconciliation" rows={duplicateGroupRows}
+      columns={[
+        { key: "group_key", label: "Matched grouping fields", render: groupLabel },
+        { key: "source_aggregate", label: "Source occurrences", render: r => renderVal(r.source_aggregate) },
+        { key: "target_aggregate", label: "Target occurrences", render: r => renderVal(r.target_aggregate) },
+        { key: "source_record", label: "Source row", render: r => <RowDataLink record={r.source_record} /> },
+        { key: "target_record", label: "Target row", render: r => <RowDataLink record={r.target_record} /> },
+        { key: "status", label: "Status", render: () => <Status status="FAIL" /> }
+      ]} />}
     <EvidenceTable title="Group aggregate mismatches" rows={aggregateRows} count={aggregateRows.length}
       columns={[
         { key: "group_key", label: "Group", render: groupLabel },
@@ -3836,20 +3952,34 @@ function GroupReconciliationDetails({ level }) {
         { key: "source_aggregate", label: "Source value", render: r => renderVal(r.source_aggregate) },
         { key: "target_aggregate", label: "Target value", render: r => renderVal(r.target_aggregate) },
         { key: "difference", label: "Difference", render: r => typeof r.difference === "number" && r.difference > 0 ? `+${formatNumber(r.difference)}` : renderVal(r.difference) },
+        { key: "source_record", label: "Source row", render: r => <RowDataLink record={r.source_record} /> },
+        { key: "target_record", label: "Target row", render: r => <RowDataLink record={r.target_record} /> },
         { key: "status", label: "Status", render: r => <Status status={r.status === "PASS" ? "PASS" : r.status === "NOT_APPLICABLE" ? "NOT_APPLICABLE" : "FAIL"} /> }
       ]} emptyText="No aggregate mismatches detected." emptySuccess />
-    <EvidenceTable title="Group presence differences" rows={rows.filter(r => ["MISSING_GROUP_IN_TARGET", "EXTRA_GROUP_IN_TARGET"].includes(r.status))}
+    {rows.some(r => ["MISSING_GROUP_IN_TARGET", "EXTRA_GROUP_IN_TARGET"].includes(r.status)) && <EvidenceTable title="Unmatched rows" rows={rows.filter(r => ["MISSING_GROUP_IN_TARGET", "EXTRA_GROUP_IN_TARGET"].includes(r.status))}
       columns={[
-        { key: "group_key", label: "Group", render: groupLabel },
-        { key: "status", label: "Issue", render: r => r.status === "MISSING_GROUP_IN_TARGET" ? "MISSING IN TARGET" : "EXTRA IN TARGET" },
+        { key: "group_key", label: "Attempted matching attributes", render: groupLabel },
+        { key: "status", label: "Issue", render: r => r.status === "MISSING_GROUP_IN_TARGET" ? "UNMATCHED SOURCE ROW" : "UNMATCHED TARGET ROW" },
+        { key: "source_record", label: "Source row", render: r => <RowDataLink record={r.source_record} /> },
+        { key: "target_record", label: "Target row", render: r => <RowDataLink record={r.target_record} /> },
         { key: "status", label: "Status", render: () => <Status status="FAIL" /> }
-      ]} emptyText="No missing or extra groups." />
+      ]} />}
+    {missingBusinessKeys.length > 0 && <EvidenceTable title="Missing business keys" rows={missingBusinessKeys}
+      columns={[
+        { key: "group_key", label: "Matched attributes", render: groupLabel },
+        { key: "source_key", label: "Source key", render: r => getRecordKey({ key: r.source_key }) },
+        { key: "target_key", label: "Target key", render: r => getRecordKey({ key: r.target_key }) },
+        { key: "source_record", label: "Source row", render: r => <RowDataLink record={r.source_record} /> },
+        { key: "target_record", label: "Target row", render: r => <RowDataLink record={r.target_record} /> },
+        { key: "reason", label: "Interpretation" }
+      ]} />}
     {mismatchCount === 0 && <div className="evidenceEmpty success"><Check size={16} /> All compared groups matched.</div>}
   </div>;
 }
 
 function L4DetailsClean({ level }) {
   const m = level.metrics || {}, fields = level.differences?.field_mismatches?.items || [];
+  const duplicatePairs = level.differences?.duplicate_matched_pairs?.items || [];
   return <div className="detailsClean">
     <ResultMetricGrid items={[
       ["Source records", m.source_record_count], ["Target records", m.target_record_count], ["Matched records", m.matched_record_count],
@@ -3857,19 +3987,24 @@ function L4DetailsClean({ level }) {
       ["Field conformity", formatMetricPercent(m.field_conformity_pct)],
       ["Mismatches", m.mismatch_count], ["Field mismatch rate", formatMetricPercent(m.field_mismatch_rate_pct)],
       ["Records with mismatch", m.records_with_mismatch],
-      ["Affected record rate", formatMetricPercent(m.affected_record_rate_pct)]
+      ["Affected record rate", formatMetricPercent(m.affected_record_rate_pct)],
+      ["Duplicate business-key rows in source", m.source_duplicate_key_count || 0],
+      ["Duplicate business-key rows in target", m.target_duplicate_key_count || 0]
     ]} />
+    <EvidenceTable title="Duplicate rows compared by business key" rows={duplicatePairs}
+      columns={duplicateReconciliationColumns}
+      emptyText="No matched business key had duplicate rows." emptySuccess />
     <EvidenceTable title="Field mismatches" rows={fields}
       columns={[
         {
           key: "key",
-          label: "Key",
+          label: "Business key",
           render: r => <CopyableKey text={r.key || r.record_id} />
         },
         {
           key: "match_method",
           label: "Match method",
-          render: () => "Primary Key"
+          render: () => "Business key"
         },
         { key: "source_column", label: "Source column", render: r => <b>{r.source_column}</b> },
         { key: "target_column", label: "Target column", render: r => <b>{r.target_column}</b> },
@@ -3950,7 +4085,12 @@ function formatNumber(val, isPercentage = false) {
 }
 
 function L5DetailsClean({ level }) {
-  const m = level.metrics || {}, rules = level.differences?.aggregate_results?.items || [];
+  const m = level.metrics || {}, rawRules = level.differences?.aggregate_results?.items || [];
+  const rules = rawRules.flatMap(rule =>
+    rule.grouped && Array.isArray(rule.group_results) && rule.group_results.length
+      ? rule.group_results
+      : [rule]
+  );
   const hasGroupedResults = rules.some(r => r.group !== null && r.group !== undefined);
 
   let nullNote = null;
@@ -4395,16 +4535,9 @@ function RulesPage({ notify }) {
 
 function RuleModal({ existingRule, initialRuleType, sourceSchema, targetSchema, onClose, onDone, notify }) {
   const dqRuleTypes = [
+    ["PATTERN", "Pattern"],
     ["COMPLETENESS", "Completeness"],
     ["VALIDITY", "Validity"],
-    ["CONSISTENCY", "Consistency"],
-    ["TIMELINESS", "Timeliness"],
-    ["REFERENTIAL_INTEGRITY", "Referential Integrity"],
-    ["PATTERN", "Pattern"],
-    ["DISTRIBUTION", "Distribution"],
-    ["CONDITIONAL", "Conditional"],
-    ["TRANSFORMATION", "Transformation"],
-    ["CUSTOM", "Custom"],
   ];
   const [ruleType, setRuleType] = useState(existingRule?.rule_type || initialRuleType || "DQ");
   const [name, setName] = useState(existingRule?.name || "");
@@ -4636,27 +4769,15 @@ function RuleModal({ existingRule, initialRuleType, sourceSchema, targetSchema, 
                   <input value={payload.target_column || payload.column || ""} onChange={e => setPayload({ ...payload, target_column: e.target.value })} required />
                 </Field>
               )}
-              {!["CONSISTENCY", "CONDITIONAL", "CUSTOM", "TRANSFORMATION", "REFERENTIAL_INTEGRITY"].includes(String(payload.rule_type || "PATTERN").toUpperCase()) && (
-                <Field label="Tolerance">
-                  <input type="number" min="0" step="any" value={payload.tolerance ?? ""} onChange={e => setPayload({ ...payload, tolerance: e.target.value === "" ? undefined : Number(e.target.value) })} />
-                </Field>
-              )}
+              <Field label="Tolerance">
+                <input type="number" min="0" step="any" value={payload.tolerance ?? ""} onChange={e => setPayload({ ...payload, tolerance: e.target.value === "" ? undefined : Number(e.target.value) })} />
+              </Field>
               {String(payload.rule_type).toUpperCase() === "PATTERN" && <Field label="Regex Pattern" required><input value={payload.regex || ""} onChange={e => setPayload({ ...payload, regex: e.target.value })} required /></Field>}
               {String(payload.rule_type).toUpperCase() === "VALIDITY" && <>
                 <Field label="Allowed values"><input value={(payload.allowed_values || []).join(", ")} onChange={e => setPayload({ ...payload, allowed_values: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })} /></Field>
                 <div className="grid2"><Field label="Minimum"><input type="number" value={payload.min ?? ""} onChange={e => setPayload({ ...payload, min: e.target.value === "" ? undefined : Number(e.target.value) })} /></Field><Field label="Maximum"><input type="number" value={payload.max ?? ""} onChange={e => setPayload({ ...payload, max: e.target.value === "" ? undefined : Number(e.target.value) })} /></Field></div>
                 <Field label="Regex"><input value={payload.regex || ""} onChange={e => setPayload({ ...payload, regex: e.target.value })} /></Field>
               </>}
-              {String(payload.rule_type).toUpperCase() === "CONSISTENCY" && <Field label="Columns" required><input value={(payload.columns || []).join(", ")} onChange={e => setPayload({ ...payload, columns: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })} required /></Field>}
-              {String(payload.rule_type).toUpperCase() === "TIMELINESS" && <Field label="Allowed delay (seconds)"><input type="number" min="0" value={payload.tolerance ?? ""} onChange={e => setPayload({ ...payload, tolerance: e.target.value === "" ? undefined : Number(e.target.value) })} /></Field>}
-              {String(payload.rule_type).toUpperCase() === "CONDITIONAL" && <>
-                <div className="ruleFormDivider">IF</div>
-                <div className="grid2"><Field label="Field"><input value={payload.condition?.column || ""} onChange={e => setPayload({ ...payload, condition: { ...(payload.condition || {}), column: e.target.value } })} /></Field><Field label="Equals"><input value={payload.condition?.equals ?? ""} onChange={e => setPayload({ ...payload, condition: { ...(payload.condition || {}), equals: e.target.value } })} /></Field></div>
-                <div className="ruleFormDivider">THEN</div>
-                <div className="grid2"><Field label="Field"><input value={payload.check?.column || ""} onChange={e => setPayload({ ...payload, check: { ...(payload.check || {}), column: e.target.value } })} /></Field><SelectField label="Check" value={payload.check?.type || "NOT_NULL"} setValue={v => setPayload({ ...payload, check: { ...(payload.check || {}), type: v } })} options={[["NOT_NULL", "Not null"], ["POSITIVE", "Positive"], ["NOT_EMPTY", "Not empty"]]} /></div>
-              </>}
-              {String(payload.rule_type).toUpperCase() === "TRANSFORMATION" && <SelectField label="Transformation" value={payload.transformation || "IDENTITY"} setValue={v => setPayload({ ...payload, transformation: v })} options={["IDENTITY", "LOWER", "UPPER", "STRIP", "ROUND"]} />}
-              {String(payload.rule_type).toUpperCase() === "CUSTOM" && <div className="grid2"><Field label="Source value" required><input value={payload.source_value ?? ""} onChange={e => setPayload({ ...payload, source_value: Number(e.target.value) })} required /></Field><Field label="Target value" required><input value={payload.target_value ?? ""} onChange={e => setPayload({ ...payload, target_value: Number(e.target.value) })} required /></Field></div>}
             </>
           )}
 

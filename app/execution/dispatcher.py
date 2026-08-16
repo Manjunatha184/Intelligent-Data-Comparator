@@ -136,6 +136,10 @@ class ExecutionDispatcher:
                 RecordingPushdownAdapter()
             )
 
+    def close(self) -> None:
+        """Release resources owned by this plan-scoped dispatcher."""
+        self.spark_executor.close()
+
     # ========================================================
     # PUBLIC DISPATCH
     # ========================================================

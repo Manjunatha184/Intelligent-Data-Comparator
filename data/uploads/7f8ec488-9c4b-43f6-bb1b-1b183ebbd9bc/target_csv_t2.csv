@@ -1,0 +1,15 @@
+ID,Name,Sales,Target_Quantity,Target_Email,Status,Region,Timestamp
+A001,Product A,100,10,a@test.com,INACTIVE,North,2026-08-16 10:00:00
+A002,Product A,200,20,a@test.com,ACTIVE,north,2026-08-16 10:15:00
+B001,Product B,500,50,b@test.com,ACTIVE,South,2026-08-16 10:30:00
+C001,Product C,600,60,c@test.com,INACTIVE,East,2026-08-16 10:45:00
+D001,Product D Target,750,70,d.target@test.com,ACTIVE,West,2026-08-16 11:00:00
+E001,Product E,820,82,e@test.com,ACTIVE,North,2026-08-16 11:15:00
+F001,Product F,900,90,,ACTIVE,South,2026-08-16 11:30:00
+G001,Product G,1100,110,g@test.com,ACTIVE,East,2026-08-16 11:45:00
+I001,Product I,150,15,i@test.com,ACTIVE,Central,2026-08-16 12:00:00
+I002,Product I,250,25,i@test.com,ACTIVE,Central,2026-08-16 12:15:00
+J001,Product J,450,40,j.target@test.com,ACTIVE,North,2026-08-16 12:30:00
+J002,Product J,550,55,j@test.com,INACTIVE,North,2026-08-16 12:45:00
+K001,Product K,1000,100,k@test.com,ACTIVE,North,2026-08-16 13:00:00
+K003,Product L,3000,800,l@test.com,ACTIVE,West,2026-08-16 13:15:00

@@ -112,6 +112,10 @@ class AggregateRule(BaseModel):
     def validate_rule(self):
         if self.tolerance_pct is not None and (self.tolerance_pct < 0 or self.tolerance_pct > 100):
             raise ValueError("tolerance_pct must be between 0 and 100")
+        if len(self.source_group_by) != len(self.target_group_by):
+            raise ValueError(
+                "Aggregate rules require matching source and target group-by fields"
+            )
         return self
 
 
@@ -151,6 +155,7 @@ class DQRule(BaseModel):
     @model_validator(mode="after")
     def validate_rule(self):
         self.apply_to = self.apply_to.upper()
+        self.rule_type = self.rule_type.upper()
 
         if self.apply_to not in {
             "SOURCE",
@@ -161,7 +166,12 @@ class DQRule(BaseModel):
                 "apply_to must be SOURCE, TARGET, or BOTH"
             )
 
-        rule_type = self.rule_type.upper()
+        rule_type = self.rule_type
+
+        if rule_type not in {"PATTERN", "VALIDITY", "COMPLETENESS"}:
+            raise ValueError(
+                "DQ rule_type must be PATTERN, VALIDITY, or COMPLETENESS"
+            )
 
         if rule_type == "PATTERN":
             if not self._has_scoped_columns():
@@ -186,61 +196,6 @@ class DQRule(BaseModel):
                     "VALIDITY rule requires configured column(s)"
                 )
         
-        elif rule_type == "CONSISTENCY":
-            if not self.columns:
-                raise ValueError(
-                    "CONSISTENCY rule requires 'columns'"
-                )
-
-        elif rule_type == "TIMELINESS":
-            if not self._has_scoped_columns():
-                raise ValueError(
-                    "TIMELINESS rule requires configured column(s)"
-                )
-
-        elif rule_type == "REFERENTIAL_INTEGRITY":
-            if not self.source_column:
-                raise ValueError(
-                    "REFERENTIAL_INTEGRITY rule requires "
-                    "'source_column'"
-                )
-
-            if not self.target_column:
-                raise ValueError(
-                    "REFERENTIAL_INTEGRITY rule requires "
-                    "'target_column'"
-                )
-
-        elif rule_type == "DISTRIBUTION":
-            if not self._has_scoped_columns():
-                raise ValueError(
-                    "DISTRIBUTION rule requires configured column(s)"
-                )
-
-        elif rule_type == "CONDITIONAL":
-            if not isinstance(self.condition, dict):
-                raise ValueError(
-                    "CONDITIONAL rule requires 'condition'"
-                )
-
-            if not isinstance(self.check, dict):
-                raise ValueError(
-                    "CONDITIONAL rule requires 'check'"
-                )
-
-        elif rule_type == "TRANSFORMATION":
-            if not self.source_column:
-                raise ValueError(
-                    "TRANSFORMATION rule requires "
-                    "'source_column'"
-                )
-
-            if not self.target_column:
-                raise ValueError(
-                    "TRANSFORMATION rule requires "
-                    "'target_column'"
-                )
-
         return self
 
     def _has_scoped_columns(self) -> bool:
@@ -329,6 +284,7 @@ class RuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def validate_group_reconciliation(self):
+        self.matching_mode = self.matching_mode.upper()
         if self.matching_mode != "GROUP_RECONCILIATION":
             return self
         if not self.grouping_attributes or any(not item.source_column or not item.target_column for item in self.grouping_attributes):

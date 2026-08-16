@@ -6,6 +6,7 @@ from typing import Any, Iterable
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from fastapi.encoders import jsonable_encoder
 
 from app.persistence.base import PersistenceRepository
 from app.persistence.models import (
@@ -218,6 +219,11 @@ class PostgresRepository(PersistenceRepository):
             value.replace("Z", "+00:00")
         )
 
+    @staticmethod
+    def _json_safe(value: Any) -> Any:
+        """Convert runtime values such as dates into JSONB-safe primitives."""
+        return jsonable_encoder(value)
+
     # ====================================================
     # CONFIGURATION
     # ====================================================
@@ -227,6 +233,8 @@ class PostgresRepository(PersistenceRepository):
         configuration: dict[str, Any],
         configuration_id: int | None = None,
     ) -> int:
+
+        configuration = self._json_safe(configuration)
 
         with Session(self.engine) as session:
 
@@ -295,6 +303,8 @@ class PostgresRepository(PersistenceRepository):
         planner_version: str,
         plan: dict[str, Any],
     ) -> None:
+
+        plan = self._json_safe(plan)
 
         with Session(
             self.engine
@@ -423,6 +433,8 @@ class PostgresRepository(PersistenceRepository):
         report: dict[str, Any] | None,
         error: str | None = None,
     ) -> None:
+        report = self._json_safe(report) if report is not None else None
+
         with Session(self.engine) as session:
             model = session.get(L7AnalysisReportModel, run_id)
             if model is None:
@@ -549,6 +561,9 @@ class PostgresRepository(PersistenceRepository):
         evidence: dict[str, Any],
     ) -> int:
 
+        metrics = self._json_safe(metrics)
+        evidence = self._json_safe(evidence)
+
         with Session(
             self.engine
         ) as session:
@@ -597,6 +612,7 @@ class PostgresRepository(PersistenceRepository):
                     "payload",
                     item,
                 )
+                payload = self._json_safe(payload)
 
                 ordinal = item.get(
                     "ordinal",
@@ -832,6 +848,9 @@ class PostgresRepository(PersistenceRepository):
         metrics: dict[str, Any],
         evidence: dict[str, Any],
     ) -> None:
+
+        metrics = self._json_safe(metrics)
+        evidence = self._json_safe(evidence)
 
         with Session(
             self.engine
@@ -1203,6 +1222,7 @@ class PostgresRepository(PersistenceRepository):
     # ====================================================
 
     def save_rule(self, name: str, rule_type: str, payload: dict[str, Any]) -> int:
+        payload = self._json_safe(payload)
         with Session(self.engine) as session:
             model = RuleModel(
                 name=name,
@@ -1231,6 +1251,7 @@ class PostgresRepository(PersistenceRepository):
             return results
 
     def update_rule(self, rule_id: int, name: str, rule_type: str, payload: dict[str, Any]) -> None:
+        payload = self._json_safe(payload)
         with Session(self.engine) as session:
             rule = session.get(RuleModel, rule_id)
             if rule is not None:

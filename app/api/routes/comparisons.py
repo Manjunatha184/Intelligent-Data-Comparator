@@ -526,10 +526,16 @@ def execute_plan(
     # --------------------------------------------------------
 
     execution_started = perf_counter()
-    engine.execute_remaining_batches(
-        dispatcher=dispatcher,
-        collector=collector,
-    )
+    try:
+        engine.execute_remaining_batches(
+            dispatcher=dispatcher,
+            collector=collector,
+        )
+    finally:
+        # The dispatcher is plan-scoped. Release persisted datasets and
+        # intermediate reconciliation frames after every run, including
+        # failed runs, while keeping the shared Spark session available.
+        dispatcher.close()
     logger.info("COMPARISON_TIMING run_id=%s execution_and_persistence_ms=%.1f", run_id, (perf_counter() - execution_started) * 1000)
 
     # --------------------------------------------------------

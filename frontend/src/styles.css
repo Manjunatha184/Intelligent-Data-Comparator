@@ -6287,7 +6287,7 @@ select option:checked {
   }
 }
 
-/* Optically center the Lumera artwork within the sidebar. */
+/* Center the compact product wordmark within the sidebar. */
 .sidebar .brand {
   width: 100%;
   padding-left: 0;
@@ -6295,7 +6295,79 @@ select option:checked {
   justify-content: center;
 }
 
-.sidebar .brandLogo {
-  margin-left: auto;
-  margin-right: auto;
+.sidebar .brandWordmark {
+  color: #9eb8d7;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: .16em;
+  white-space: nowrap;
+}
+
+.rowDataLink {
+  border: 1px solid #c9d6e5;
+  border-radius: 5px;
+  padding: 5px 9px;
+  background: #f7f9fc;
+  color: #294f78;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rowDataLink:hover {
+  border-color: #9fb5cd;
+  background: #edf3f8;
+}
+
+.rowDataModal {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+}
+
+.rowDataModal .modalHead p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.rowDataTableWrap {
+  overflow: auto;
+  padding: 18px 22px 22px;
+}
+
+.rowDataTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.rowDataTable th,
+.rowDataTable td {
+  padding: 10px 12px;
+  border: 1px solid #d8e1ec;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.rowDataTable th {
+  background: #edf2f7;
+  color: #334e6f;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.rowDataTable td:first-child {
+  width: 38%;
+  background: #f8fafc;
+}
+
+@media (max-width: 760px) {
+  .sidebar .brandWordmark {
+    display: none;
+  }
 }

@@ -81,6 +81,33 @@ class SparkExecutor:
         self.spark.range(1).count()
         logger.info("SPARK_SESSION_READY startup_ms=%.1f", (perf_counter() - started) * 1000)
 
+    def close(self) -> None:
+        """Release all per-comparison Spark cache without stopping the cluster."""
+        for dataframe in list(self._dataset_cache.values()):
+            try:
+                dataframe.unpersist(blocking=False)
+            except Exception:
+                logger.debug("Unable to unpersist a comparison dataset", exc_info=True)
+
+        for cached in list(self._match_cache.values()):
+            try:
+                reconciliation = cached[0]
+                reconciliation.unpersist(blocking=False)
+            except Exception:
+                logger.debug("Unable to unpersist a reconciliation stream", exc_info=True)
+
+        self._dataset_cache.clear()
+        self._match_cache.clear()
+        self._stats_cache.clear()
+
+        try:
+            if self._spark is not None:
+                self._spark.catalog.clearCache()
+        except Exception:
+            # A dead Py4J gateway cannot be repaired inside the current Python
+            # process. Cleanup must not hide the original comparison failure.
+            logger.warning("Spark cache cleanup skipped because the driver is unavailable")
+
     def execute(self, task: ExecutionTask) -> dict[str, Any]:
         load_started = perf_counter()
         source = self._load(task.configuration["source"])
@@ -654,14 +681,47 @@ class SparkExecutor:
             "__key_count",
             F.when(target_valid, F.count("__target_row_id").over(Window.partitionBy("__normalized_primary_key"))),
         )
+        # Pair repeated populated keys by a deterministic occurrence number.
+        # This avoids a Cartesian join while allowing every paired occurrence
+        # to continue to L4. Any excess occurrence remains missing/extra in L3.
+        source_order = F.to_json(F.struct(*[F.col(column) for column in sorted(s.columns)]))
+        target_order = F.to_json(F.struct(*[F.col(column) for column in sorted(t.columns)]))
+        source_prepared = source_prepared.withColumn(
+            "__key_ordinal",
+            F.when(source_valid, F.row_number().over(Window.partitionBy("__normalized_primary_key").orderBy(source_order, "__source_row_id"))),
+        )
+        target_prepared = target_prepared.withColumn(
+            "__key_ordinal",
+            F.when(target_valid, F.row_number().over(Window.partitionBy("__normalized_primary_key").orderBy(target_order, "__target_row_id"))),
+        )
+        source_population = source_prepared.filter(F.col("__normalized_primary_key").isNotNull()).groupBy(
+            "__normalized_primary_key"
+        ).agg(F.count(F.lit(1)).alias("__source_population_count"))
+        target_population = target_prepared.filter(F.col("__normalized_primary_key").isNotNull()).groupBy(
+            "__normalized_primary_key"
+        ).agg(F.count(F.lit(1)).alias("__target_population_count"))
+        source_prepared = source_prepared.join(target_population, "__normalized_primary_key", "left").fillna(
+            0, subset=["__target_population_count"]
+        )
+        target_prepared = target_prepared.join(source_population, "__normalized_primary_key", "left").fillna(
+            0, subset=["__source_population_count"]
+        )
+        source_pair_ordinal = F.when(
+            (F.col("__target_population_count") > 0) & (F.col("__key_ordinal") > F.col("__target_population_count")),
+            F.lit(1),
+        ).otherwise(F.col("__key_ordinal"))
+        target_pair_ordinal = F.when(
+            (F.col("__source_population_count") > 0) & (F.col("__key_ordinal") > F.col("__source_population_count")),
+            F.lit(1),
+        ).otherwise(F.col("__key_ordinal"))
         source_prepared = source_prepared.withColumn(
             "__join_key",
-            F.when((F.col("__key_count") == 1), F.concat(F.lit("KEY:"), F.col("__normalized_primary_key")))
+            F.when(source_valid, F.concat(F.lit("KEY:"), F.col("__normalized_primary_key"), F.lit(":"), source_pair_ordinal))
             .otherwise(F.concat(F.lit("SOURCE_UNMATCHED:"), F.col("__source_row_id").cast("string"))),
         )
         target_prepared = target_prepared.withColumn(
             "__join_key",
-            F.when((F.col("__key_count") == 1), F.concat(F.lit("KEY:"), F.col("__normalized_primary_key")))
+            F.when(target_valid, F.concat(F.lit("KEY:"), F.col("__normalized_primary_key"), F.lit(":"), target_pair_ordinal))
             .otherwise(F.concat(F.lit("TARGET_UNMATCHED:"), F.col("__target_row_id").cast("string"))),
         )
 
@@ -679,27 +739,49 @@ class SparkExecutor:
             target_struct.alias("_t"),
             F.coalesce(F.col("s.__normalized_primary_key"), F.col("t.__normalized_primary_key")).alias("normalized_primary_key"),
             F.when(F.col("s.__source_row_id").isNotNull() & F.col("t.__target_row_id").isNotNull(), F.lit("MATCHED"))
+            .when(F.col("s.__source_row_id").isNotNull() & F.col("s.__normalized_primary_key").isNull(), F.lit("UNMATCHABLE_SOURCE"))
+            .when(F.col("t.__target_row_id").isNotNull() & F.col("t.__normalized_primary_key").isNull(), F.lit("UNMATCHABLE_TARGET"))
             .when(F.col("s.__source_row_id").isNotNull(), F.lit("MISSING_IN_TARGET"))
             .otherwise(F.lit("EXTRA_IN_TARGET")).alias("reconciliation_status"),
             F.when(F.col("s.__source_row_id").isNotNull() & F.col("t.__target_row_id").isNotNull(), F.lit("PRIMARY_KEY")).otherwise(F.lit(None).cast("string")).alias("match_type"),
             F.when(F.col("s.__source_row_id").isNotNull(), source_key_json).otherwise(target_key_json).alias("match_key"),
             F.col("s.__key_count").alias("_source_key_count"),
             F.col("t.__key_count").alias("_target_key_count"),
+            F.col("s.__source_row_id").alias("_source_row_id"),
+            F.col("t.__target_row_id").alias("_target_row_id"),
         ).persist()
         pk_build_ms = (perf_counter() - build_started) * 1000
         summary_started = perf_counter()
         summary = reconciliation.agg(
             F.sum(F.when(F.col("reconciliation_status") == "MATCHED", 1).otherwise(0)).alias("matched"),
+            F.countDistinct(F.when(F.col("reconciliation_status") == "MATCHED", F.col("normalized_primary_key"))).alias("matched_keys"),
+            F.countDistinct(F.when(F.col("reconciliation_status") == "MATCHED", F.col("_source_row_id"))).alias("matched_source_records"),
+            F.countDistinct(F.when(F.col("reconciliation_status") == "MATCHED", F.col("_target_row_id"))).alias("matched_target_records"),
             F.sum(F.when(F.col("reconciliation_status") == "MISSING_IN_TARGET", 1).otherwise(0)).alias("missing"),
             F.sum(F.when(F.col("reconciliation_status") == "EXTRA_IN_TARGET", 1).otherwise(0)).alias("extra"),
+            F.sum(F.when(F.col("_source_key_count") > 1, 1).otherwise(0)).alias("source_duplicate_records"),
+            F.sum(F.when(F.col("_target_key_count") > 1, 1).otherwise(0)).alias("target_duplicate_records"),
+            F.countDistinct(F.when(F.col("_source_key_count") > 1, F.col("normalized_primary_key"))).alias("source_duplicate_keys"),
+            F.countDistinct(F.when(F.col("_target_key_count") > 1, F.col("normalized_primary_key"))).alias("target_duplicate_keys"),
+            F.sum(F.when(F.col("reconciliation_status") == "UNMATCHABLE_SOURCE", 1).otherwise(0)).alias("unmatchable_source"),
+            F.sum(F.when(F.col("reconciliation_status") == "UNMATCHABLE_TARGET", 1).otherwise(0)).alias("unmatchable_target"),
             F.sum(F.when(F.col("_source_key_count") == 1, 1).otherwise(0)).alias("source_unique"),
             F.sum(F.when(F.col("_target_key_count") == 1, 1).otherwise(0)).alias("target_unique"),
         ).first().asDict()
         pk_summary_ms = (perf_counter() - summary_started) * 1000
         counts = {
             "primary_matched_count": int(summary.get("matched") or 0),
+            "matched_key_count": int(summary.get("matched_keys") or 0),
+            "matched_source_record_count": int(summary.get("matched_source_records") or 0),
+            "matched_target_record_count": int(summary.get("matched_target_records") or 0),
             "missing_count": int(summary.get("missing") or 0),
             "extra_count": int(summary.get("extra") or 0),
+            "source_duplicate_record_count": int(summary.get("source_duplicate_records") or 0),
+            "target_duplicate_record_count": int(summary.get("target_duplicate_records") or 0),
+            "source_duplicate_key_count": int(summary.get("source_duplicate_keys") or 0),
+            "target_duplicate_key_count": int(summary.get("target_duplicate_keys") or 0),
+            "unmatchable_source_count": int(summary.get("unmatchable_source") or 0),
+            "unmatchable_target_count": int(summary.get("unmatchable_target") or 0),
             "source_unique_key_count": int(summary.get("source_unique") or 0),
             "target_unique_key_count": int(summary.get("target_unique") or 0),
         }
@@ -715,39 +797,230 @@ class SparkExecutor:
             raise ValueError("Spark L3 requires comparison_keys")
         reconciliation, counts, pk_timing = self._matched_pairs(s,t,cfg)
         pairs = reconciliation.filter(F.col("reconciliation_status") == "MATCHED").select("_s", "_t", "match_type", "match_key")
-        missing = reconciliation.filter(F.col("reconciliation_status") == "MISSING_IN_TARGET").select("_s.*")
-        extra = reconciliation.filter(F.col("reconciliation_status") == "EXTRA_IN_TARGET").select("_t.*")
+        missing = reconciliation.filter(F.col("reconciliation_status") == "MISSING_IN_TARGET").select(F.col("match_key").alias("key"), F.col("_s").alias("record"))
+        extra = reconciliation.filter(F.col("reconciliation_status") == "EXTRA_IN_TARGET").select(F.col("match_key").alias("key"), F.col("_t").alias("record"))
+        source_duplicates = reconciliation.filter(F.col("reconciliation_status") == "DUPLICATE_IN_SOURCE").groupBy("match_key").agg(
+            F.count(F.lit(1)).alias("duplicate_count"), F.first("_s", ignorenulls=True).alias("record")
+        ).select(F.col("match_key").alias("key"), "duplicate_count", "record")
+        target_duplicates = reconciliation.filter(F.col("reconciliation_status") == "DUPLICATE_IN_TARGET").groupBy("match_key").agg(
+            F.count(F.lit(1)).alias("duplicate_count"), F.first("_t", ignorenulls=True).alias("record")
+        ).select(F.col("match_key").alias("key"), "duplicate_count", "record")
+        duplicate_key_reconciliation = reconciliation.filter(
+            F.col("normalized_primary_key").isNotNull()
+        ).groupBy("normalized_primary_key").agg(
+            F.first("match_key", ignorenulls=True).alias("key"),
+            F.max(F.coalesce(F.col("_source_key_count"), F.lit(0))).alias("source_occurrences"),
+            F.max(F.coalesce(F.col("_target_key_count"), F.lit(0))).alias("target_occurrences"),
+            F.sum(F.when(
+                F.col("_source_key_count").isNotNull() & F.col("_target_key_count").isNotNull(), 1
+            ).otherwise(0)).alias("compared_pairs"),
+            F.first(F.when(F.col("_source_key_count").isNotNull(), F.col("_s")), ignorenulls=True).alias("source_record"),
+            F.first(F.when(F.col("_target_key_count").isNotNull(), F.col("_t")), ignorenulls=True).alias("target_record"),
+        ).filter(
+            (F.col("source_occurrences") > 1) | (F.col("target_occurrences") > 1)
+        ).select("key", "source_occurrences", "target_occurrences", "compared_pairs", "source_record", "target_record")
+        unmatchable_source = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_SOURCE").select(F.col("_s").alias("record"))
+        unmatchable_target = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_TARGET").select(F.col("_t").alias("record"))
         source_stats = self._stats(s, cfg, "source")
         target_stats = self._stats(t, cfg, "target")
         sc=source_stats["total_rows"]; tc=target_stats["total_rows"]
-        mic=counts["missing_count"]; ec=counts["extra_count"]; mc=counts["primary_matched_count"]
-        metrics={"status":"PASS" if mic+ec==0 else "FAIL","source_record_count":sc,"target_record_count":tc,
-                 "source_unique_key_count":counts["source_unique_key_count"], "target_unique_key_count":counts["target_unique_key_count"],
-                 "matched_key_count":mc,"primary_matched_count":mc,
-                 "missing_key_count":mic,"extra_key_count":ec,"ambiguous_record_count":0,
-                 "mismatch_count":mic+ec,
-                 "source_record_coverage_pct":safe_rate_pct(mc,sc,zero_value=100.0),
-                 "target_record_coverage_pct":safe_rate_pct(mc,tc,zero_value=100.0),
+        mic=counts["missing_count"]; ec=counts["extra_count"]
+        mc=counts["matched_key_count"]; pmc=counts["primary_matched_count"]
+        # Keep the public duplicate counters identical to L2: these are the
+        # duplicate occurrences beyond the first row for each populated key.
+        # The number of distinct duplicated key values is exposed separately.
+        sdk=int(source_stats.get("duplicate_key_count") or 0)
+        tdk=int(target_stats.get("duplicate_key_count") or 0)
+        sdg=counts["source_duplicate_key_count"]; tdg=counts["target_duplicate_key_count"]
+        sdr=sdk+sdg; tdr=tdk+tdg
+        usc=counts["unmatchable_source_count"]; utc=counts["unmatchable_target_count"]
+        all_rows_have_usable_keys = usc == 0 and utc == 0
+        needs_secondary_reconciliation = (usc + utc + mic + ec) > 0
+        effective_matching_mode = (
+            cfg.get("matching_mode", "ROW_LEVEL")
+            if needs_secondary_reconciliation
+            else "ROW_LEVEL"
+        )
+        metrics={"status":"PASS" if mic+ec+usc+utc==0 else "FAIL","source_record_count":sc,"target_record_count":tc,
+                 "source_unique_key_count":source_stats["distinct_key_count"], "target_unique_key_count":target_stats["distinct_key_count"],
+                 "matched_key_count":mc,"primary_matched_count":pmc,
+                 "missing_key_count":mic,"extra_key_count":ec,
+                 "source_duplicate_key_count":sdk,"target_duplicate_key_count":tdk,
+                 "source_duplicated_key_value_count":sdg,"target_duplicated_key_value_count":tdg,
+                 "source_duplicate_record_count":sdr,"target_duplicate_record_count":tdr,
+                 "unmatchable_source_count":usc,"unmatchable_target_count":utc,
+                 "ambiguous_record_count":usc+utc,
+                 "mismatch_count":mic+ec+usc+utc,
+                 "source_record_coverage_pct":safe_rate_pct(counts["matched_source_record_count"],sc,zero_value=100.0),
+                 "target_record_coverage_pct":safe_rate_pct(counts["matched_target_record_count"],tc,zero_value=100.0),
                  "missing_record_rate_pct":safe_rate_pct(mic,sc),"extra_record_rate_pct":safe_rate_pct(ec,tc),
-                 "ambiguous_record_rate_pct":0.0,
-                 "matching_mode":cfg.get("matching_mode","ROW_LEVEL")}
-        if cfg.get("matching_mode") == "GROUP_RECONCILIATION":
+                 "ambiguous_record_rate_pct":safe_rate_pct(usc+utc,sc+tc),
+                 "matching_mode":effective_matching_mode,
+                 "all_rows_have_usable_keys":all_rows_have_usable_keys,
+                 "needs_secondary_reconciliation":needs_secondary_reconciliation}
+        if cfg.get("matching_mode") == "GROUP_RECONCILIATION" and needs_secondary_reconciliation:
             group_started = perf_counter()
-            gr=self._group(s,t,cfg); row_metrics=dict(metrics); metrics={**metrics,**gr["metrics"],"row_reconciliation":row_metrics,"group_reconciliation":gr["metrics"],
-                "status":"FAIL" if row_metrics["status"]=="FAIL" or gr["metrics"]["status"]=="FAIL" else "PASS"}
+            groups = cfg.get("grouping_attributes", []) or []
+            mapping_lookup = self._mapping_lookup(cfg)
+
+            def with_secondary_group_key(df, side):
+                expressions = []
+                for item in groups:
+                    source_column = item["source_column"]
+                    target_column = item["target_column"]
+                    column = source_column if side == "source" else target_column
+                    mapping = mapping_lookup.get(source_column, {})
+                    if mapping.get("target_column") != target_column:
+                        mapping = {}
+                    expressions.append(self._apply_mapping_normalization(F.col(column), mapping).cast("string"))
+                return df.withColumn("__secondary_group_key", F.to_json(F.array(*expressions)))
+
+            null_source = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_SOURCE").select("_s.*")
+            null_target = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_TARGET").select("_t.*")
+            missing_source = reconciliation.filter(F.col("reconciliation_status") == "MISSING_IN_TARGET").select("_s.*")
+            extra_target = reconciliation.filter(F.col("reconciliation_status") == "EXTRA_IN_TARGET").select("_t.*")
+
+            # A populated missing/extra key may participate in grouped
+            # reconciliation only when the opposite matching group contains a
+            # row with no usable key. Populated key vs populated key is never
+            # reinterpreted by grouping.
+            keyed_null_source = with_secondary_group_key(null_source, "source")
+            keyed_null_target = with_secondary_group_key(null_target, "target")
+            target_null_groups = keyed_null_target.select("__secondary_group_key").distinct()
+            source_null_groups = keyed_null_source.select("__secondary_group_key").distinct()
+            related_missing_source = with_secondary_group_key(missing_source, "source").join(
+                target_null_groups, "__secondary_group_key", "left_semi"
+            )
+            related_extra_target = with_secondary_group_key(extra_target, "target").join(
+                source_null_groups, "__secondary_group_key", "left_semi"
+            )
+            fallback_source = keyed_null_source.unionByName(related_missing_source).drop("__secondary_group_key")
+            fallback_target = keyed_null_target.unionByName(related_extra_target).drop("__secondary_group_key")
+            secondary_matches = self._possible_key_changes(fallback_source, fallback_target, cfg).persist()
+            secondary_match_count = secondary_matches.count()
+            possible_key_changes = secondary_matches.filter(F.col("status") == "POSSIBLE_KEY_CHANGE")
+            possible_key_change_count = possible_key_changes.count()
+            missing_business_keys = secondary_matches.filter(F.col("status") == "MISSING_BUSINESS_KEY")
+            missing_business_key_count = missing_business_keys.count()
+            metrics["secondary_match_count"] = secondary_match_count
+            metrics["possible_key_change_count"] = possible_key_change_count
+            metrics["missing_business_key_count"] = missing_business_key_count
+            gr = None
+            if fallback_source.limit(1).count() or fallback_target.limit(1).count():
+                # Reconcile every key-unresolved row by configured grouping
+                # attributes. Duplicate primary keys stay in the PK section.
+                gr=self._group(fallback_source,fallback_target,cfg)
+                row_metrics=dict(metrics)
+                unresolved_populated_keys = max(0, mic + ec - missing_business_key_count)
+                final_status = "FAIL" if (
+                    unresolved_populated_keys > 0
+                    or missing_business_key_count > 0
+                    or gr["metrics"]["status"] == "FAIL"
+                ) else "PASS"
+                metrics={**metrics,**gr["metrics"],"row_reconciliation":row_metrics,"group_reconciliation":gr["metrics"],
+                    "status":final_status}
+                metrics["secondary_match_count"] = secondary_match_count
+                metrics["possible_key_change_count"] = possible_key_change_count
+                metrics["missing_business_key_count"] = missing_business_key_count
+            else:
+                metrics["matching_mode"] = "ROW_LEVEL"
             group_ms = (perf_counter() - group_started) * 1000
             evidence_started = perf_counter()
-            evidence = {"matched_pairs":self._bounded(pairs, mc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec),"group_reconciliation":gr["evidence"].get("group_reconciliation",[])}
+            row_evidence = {"matched_pairs":self._bounded(pairs, pmc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec),
+                "duplicate_source_records":self._bounded(source_duplicates, sdk),"duplicate_target_records":self._bounded(target_duplicates, tdk),
+                "duplicate_key_reconciliation":self._bounded(duplicate_key_reconciliation, sdg + tdg),
+                "unmatchable_source_records":self._bounded(unmatchable_source, usc),"unmatchable_target_records":self._bounded(unmatchable_target, utc)}
+            evidence = {**row_evidence, "row_reconciliation": row_evidence,
+                "secondary_matches":self._bounded(secondary_matches, secondary_match_count),
+                "missing_business_keys":self._bounded(missing_business_keys, missing_business_key_count),
+                "possible_key_changes":self._bounded(possible_key_changes, possible_key_change_count)}
+            if gr is not None:
+                evidence["group_reconciliation"] = gr["evidence"].get("group_reconciliation",[])
             evidence_ms = (perf_counter() - evidence_started) * 1000
             logger.info("SPARK_L3_TIMING pk_build_ms=%.1f pk_summary_ms=%.1f pk_evidence_ms=%.1f group_ms=%.1f", pk_timing["pk_build_ms"], pk_timing["pk_summary_ms"], evidence_ms, group_ms)
             print(f"SPARK_L3_TIMING pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms={group_ms:.1f}")
             return {"metrics":metrics,"evidence":evidence}
         evidence_started = perf_counter()
-        evidence = {"matched_pairs":self._bounded(pairs, mc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec)}
+        evidence = {"matched_pairs":self._bounded(pairs, pmc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec),
+            "duplicate_source_records":self._bounded(source_duplicates, sdk),"duplicate_target_records":self._bounded(target_duplicates, tdk),
+            "duplicate_key_reconciliation":self._bounded(duplicate_key_reconciliation, sdg + tdg),
+            "unmatchable_source_records":self._bounded(unmatchable_source, usc),"unmatchable_target_records":self._bounded(unmatchable_target, utc)}
         evidence_ms = (perf_counter() - evidence_started) * 1000
         logger.info("SPARK_L3_TIMING pk_build_ms=%.1f pk_summary_ms=%.1f pk_evidence_ms=%.1f group_ms=0.0", pk_timing["pk_build_ms"], pk_timing["pk_summary_ms"], evidence_ms)
         print(f"SPARK_L3_TIMING pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms=0.0")
         return {"metrics":metrics,"evidence":evidence}
+
+    def _possible_key_changes(self, source, target, cfg):
+        """Match unresolved rows one-to-one using configured grouping fields."""
+        from pyspark.sql import functions as F
+
+        groups = cfg.get("grouping_attributes", []) or []
+        keys = cfg.get("comparison_keys", []) or []
+        if not groups or not keys:
+            return source.limit(0).select(F.lit(None).cast("string").alias("source_key"))
+
+        source_group_columns = [item["source_column"] for item in groups]
+        target_group_columns = [item["target_column"] for item in groups]
+        source_record = F.struct(*[F.col(column) for column in source.columns])
+        target_record = F.struct(*[F.col(column) for column in target.columns])
+        source_key = F.to_json(F.struct(*[F.col(item["source_column"]) for item in keys]))
+        target_key = F.to_json(F.struct(*[F.col(item["target_column"]) for item in keys]))
+        source_key_available = None
+        target_key_available = None
+        for item in keys:
+            source_part = F.col(item["source_column"]).isNotNull() & (F.trim(F.col(item["source_column"]).cast("string")) != "")
+            target_part = F.col(item["target_column"]).isNotNull() & (F.trim(F.col(item["target_column"]).cast("string")) != "")
+            source_key_available = source_part if source_key_available is None else source_key_available & source_part
+            target_key_available = target_part if target_key_available is None else target_key_available & target_part
+
+        source_groups = source.groupBy(*source_group_columns).agg(
+            F.count(F.lit(1)).alias("source_candidates"),
+            F.first(source_record, ignorenulls=True).alias("source_record"),
+            F.first(source_key, ignorenulls=True).alias("source_key"),
+            F.max(source_key_available.cast("int")).alias("source_key_available"),
+        ).alias("s")
+        target_groups = target.groupBy(*target_group_columns).agg(
+            F.count(F.lit(1)).alias("target_candidates"),
+            F.first(target_record, ignorenulls=True).alias("target_record"),
+            F.first(target_key, ignorenulls=True).alias("target_key"),
+            F.max(target_key_available.cast("int")).alias("target_key_available"),
+        ).alias("t")
+
+        condition = None
+        for source_column, target_column in zip(source_group_columns, target_group_columns):
+            pair = F.col(f"s.`{source_column}`").eqNullSafe(F.col(f"t.`{target_column}`"))
+            condition = pair if condition is None else condition & pair
+
+        group_value = F.array(*[
+            F.coalesce(F.col(f"s.`{source_column}`"), F.col(f"t.`{target_column}`")).cast("string")
+            for source_column, target_column in zip(source_group_columns, target_group_columns)
+        ])
+        return source_groups.join(target_groups, condition, "inner").filter(
+            ((F.col("source_candidates") == 1) & (F.col("target_candidates") == 1))
+            | (F.col("source_key_available") != F.col("target_key_available"))
+        ).select(
+            group_value.alias("group_key"),
+            "source_key",
+            "target_key",
+            "source_record",
+            "target_record",
+            F.when(
+                F.col("source_key_available") != F.col("target_key_available"),
+                F.lit("The configured matching attributes identify the same record, but its business key is missing on one side"),
+            ).when(
+                (F.col("source_key_available") == 1) & (F.col("target_key_available") == 1),
+                F.lit("Records share the configured matching attributes but use different business keys"),
+            ).otherwise(
+                F.lit("Records have no usable business key and were paired by the configured matching attributes")
+            ).alias("reason"),
+            F.when(
+                F.col("source_key_available") != F.col("target_key_available"),
+                F.lit("MISSING_BUSINESS_KEY"),
+            ).when(
+                (F.col("source_key_available") == 1) & (F.col("target_key_available") == 1),
+                F.lit("POSSIBLE_KEY_CHANGE"),
+            ).otherwise(F.lit("MATCHED_BY_ATTRIBUTES")).alias("status"),
+        )
 
     @staticmethod
     def _mapping_lookup(cfg):
@@ -842,7 +1115,21 @@ class SparkExecutor:
         keys=cfg.get("comparison_keys",[])
         if not keys: return {"metrics":{"status":"NOT_APPLICABLE","comparison_mode":"GROUP_RECONCILIATION","reason":"Row-level field comparison is not applicable without row matches."},"evidence":{}}
         reconciliation, match_counts, _ = self._matched_pairs(s,t,cfg)
-        pairs = reconciliation.filter(F.col("reconciliation_status") == "MATCHED").select("_s", "_t", "match_type", "match_key")
+        matched_reconciliation = reconciliation.filter(F.col("reconciliation_status") == "MATCHED")
+        pairs = matched_reconciliation.select("_s", "_t", "match_type", "match_key")
+        duplicate_pairs = matched_reconciliation.filter(
+            (F.col("_source_key_count") > 1) | (F.col("_target_key_count") > 1)
+        ).groupBy("normalized_primary_key").agg(
+            F.first("match_key", ignorenulls=True).alias("key"),
+            F.max("_source_key_count").alias("source_occurrences"),
+            F.max("_target_key_count").alias("target_occurrences"),
+            F.count(F.lit(1)).alias("compared_pairs"),
+            F.first("_s", ignorenulls=True).alias("source_record"),
+            F.first("_t", ignorenulls=True).alias("target_record"),
+        ).select(
+            "key", "source_occurrences", "target_occurrences", "compared_pairs",
+            "source_record", "target_record",
+        )
 
         resolved_pairs = self._resolve_l4_column_pairs(s.columns, t.columns, cfg)
         hashed_pairs = self._matched_row_hashes(pairs, resolved_pairs).persist()
@@ -982,6 +1269,8 @@ class SparkExecutor:
                 "hash_equal_record_count": hash_equal,
                 "hash_changed_candidate_count": hash_changed,
                 "hash_algorithm": "SHA-256",
+                "source_duplicate_key_count":source_stats["duplicate_key_count"],
+                "target_duplicate_key_count":target_stats["duplicate_key_count"],
                 "missing_record_count":match_counts["missing_count"],"extra_record_count":match_counts["extra_count"],"ambiguous_record_count":0},
                 "evidence":{"field_statistics":field_statistics,"comparison_keys":keys,
                             "effective_column_mappings":[{
@@ -996,7 +1285,8 @@ class SparkExecutor:
                                   else "NUMERIC_TOLERANCE" if (mapping or {}).get("tolerance") is not None
                                   else "EXACT"
                               )]],
-                            "field_mismatches":self._bounded(field_mismatches, total_mismatch)}}
+                            "field_mismatches":self._bounded(field_mismatches, total_mismatch),
+                            "duplicate_matched_pairs":self._bounded(duplicate_pairs, match_counts["source_duplicate_key_count"] + match_counts["target_duplicate_key_count"])}}
 
     def _agg_expr(self, op, col):
         from pyspark.sql import functions as F
@@ -1062,7 +1352,47 @@ class SparkExecutor:
                 F.sum(F.when(~F.col("matched"), 1).otherwise(0)).alias("failed"),
             ).first()
             total = int(summary["total"] or 0); failed = int(summary["failed"] or 0)
-            result_by_index[index] = {"rule_name":r.get("name"),"operation":op,"source_column":sc,"target_column":tc,"grouped":True,"checks":total,"failed":failed,"matched":failed==0}
+            group_columns = [
+                F.coalesce(F.col(f"s.`{source_group}`"), F.col(f"t.`{target_group}`")).alias(f"group_{group_index}")
+                for group_index, (source_group, target_group) in enumerate(zip(sg, tg))
+            ]
+            failed_group_rows = (
+                g.filter(~F.col("matched"))
+                .select(
+                    *group_columns,
+                    F.col("sv").alias("source"),
+                    F.col("tv").alias("target"),
+                    diff_expr.alias("difference"),
+                )
+                .limit(self.evidence_limit)
+                .collect()
+            )
+            tolerance = (
+                {"percentage": float(r["tolerance_pct"])}
+                if r.get("tolerance_pct") is not None
+                else r.get("tolerance")
+            )
+            group_results = []
+            for failed_row in failed_group_rows:
+                group_values = [failed_row[f"group_{group_index}"] for group_index in range(len(sg))]
+                group_results.append({
+                    "rule_name": r.get("name"),
+                    "operation": op,
+                    "source_column": sc,
+                    "target_column": tc,
+                    "group": group_values[0] if len(group_values) == 1 else group_values,
+                    "source": failed_row["source"],
+                    "target": failed_row["target"],
+                    "difference": failed_row["difference"],
+                    "tolerance": tolerance,
+                    "tolerance_pct": r.get("tolerance_pct"),
+                    "matched": False,
+                })
+            result_by_index[index] = {
+                "rule_name":r.get("name"),"operation":op,"source_column":sc,"target_column":tc,
+                "grouped":True,"checks":total,"failed":failed,"matched":failed==0,
+                "group_results":group_results,
+            }
         results = [result_by_index[index] for index in range(len(rules))]
         failed=sum(1 for x in results if not x["matched"])
         checks_total = sum(item.get("checks", 1) for item in results)
@@ -1111,7 +1441,11 @@ class SparkExecutor:
         def build(df, side):
             from pyspark.sql.window import Window
             prepared = prepare(df, side)
-            aggregate_exprs=[F.count(F.lit(1)).alias("__present")]
+            record_struct = F.struct(*[F.col(column) for column in df.columns])
+            aggregate_exprs=[
+                F.count(F.lit(1)).alias("__present"),
+                F.first(record_struct, ignorenulls=True).alias("__record"),
+            ]
             mode_specs=[]
             for i,item in enumerate(aggs):
                 sc=item["source_column"]; tc=item["target_column"]
@@ -1167,6 +1501,7 @@ class SparkExecutor:
         ])
         presence_rows=j.filter(F.col("s.__present").isNull() | F.col("t.__present").isNull()).select(
             group_key.alias("group_key"),
+            F.col("s.__record").alias("source_record"), F.col("t.__record").alias("target_record"),
             F.lit(None).cast("string").alias("source_aggregate"), F.lit(None).cast("string").alias("target_aggregate"),
             F.lit(None).cast("string").alias("source_column"), F.lit(None).cast("string").alias("target_column"),
             F.lit(None).cast("string").alias("operation"), F.lit(None).cast("double").alias("difference"),
@@ -1174,6 +1509,30 @@ class SparkExecutor:
         ).withColumn("matched", F.lit(False))
 
         common_rows=j.filter(F.col("s.__present").isNotNull() & F.col("t.__present").isNotNull())
+        count_mismatch_rows=common_rows.filter(F.col("s.__present") != F.col("t.__present")).select(
+            group_key.alias("group_key"),
+            F.col("s.__record").alias("source_record"), F.col("t.__record").alias("target_record"),
+            F.col("s.__present").cast("string").alias("source_aggregate"),
+            F.col("t.__present").cast("string").alias("target_aggregate"),
+            F.lit("Rows").alias("source_column"), F.lit("Rows").alias("target_column"),
+            F.lit("COUNT").alias("operation"),
+            (F.col("t.__present").cast("double")-F.col("s.__present").cast("double")).alias("difference"),
+            F.lit("GROUP_ROW_COUNT_MISMATCH").alias("status"), F.lit(False).alias("matched"),
+        )
+        duplicate_group_rows=j.filter(
+            (F.coalesce(F.col("s.__present"), F.lit(0)) > 1)
+            | (F.coalesce(F.col("t.__present"), F.lit(0)) > 1)
+        ).select(
+            group_key.alias("group_key"),
+            F.col("s.__record").alias("source_record"), F.col("t.__record").alias("target_record"),
+            F.coalesce(F.col("s.__present"), F.lit(0)).cast("string").alias("source_aggregate"),
+            F.coalesce(F.col("t.__present"), F.lit(0)).cast("string").alias("target_aggregate"),
+            F.lit("Rows").alias("source_column"), F.lit("Rows").alias("target_column"),
+            F.lit("DUPLICATE COUNT").alias("operation"),
+            (F.coalesce(F.col("t.__present"), F.lit(0)).cast("double")
+             - F.coalesce(F.col("s.__present"), F.lit(0)).cast("double")).alias("difference"),
+            F.lit("GROUP_DUPLICATE_ROWS").alias("status"), F.lit(False).alias("matched"),
+        )
         aggregate_structs=[]
         for index,item in enumerate(aggs):
             source_value,target_value=F.col(f"s.a{index}"),F.col(f"t.a{index}")
@@ -1181,6 +1540,8 @@ class SparkExecutor:
                     .when(source_value.eqNullSafe(target_value), F.lit("PASS"))
                     .otherwise(F.lit("GROUP_VALUE_MISMATCH")))
             aggregate_structs.append(F.struct(
+                F.col("s.__record").alias("source_record"),
+                F.col("t.__record").alias("target_record"),
                 source_value.cast("string").alias("source_aggregate"),
                 target_value.cast("string").alias("target_aggregate"),
                 F.lit(item["source_column"]).alias("source_column"),
@@ -1192,13 +1553,15 @@ class SparkExecutor:
             ))
         aggregate_rows=(common_rows.select(group_key.alias("group_key"),F.explode(F.array(*aggregate_structs)).alias("aggregate"))
                         .select("group_key","aggregate.*")) if aggregate_structs else None
-        result_rows=presence_rows if aggregate_rows is None else presence_rows.unionByName(aggregate_rows)
+        result_rows=presence_rows.unionByName(count_mismatch_rows).unionByName(duplicate_group_rows)
+        if aggregate_rows is not None:
+            result_rows=result_rows.unionByName(aggregate_rows)
         result_rows=result_rows.persist()
         result_summary=result_rows.agg(
             F.count(F.lit(1)).alias("result_row_count"),
             F.sum(F.when(~F.col("status").isin("MISSING_GROUP_IN_TARGET","EXTRA_GROUP_IN_TARGET","NOT_APPLICABLE"),1).otherwise(0)).alias("applicable"),
-            F.sum(F.when(F.col("status")=="GROUP_VALUE_MISMATCH",1).otherwise(0)).alias("failed"),
-            F.countDistinct(F.when(F.col("status")=="GROUP_VALUE_MISMATCH",F.to_json(F.col("group_key")))).alias("mismatch_groups"),
+            F.sum(F.when(F.col("status").isin("GROUP_VALUE_MISMATCH","GROUP_ROW_COUNT_MISMATCH","GROUP_DUPLICATE_ROWS"),1).otherwise(0)).alias("failed"),
+            F.countDistinct(F.when(F.col("status").isin("GROUP_VALUE_MISMATCH","GROUP_ROW_COUNT_MISMATCH","GROUP_DUPLICATE_ROWS"),F.to_json(F.col("group_key")))).alias("mismatch_groups"),
         ).first()
         aggregate_checks_total=int(result_summary["applicable"] or 0)
         aggregate_checks_failed=int(result_summary["failed"] or 0)

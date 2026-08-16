@@ -218,16 +218,7 @@ class DQComparator:
         ] = {
             "COMPLETENESS": self._check_completeness,
             "VALIDITY": self._check_validity,
-            "CONSISTENCY": self._check_consistency,
-            "TIMELINESS": self._check_timeliness,
-            "CUSTOM": self._check_custom,
-            "REFERENTIAL_INTEGRITY": (
-                self._check_referential_integrity
-            ),
             "PATTERN": self._check_pattern,
-            "DISTRIBUTION": self._check_distribution,
-            "CONDITIONAL": self._check_conditional,
-            "TRANSFORMATION": self._check_transformation,
         }
 
         handler = handlers.get(rule_type)
@@ -240,11 +231,7 @@ class DQComparator:
         if rule_type in {
             "COMPLETENESS",
             "VALIDITY",
-            "TIMELINESS",
             "PATTERN",
-            "DISTRIBUTION",
-            "REFERENTIAL_INTEGRITY",
-            "TRANSFORMATION",
         }:
             self._validate_scoped_columns(
                 normalized_rule,
