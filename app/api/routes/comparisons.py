@@ -45,7 +45,6 @@ from app.connectors.manager import ConnectorManager
 from app.connectors.csv import CSVMetadataProvider
 from app.connectors.databricks import DatabricksConnector
 
-from app.comparators.registry import ComparatorRegistry
 from app.analysis.engine import L7AnalysisEngine
 
 
@@ -118,29 +117,6 @@ connector_manager.register_connection_provider(
     "databricks",
     databricks_provider,
 )
-
-# ============================================================
-# COMPARATOR REGISTRY
-# ============================================================
-
-comparator_registry = ComparatorRegistry(
-    schema_providers={
-        "csv": csv_provider,
-        "databricks": databricks_provider,
-    }
-)
-
-
-# ============================================================
-# COMPARATOR REGISTRY
-# ============================================================
-
-comparator_registry = ComparatorRegistry(
-    schema_providers={
-        "csv": csv_provider,
-    }
-)
-
 
 # ============================================================
 # IN-MEMORY RUN REGISTRY
@@ -491,8 +467,8 @@ def execute_plan(
     )
 
     dispatcher = ExecutionDispatcher(
-        comparator_registry=comparator_registry,
         connector_manager=connector_manager,
+        persistence_repository=persistence_repository,
     )
 
     collector = ExecutionCollector()
