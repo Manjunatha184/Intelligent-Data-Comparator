@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -31,6 +32,7 @@ class CSVMetadataProvider(
     """
 
     SCHEMA_SAMPLE_SIZE = 1000
+    UPLOAD_ROOT = Path("/app/data/uploads")
 
     def get_schema(
         self,
@@ -49,7 +51,11 @@ class CSVMetadataProvider(
                 "CSV dataset requires 'properties.path'"
             )
 
-        path = Path(path_value)
+        filename = properties.get("filename")
+        path = self._resolve_csv_path(
+            Path(path_value),
+            str(filename) if filename else None,
+        )
 
         if not path.exists():
             raise FileNotFoundError(
@@ -142,6 +148,70 @@ class CSVMetadataProvider(
     # ========================================================
     # CONNECTION
     # ========================================================
+
+    def _resolve_csv_path(
+        self,
+        path: Path,
+        filename: str | None = None,
+    ) -> Path:
+        if path.exists():
+            return path
+
+        names = self._fallback_filenames(
+            filename or path.name,
+        )
+        candidates = [
+            candidate
+            for name in names
+            for candidate in self.UPLOAD_ROOT.glob(f"*/{name}")
+            if candidate.is_file()
+        ]
+
+        if not candidates:
+            return path
+
+        return max(
+            candidates,
+            key=lambda candidate: candidate.stat().st_mtime,
+        )
+
+    @staticmethod
+    def _fallback_filenames(
+        filename: str,
+    ) -> list[str]:
+        names = [Path(filename).name]
+        lowered = names[0].lower()
+
+        if lowered not in names:
+            names.append(lowered)
+
+        source_match = re.fullmatch(
+            r"source_data_s(\d+)\.csv",
+            lowered,
+        )
+        if source_match:
+            number = source_match.group(1)
+            names.extend(
+                [
+                    f"source_t{number}.csv",
+                    f"source_csv_t{number}.csv",
+                ]
+            )
+
+        target_match = re.fullmatch(
+            r"target_data_t(\d+)\.csv",
+            lowered,
+        )
+        if target_match:
+            number = target_match.group(1)
+            names.extend(
+                [
+                    f"target_t{number}.csv",
+                    f"target_csv_t{number}.csv",
+                ]
+            )
+
+        return list(dict.fromkeys(names))
 
     def test_connection(
         self,
