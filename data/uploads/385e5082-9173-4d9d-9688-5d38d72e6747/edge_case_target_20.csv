@@ -1,0 +1,25 @@
+ID,Name,Sales,Target_Quantity,Target_Email,Status,Region,Event_Date,Timestamp,Version
+A001,Product Alpha,100,10,alpha@test.com,ACTIVE,North,2026-08-01,2026-08-20 10:00:00,1
+A002, product alpha plus ,200,20,ALPHA.PLUS@TEST.COM,ACTIVE,north,2026-08-02,2026-08-20 10:05:00,1
+X001,Product Xray,5000,999,xray@test.com,ACTIVE,West,2026-08-20,2026-08-20 10:12:00,1
+C001,Product Gamma Duplicate,475,48,gamma.duplicate.target@test.com,INACTIVE,East,2026-08-05,2026-08-20 10:11:00,2
+B001,Product Beta,300,30,beta@test.com,ACTIVE,South,2026-08-03,2026-08-20 10:10:00,1
+C001,Product Gamma,400,40,gamma@test.com,ACTIVE,East,2026-08-04,2026-08-20 10:15:00,1
+,Product Echo,600,60,echo@test.com,ACTIVE,Central,2026-08-06,2026-08-20 10:20:00,1
+F001,Product Foxtrot Target,775,77,foxtrot.target@test.com,INACTIVE,North,2026-08-17,2026-08-20 10:25:00,2
+G001,Product Golf,800,80,golf@test.com,ACTIVE,South,2026-08-08,2026-08-20 10:30:00,1
+,Product Hotel,900.40,90.4,hotel@test.com,ACTIVE,East,2026-08-09,2026-08-20 10:35:00,1
+I001,Product India,1000,100,india@test.com,ACTIVE,west,2026-08-10,2026-08-20 10:40:00,1
+,Product Juliett,1150,115,juliett@test.com,INACTIVE,Central,2026-08-12,2026-08-20 10:45:00,1
+K999,Product Kilo,1250,125,kilo@test.com,ACTIVE,South,2026-08-12,2026-08-20 10:50:00,2
+L001,Product Lima,1300,130,not-an-email,ACTIVE,South,2026-08-13,2026-08-20 10:55:00,1
+M001,Product Mike,1400,0,mike@test.com,ACTIVE,East,2026-08-14,2026-08-20 11:00:00,1
+N001,Product November,1500,150,november@test.com,ACTIVE,West,2026-08-15,2026-08-20 11:05:00,1
+O001,,1600,160,oscar@test.com,ACTIVE,Central,2026-08-16,2026-08-20 11:10:00,1
+,Café Product,1700,170,cafe@test.com,ACTIVE,North,2026-08-17,2026-08-20 11:15:00,1
+Q001,Product Quebec,1801.00,181.0,quebec@test.com,ACTIVE,South,2026-08-19,2026-08-20 11:20:00,2
+,Café Product,1700,170,cafe@test.com,ACTIVE,North,2026-08-17,2026-08-20 11:15:00,1
+N111,Product November,1500,150,november@test.com,ACTIVE,West,2026-08-15,2026-08-20 11:05:00,1
+N222,Product November,1500,150,november@test.com,ACTIVE,West,2026-08-15,2026-08-20 11:05:00,1
+,Product Lima,1300,130,lima@test.com,ACTIVE,South,2026-08-13,LEG-M
+

@@ -43,14 +43,7 @@ class Priority(str, Enum):
 
 
 class ExecutionLocation(str, Enum):
-    PUSHDOWN = "PUSHDOWN"
-    LOCAL = "LOCAL"
     SPARK = "SPARK"
-
-
-class DataAccessMode(str, Enum):
-    IN_MEMORY = "IN_MEMORY"
-    CHUNKED = "CHUNKED"
 
 
 class ExecutionResultStatus(str, Enum):

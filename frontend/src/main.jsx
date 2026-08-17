@@ -1841,7 +1841,6 @@ function ComparisonBuilder({
         max_exact_bytes: 50000000,
         sampling_min_rows: 1000000,
         allow_sampling: false,
-        prefer_pushdown: true,
       },
     };
 

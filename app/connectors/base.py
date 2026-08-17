@@ -101,12 +101,6 @@ class DataProvider(ABC):
         if chunk:
             yield chunk
 
-    def supports_pushdown(
-        self,
-        comparison_level: str,
-    ) -> bool:
-
-        return False
 
     def get_volume_statistics(
         self,

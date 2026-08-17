@@ -59,16 +59,6 @@ class DatabricksConnector(
                 resolved[key] = nested[key]
         return resolved
 
-    # ====================================================
-    # CAPABILITIES
-    # ====================================================
-
-    def supports_pushdown(
-        self,
-        comparison_level: str,
-    ) -> bool:
-
-        return comparison_level.upper() == "L2"
 
     # ====================================================
     # CONNECTION
@@ -545,7 +535,7 @@ class DatabricksConnector(
         ]
 
     # ====================================================
-    # L2 PUSHDOWN STATISTICS
+    # L2 DATASET STATISTICS
     # ====================================================
 
     def get_volume_statistics(

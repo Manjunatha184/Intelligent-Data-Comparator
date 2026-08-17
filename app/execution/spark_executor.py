@@ -646,6 +646,247 @@ class SparkExecutor:
         return ss.join(tt,cond,"full_outer"), cond
 
     def _matched_pairs(self, s, t, cfg):
+        """Build the authoritative PK reconciliation using the cheapest safe Spark path.
+
+        L2 normally computes and caches per-side key statistics before L3.  When
+        those statistics prove that populated business keys are unique on both
+        sides, the expensive duplicate-key Window/group/join machinery is not
+        needed.  In that common case we use one direct distributed full-outer
+        join on the normalized PK.  If either side contains duplicates, the
+        existing deterministic occurrence-matching implementation is used
+        unchanged.
+        """
+        from pyspark.sql import functions as F
+
+        keys = cfg.get("comparison_keys", [])
+        if not keys:
+            raise ValueError("Spark row comparison requires comparison_keys")
+
+        cache_key = json.dumps(
+            {
+                "source": cfg.get("source"),
+                "target": cfg.get("target"),
+                "comparison_keys": keys,
+            },
+            sort_keys=True,
+            default=str,
+        )
+        cached = self._match_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        # These are normally cache hits because L2 runs before L3.  If L3 is
+        # invoked independently they are still exact distributed Spark stats.
+        source_stats = self._stats(s, cfg, "source")
+        target_stats = self._stats(t, cfg, "target")
+        source_duplicates = int(source_stats.get("duplicate_key_count") or 0)
+        target_duplicates = int(target_stats.get("duplicate_key_count") or 0)
+
+        # Preserve the full deterministic duplicate-occurrence algorithm for
+        # the complex case.  Nothing about duplicate semantics changes.
+        if source_duplicates > 0 or target_duplicates > 0:
+            return self._matched_pairs_with_duplicates(s, t, cfg)
+
+        build_started = perf_counter()
+
+        source = s.withColumn("__source_row_id", F.monotonically_increasing_id())
+        target = t.withColumn("__target_row_id", F.monotonically_increasing_id())
+
+        source_valid = None
+        target_valid = None
+        for item in keys:
+            source_column = item["source_column"]
+            target_column = item["target_column"]
+            source_populated = (
+                F.col(source_column).isNotNull()
+                & (F.trim(F.col(source_column).cast("string")) != "")
+            )
+            target_populated = (
+                F.col(target_column).isNotNull()
+                & (F.trim(F.col(target_column).cast("string")) != "")
+            )
+            source_valid = (
+                source_populated
+                if source_valid is None
+                else source_valid & source_populated
+            )
+            target_valid = (
+                target_populated
+                if target_valid is None
+                else target_valid & target_populated
+            )
+
+        source_key = F.concat_ws(
+            "\u001f",
+            *[F.col(item["source_column"]).cast("string") for item in keys],
+        )
+        target_key = F.concat_ws(
+            "\u001f",
+            *[F.col(item["target_column"]).cast("string") for item in keys],
+        )
+
+        source_prepared = (
+            source
+            .withColumn(
+                "__normalized_primary_key",
+                F.when(source_valid, source_key),
+            )
+            .withColumn(
+                "__key_count",
+                F.when(source_valid, F.lit(1)).otherwise(F.lit(None).cast("int")),
+            )
+        )
+        target_prepared = (
+            target
+            .withColumn(
+                "__normalized_primary_key",
+                F.when(target_valid, target_key),
+            )
+            .withColumn(
+                "__key_count",
+                F.when(target_valid, F.lit(1)).otherwise(F.lit(None).cast("int")),
+            )
+        )
+
+        # Normal equality deliberately does NOT match NULL keys.  Rows without
+        # usable PKs therefore remain separate UNMATCHABLE_SOURCE/TARGET rows.
+        joined = source_prepared.alias("s").join(
+            target_prepared.alias("t"),
+            F.col("s.__normalized_primary_key")
+            == F.col("t.__normalized_primary_key"),
+            "full_outer",
+        )
+
+        source_struct = F.struct(
+            *[
+                F.col(f"s.`{field.name}`").alias(field.name)
+                for field in s.schema.fields
+            ]
+        )
+        target_struct = F.struct(
+            *[
+                F.col(f"t.`{field.name}`").alias(field.name)
+                for field in t.schema.fields
+            ]
+        )
+        source_key_json = F.to_json(
+            F.struct(*[F.col(f"s.`{item['source_column']}`") for item in keys])
+        )
+        target_key_json = F.to_json(
+            F.struct(*[F.col(f"t.`{item['target_column']}`") for item in keys])
+        )
+
+        reconciliation = joined.select(
+            source_struct.alias("_s"),
+            target_struct.alias("_t"),
+            F.coalesce(
+                F.col("s.__normalized_primary_key"),
+                F.col("t.__normalized_primary_key"),
+            ).alias("normalized_primary_key"),
+            F.when(
+                F.col("s.__source_row_id").isNotNull()
+                & F.col("t.__target_row_id").isNotNull(),
+                F.lit("MATCHED"),
+            )
+            .when(
+                F.col("s.__source_row_id").isNotNull()
+                & F.col("s.__normalized_primary_key").isNull(),
+                F.lit("UNMATCHABLE_SOURCE"),
+            )
+            .when(
+                F.col("t.__target_row_id").isNotNull()
+                & F.col("t.__normalized_primary_key").isNull(),
+                F.lit("UNMATCHABLE_TARGET"),
+            )
+            .when(
+                F.col("s.__source_row_id").isNotNull(),
+                F.lit("MISSING_IN_TARGET"),
+            )
+            .otherwise(F.lit("EXTRA_IN_TARGET"))
+            .alias("reconciliation_status"),
+            F.when(
+                F.col("s.__source_row_id").isNotNull()
+                & F.col("t.__target_row_id").isNotNull(),
+                F.lit("PRIMARY_KEY"),
+            )
+            .otherwise(F.lit(None).cast("string"))
+            .alias("match_type"),
+            F.when(
+                F.col("s.__source_row_id").isNotNull(),
+                source_key_json,
+            )
+            .otherwise(target_key_json)
+            .alias("match_key"),
+            F.col("s.__key_count").alias("_source_key_count"),
+            F.col("t.__key_count").alias("_target_key_count"),
+            F.col("s.__source_row_id").alias("_source_row_id"),
+            F.col("t.__target_row_id").alias("_target_row_id"),
+        ).persist()
+
+        pk_build_ms = (perf_counter() - build_started) * 1000
+        summary_started = perf_counter()
+
+        # Unique keys make matched keys == matched records.  Avoid expensive
+        # countDistinct expressions and duplicate bookkeeping on this path.
+        summary = reconciliation.agg(
+            F.sum(
+                F.when(F.col("reconciliation_status") == "MATCHED", 1).otherwise(0)
+            ).alias("matched"),
+            F.sum(
+                F.when(
+                    F.col("reconciliation_status") == "MISSING_IN_TARGET", 1
+                ).otherwise(0)
+            ).alias("missing"),
+            F.sum(
+                F.when(
+                    F.col("reconciliation_status") == "EXTRA_IN_TARGET", 1
+                ).otherwise(0)
+            ).alias("extra"),
+            F.sum(
+                F.when(
+                    F.col("reconciliation_status") == "UNMATCHABLE_SOURCE", 1
+                ).otherwise(0)
+            ).alias("unmatchable_source"),
+            F.sum(
+                F.when(
+                    F.col("reconciliation_status") == "UNMATCHABLE_TARGET", 1
+                ).otherwise(0)
+            ).alias("unmatchable_target"),
+        ).first().asDict()
+
+        pk_summary_ms = (perf_counter() - summary_started) * 1000
+        matched = int(summary.get("matched") or 0)
+
+        counts = {
+            "primary_matched_count": matched,
+            "matched_key_count": matched,
+            "matched_source_record_count": matched,
+            "matched_target_record_count": matched,
+            "missing_count": int(summary.get("missing") or 0),
+            "extra_count": int(summary.get("extra") or 0),
+            "source_duplicate_record_count": 0,
+            "target_duplicate_record_count": 0,
+            "source_duplicate_key_count": 0,
+            "target_duplicate_key_count": 0,
+            "unmatchable_source_count": int(summary.get("unmatchable_source") or 0),
+            "unmatchable_target_count": int(summary.get("unmatchable_target") or 0),
+            "source_unique_key_count": int(source_stats.get("distinct_key_count") or 0),
+            "target_unique_key_count": int(target_stats.get("distinct_key_count") or 0),
+        }
+
+        result = (
+            reconciliation,
+            counts,
+            {
+                "pk_build_ms": pk_build_ms,
+                "pk_summary_ms": pk_summary_ms,
+                "pk_path": "UNIQUE_KEY_FAST_PATH",
+            },
+        )
+        self._match_cache[cache_key] = result
+        return result
+
+    def _matched_pairs_with_duplicates(self, s, t, cfg):
         """Build the one authoritative, full-outer PK reconciliation stream."""
         from pyspark.sql import functions as F
         from pyspark.sql.window import Window
@@ -785,7 +1026,7 @@ class SparkExecutor:
             "source_unique_key_count": int(summary.get("source_unique") or 0),
             "target_unique_key_count": int(summary.get("target_unique") or 0),
         }
-        result = (reconciliation, counts, {"pk_build_ms": pk_build_ms, "pk_summary_ms": pk_summary_ms})
+        result = (reconciliation, counts, {"pk_build_ms": pk_build_ms, "pk_summary_ms": pk_summary_ms, "pk_path": "DUPLICATE_KEY_PATH"})
         self._match_cache[cache_key] = result
         return result
 
@@ -894,19 +1135,48 @@ class SparkExecutor:
             related_extra_target = with_secondary_group_key(extra_target, "target").join(
                 source_null_groups, "__secondary_group_key", "left_semi"
             )
-            fallback_source = keyed_null_source.unionByName(related_missing_source).drop("__secondary_group_key")
-            fallback_target = keyed_null_target.unionByName(related_extra_target).drop("__secondary_group_key")
+            # Persist the unresolved fallback rows once. Both secondary matching
+            # and grouped reconciliation consume the same rows; without this
+            # cache Spark rebuilds the reconciliation/distinct/semi-join lineage
+            # for each downstream branch. The secondary summary below naturally
+            # materializes these caches, so no extra count() job is introduced.
+            fallback_source = (
+                keyed_null_source
+                .unionByName(related_missing_source)
+                .drop("__secondary_group_key")
+                .persist()
+            )
+            fallback_target = (
+                keyed_null_target
+                .unionByName(related_extra_target)
+                .drop("__secondary_group_key")
+                .persist()
+            )
             secondary_matches = self._possible_key_changes(fallback_source, fallback_target, cfg).persist()
-            secondary_match_count = secondary_matches.count()
             possible_key_changes = secondary_matches.filter(F.col("status") == "POSSIBLE_KEY_CHANGE")
-            possible_key_change_count = possible_key_changes.count()
             missing_business_keys = secondary_matches.filter(F.col("status") == "MISSING_BUSINESS_KEY")
-            missing_business_key_count = missing_business_keys.count()
+
+            # One Spark action computes all secondary-reconciliation counters.
+            # Previously this path launched three separate count() jobs.
+            secondary_summary = secondary_matches.agg(
+                F.count(F.lit(1)).alias("total"),
+                F.sum(F.when(F.col("status") == "POSSIBLE_KEY_CHANGE", 1).otherwise(0)).alias("possible_key_changes"),
+                F.sum(F.when(F.col("status") == "MISSING_BUSINESS_KEY", 1).otherwise(0)).alias("missing_business_keys"),
+            ).first()
+            secondary_match_count = int(secondary_summary["total"] or 0)
+            possible_key_change_count = int(secondary_summary["possible_key_changes"] or 0)
+            missing_business_key_count = int(secondary_summary["missing_business_keys"] or 0)
             metrics["secondary_match_count"] = secondary_match_count
             metrics["possible_key_change_count"] = possible_key_change_count
             metrics["missing_business_key_count"] = missing_business_key_count
             gr = None
-            if fallback_source.limit(1).count() or fallback_target.limit(1).count():
+
+            # related_missing_source can only exist when target has an unmatchable
+            # row; related_extra_target can only exist when source has one.
+            # Therefore fallback data exists iff usc + utc > 0.  Reuse those
+            # already-computed exact counts instead of launching limit().count()
+            # jobs against both fallback DataFrames.
+            if (usc + utc) > 0:
                 # Reconcile every key-unresolved row by configured grouping
                 # attributes. Duplicate primary keys stay in the PK section.
                 gr=self._group(fallback_source,fallback_target,cfg)
@@ -924,6 +1194,16 @@ class SparkExecutor:
                 metrics["missing_business_key_count"] = missing_business_key_count
             else:
                 metrics["matching_mode"] = "ROW_LEVEL"
+
+            # Group reconciliation has finished consuming the fallback rows.
+            # Secondary-match evidence is backed by its own persisted DataFrame,
+            # so the fallback caches can be released before evidence collection.
+            try:
+                fallback_source.unpersist(blocking=False)
+                fallback_target.unpersist(blocking=False)
+            except Exception:
+                logger.debug("Unable to unpersist L3 fallback datasets", exc_info=True)
+
             group_ms = (perf_counter() - group_started) * 1000
             evidence_started = perf_counter()
             row_evidence = {"matched_pairs":self._bounded(pairs, pmc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec),
@@ -938,7 +1218,7 @@ class SparkExecutor:
                 evidence["group_reconciliation"] = gr["evidence"].get("group_reconciliation",[])
             evidence_ms = (perf_counter() - evidence_started) * 1000
             logger.info("SPARK_L3_TIMING pk_build_ms=%.1f pk_summary_ms=%.1f pk_evidence_ms=%.1f group_ms=%.1f", pk_timing["pk_build_ms"], pk_timing["pk_summary_ms"], evidence_ms, group_ms)
-            print(f"SPARK_L3_TIMING pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms={group_ms:.1f}")
+            print(f"SPARK_L3_TIMING pk_path={pk_timing.get('pk_path','UNKNOWN')} pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms={group_ms:.1f}")
             return {"metrics":metrics,"evidence":evidence}
         evidence_started = perf_counter()
         evidence = {"matched_pairs":self._bounded(pairs, pmc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec),
@@ -947,7 +1227,7 @@ class SparkExecutor:
             "unmatchable_source_records":self._bounded(unmatchable_source, usc),"unmatchable_target_records":self._bounded(unmatchable_target, utc)}
         evidence_ms = (perf_counter() - evidence_started) * 1000
         logger.info("SPARK_L3_TIMING pk_build_ms=%.1f pk_summary_ms=%.1f pk_evidence_ms=%.1f group_ms=0.0", pk_timing["pk_build_ms"], pk_timing["pk_summary_ms"], evidence_ms)
-        print(f"SPARK_L3_TIMING pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms=0.0")
+        print(f"SPARK_L3_TIMING pk_path={pk_timing.get('pk_path','UNKNOWN')} pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms=0.0")
         return {"metrics":metrics,"evidence":evidence}
 
     def _possible_key_changes(self, source, target, cfg):
@@ -1403,6 +1683,7 @@ class SparkExecutor:
 
     def _group(self,s,t,cfg):
         from pyspark.sql import functions as F
+        group_started = perf_counter()
         groups=cfg.get("grouping_attributes",[]) or []
         aggs=cfg.get("aggregation_columns",[]) or []
         if not groups:
@@ -1438,9 +1719,14 @@ class SparkExecutor:
             if op == "COUNT": return F.count(expr)
             raise ValueError(f"Unsupported group aggregation operation: {op}")
 
+        prepared_caches = []
+
         def build(df, side):
-            from pyspark.sql.window import Window
-            prepared = prepare(df, side)
+            # Base aggregates and MODE calculations reuse the same normalized
+            # rows. Persist once so Spark does not rebuild normalization and the
+            # upstream fallback lineage for each aggregation branch.
+            prepared = prepare(df, side).persist()
+            prepared_caches.append(prepared)
             record_struct = F.struct(*[F.col(column) for column in df.columns])
             aggregate_exprs=[
                 F.count(F.lit(1)).alias("__present"),
@@ -1460,19 +1746,32 @@ class SparkExecutor:
 
             result = prepared.groupBy(*group_aliases).agg(*aggregate_exprs)
 
-            # Compute a real deterministic MODE instead of first().  Ties are
-            # resolved by the lexically smallest normalized value so repeated
-            # runs return the same result regardless of partition order.
+            # Deterministic MODE without a Window/sort stage. First count each
+            # value inside the group, then choose the value with the smallest
+            # ordering tuple (-frequency, lexical_value): highest frequency wins;
+            # ties resolve to the lexically smallest normalized value, exactly as
+            # before. min_by is available in Spark 3.5.3.
             for index, value_expr in mode_specs:
                 mode_values = prepared.select(
                     *[F.col(alias) for alias in group_aliases],
                     value_expr.alias("__mode_value"),
                 ).filter(F.col("__mode_value").isNotNull())
-                counts = mode_values.groupBy(*group_aliases, "__mode_value").agg(F.count(F.lit(1)).alias("__mode_count"))
-                window = Window.partitionBy(*group_aliases).orderBy(F.desc("__mode_count"), F.asc(F.col("__mode_value").cast("string")))
-                modes = (counts.withColumn("__mode_rank", F.row_number().over(window))
-                         .filter(F.col("__mode_rank") == 1)
-                         .select(*group_aliases, F.col("__mode_value").alias(f"a{index}")))
+
+                counts = mode_values.groupBy(
+                    *group_aliases, "__mode_value"
+                ).agg(
+                    F.count(F.lit(1)).alias("__mode_count")
+                )
+
+                ordering = F.struct(
+                    (-F.col("__mode_count")).alias("frequency_order"),
+                    F.col("__mode_value").cast("string").alias("lexical_order"),
+                )
+
+                modes = counts.groupBy(*group_aliases).agg(
+                    F.min_by(F.col("__mode_value"), ordering).alias(f"a{index}")
+                )
+
                 result = result.join(modes, group_aliases, "left")
 
             return result
@@ -1483,17 +1782,80 @@ class SparkExecutor:
         for alias in group_aliases:
             q=F.col(f"s.`{alias}`").eqNullSafe(F.col(f"t.`{alias}`"))
             cond=q if cond is None else cond&q
+
+        # Cache the expensive grouped source/target join.  The summary action
+        # below materializes it once; bounded evidence reuses the cached rows.
         j=a.join(b,cond,"full_outer").persist()
-        group_summary = j.agg(
-            F.sum(F.when(F.col("s.__present").isNotNull(), 1).otherwise(0)).alias("source_groups"),
-            F.sum(F.when(F.col("t.__present").isNotNull(), 1).otherwise(0)).alias("target_groups"),
-            F.sum(F.when(F.col("s.__present").isNotNull() & F.col("t.__present").isNotNull(), 1).otherwise(0)).alias("common_groups"),
-        ).first()
-        source_groups=int(group_summary["source_groups"] or 0)
-        target_groups=int(group_summary["target_groups"] or 0)
-        common=int(group_summary["common_groups"] or 0)
+
+        source_present = F.col("s.__present").isNotNull()
+        target_present = F.col("t.__present").isNotNull()
+        common_present = source_present & target_present
+        row_count_mismatch = common_present & (F.col("s.__present") != F.col("t.__present"))
+        duplicate_group = (
+            (F.coalesce(F.col("s.__present"), F.lit(0)) > 1)
+            | (F.coalesce(F.col("t.__present"), F.lit(0)) > 1)
+        )
+
+        # Build the aggregate mismatch/applicability expressions once.  These
+        # are evaluated directly on one joined group row, so all metrics can be
+        # computed in the same Spark aggregation that materializes `j`.
+        aggregate_applicable=[]
+        aggregate_failed=[]
+        for index,item in enumerate(aggs):
+            source_value=F.col(f"s.a{index}")
+            target_value=F.col(f"t.a{index}")
+            both_null=source_value.isNull() & target_value.isNull()
+            applicable=common_present & ~both_null
+            failed=applicable & ~source_value.eqNullSafe(target_value)
+            aggregate_applicable.append(applicable)
+            aggregate_failed.append(failed)
+
+        any_group_failure = row_count_mismatch | duplicate_group
+        for failed in aggregate_failed:
+            any_group_failure = any_group_failure | failed
+
+        summary_exprs=[
+            F.sum(F.when(source_present,1).otherwise(0)).alias("source_groups"),
+            F.sum(F.when(target_present,1).otherwise(0)).alias("target_groups"),
+            F.sum(F.when(common_present,1).otherwise(0)).alias("common_groups"),
+            F.sum(F.when(row_count_mismatch,1).otherwise(0)).alias("row_count_checks_failed"),
+            F.sum(F.when(duplicate_group,1).otherwise(0)).alias("duplicate_checks_failed"),
+            F.sum(F.when(any_group_failure,1).otherwise(0)).alias("mismatch_groups"),
+        ]
+        for index, applicable in enumerate(aggregate_applicable):
+            summary_exprs.append(
+                F.sum(F.when(applicable,1).otherwise(0)).alias(f"aggregate_applicable_{index}")
+            )
+        for index, failed in enumerate(aggregate_failed):
+            summary_exprs.append(
+                F.sum(F.when(failed,1).otherwise(0)).alias(f"aggregate_failed_{index}")
+            )
+
+        summary_started = perf_counter()
+        summary=j.agg(*summary_exprs).first()
+        summary_ms = (perf_counter() - summary_started) * 1000
+
+        # `j` is now fully materialized. The normalized per-side inputs are no
+        # longer needed and can be released before evidence scans the cached join.
+        for prepared in prepared_caches:
+            try:
+                prepared.unpersist(blocking=False)
+            except Exception:
+                logger.debug("Unable to unpersist prepared group dataset", exc_info=True)
+
+        source_groups=int(summary["source_groups"] or 0)
+        target_groups=int(summary["target_groups"] or 0)
+        common=int(summary["common_groups"] or 0)
         missing=source_groups-common
         extra=target_groups-common
+
+        row_count_checks_failed=int(summary["row_count_checks_failed"] or 0)
+        duplicate_checks_failed=int(summary["duplicate_checks_failed"] or 0)
+        aggregate_field_checks=sum(int(summary[f"aggregate_applicable_{i}"] or 0) for i in range(len(aggs)))
+        aggregate_field_failed=sum(int(summary[f"aggregate_failed_{i}"] or 0) for i in range(len(aggs)))
+        aggregate_checks_total=row_count_checks_failed+duplicate_checks_failed+aggregate_field_checks
+        aggregate_checks_failed=row_count_checks_failed+duplicate_checks_failed+aggregate_field_failed
+        mismatch_groups=int(summary["mismatch_groups"] or 0)
 
         group_key = F.array(*[
             F.coalesce(F.col(f"s.`{alias}`").cast("string"), F.col(f"t.`{alias}`").cast("string"))
@@ -1508,7 +1870,7 @@ class SparkExecutor:
             F.when(F.col("s.__present").isNull(), F.lit("EXTRA_GROUP_IN_TARGET")).otherwise(F.lit("MISSING_GROUP_IN_TARGET")).alias("status"),
         ).withColumn("matched", F.lit(False))
 
-        common_rows=j.filter(F.col("s.__present").isNotNull() & F.col("t.__present").isNotNull())
+        common_rows=j.filter(common_present)
         count_mismatch_rows=common_rows.filter(F.col("s.__present") != F.col("t.__present")).select(
             group_key.alias("group_key"),
             F.col("s.__record").alias("source_record"), F.col("t.__record").alias("target_record"),
@@ -1556,16 +1918,7 @@ class SparkExecutor:
         result_rows=presence_rows.unionByName(count_mismatch_rows).unionByName(duplicate_group_rows)
         if aggregate_rows is not None:
             result_rows=result_rows.unionByName(aggregate_rows)
-        result_rows=result_rows.persist()
-        result_summary=result_rows.agg(
-            F.count(F.lit(1)).alias("result_row_count"),
-            F.sum(F.when(~F.col("status").isin("MISSING_GROUP_IN_TARGET","EXTRA_GROUP_IN_TARGET","NOT_APPLICABLE"),1).otherwise(0)).alias("applicable"),
-            F.sum(F.when(F.col("status").isin("GROUP_VALUE_MISMATCH","GROUP_ROW_COUNT_MISMATCH","GROUP_DUPLICATE_ROWS"),1).otherwise(0)).alias("failed"),
-            F.countDistinct(F.when(F.col("status").isin("GROUP_VALUE_MISMATCH","GROUP_ROW_COUNT_MISMATCH","GROUP_DUPLICATE_ROWS"),F.to_json(F.col("group_key")))).alias("mismatch_groups"),
-        ).first()
-        aggregate_checks_total=int(result_summary["applicable"] or 0)
-        aggregate_checks_failed=int(result_summary["failed"] or 0)
-        mismatch_groups=int(result_summary["mismatch_groups"] or 0)
+
         metrics={
             "status":"PASS" if missing+extra+mismatch_groups==0 else "FAIL",
             "matching_mode":"GROUP_RECONCILIATION","comparison_mode":"GROUP_RECONCILIATION",
@@ -1582,12 +1935,23 @@ class SparkExecutor:
             "aggregate_checks_passed":aggregate_checks_total-aggregate_checks_failed,"aggregate_checks_failed":aggregate_checks_failed,
             "checks_total":aggregate_checks_total,"checks_passed":aggregate_checks_total-aggregate_checks_failed,"checks_failed":aggregate_checks_failed,
         }
-        # Evidence is an exception list.  Keeping passing aggregates here makes
-        # large reconciliations slow to persist and buries the actionable rows.
-        # The complete pass/fail totals remain in metrics above.
-        exception_rows = result_rows.filter(~F.col("status").isin("PASS", "NOT_APPLICABLE"))
-        exception_count = missing + extra + aggregate_checks_failed
-        return {"metrics":metrics,"evidence":{"group_reconciliation":self._bounded(exception_rows, exception_count)}}
+
+        # Only exception evidence is collected. `j` is already materialized by
+        # the single summary action above, so this bounded sample scans cached
+        # group rows without recomputing source/target aggregation.
+        exception_rows=result_rows.filter(~F.col("status").isin("PASS","NOT_APPLICABLE"))
+        exception_count=missing+extra+aggregate_checks_failed
+        evidence_started = perf_counter()
+        bounded_evidence=self._bounded(exception_rows,exception_count)
+        evidence_ms = (perf_counter() - evidence_started) * 1000
+        total_ms = (perf_counter() - group_started) * 1000
+        logger.info("SPARK_GROUP_OPT_TIMING summary_ms=%.1f evidence_ms=%.1f total_ms=%.1f", summary_ms, evidence_ms, total_ms)
+        print(f"SPARK_GROUP_OPT_TIMING summary_ms={summary_ms:.1f} evidence_ms={evidence_ms:.1f} total_ms={total_ms:.1f}")
+        try:
+            j.unpersist(blocking=False)
+        except Exception:
+            logger.debug("Unable to unpersist group reconciliation join", exc_info=True)
+        return {"metrics":metrics,"evidence":{"group_reconciliation":bounded_evidence}}
 
     def _l6(self,s,t,cfg):
         from pyspark.sql import functions as F
@@ -1655,6 +2019,10 @@ class SparkExecutor:
 
     def _bounded(self, df, total_count: int | None = None):
         if df is None:
+            return {"count": 0, "sample": [], "truncated": False}
+        # If the caller already proved that this evidence bucket is empty, do
+        # not launch a Spark job merely to collect zero rows.
+        if total_count is not None and int(total_count) == 0:
             return {"count": 0, "sample": [], "truncated": False}
         # The public count remains exact. Where the caller already has it,
         # avoid a full count() and collect one bounded extra row to determine

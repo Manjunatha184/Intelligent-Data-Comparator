@@ -14,7 +14,6 @@ from app.domain.context import (
 from app.execution.models import (
     ComparisonLevel,
     ExecutionLocation,
-    DataAccessMode,
     ExecutionMode,
     ExecutionTask,
     ExecutionGroup,
@@ -118,7 +117,6 @@ class StrategyPlanner:
         )
 
         capability_keys = {
-            "supports_pushdown",
             "supports_hash",
             "supports_sampling",
         }
@@ -158,7 +156,6 @@ class StrategyPlanner:
         # Spark is the sole execution engine. Dataset size affects Spark's
         # partition tuning, never comparison semantics or engine selection.
         execution_location = ExecutionLocation.SPARK
-        data_access_mode = None
 
         strategies = []
 
@@ -211,8 +208,7 @@ class StrategyPlanner:
                     comparison_level=level,
                     comparison_mode=mode,
                     execution_location=execution_location,
-                    data_access_mode=data_access_mode,
-                )
+                )   
             )
 
         return StrategyDecision(strategies=strategies)
@@ -317,10 +313,6 @@ class StrategyPlanner:
                 "_filters": [f.model_dump(mode="python") for f in configuration.target_filters],
             }
 
-            if strategy.data_access_mode is not None:
-                task_configuration[
-                    "data_access_mode"
-                ] = strategy.data_access_mode.value
 
             tasks.append(
                 ExecutionTask(

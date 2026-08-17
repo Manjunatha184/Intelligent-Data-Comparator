@@ -31,7 +31,6 @@ class CSVDatasetAnalyzer(DatasetAnalyzer):
     CSV-specific logic is isolated here.
     """
     capabilities = {
-        "supports_pushdown": False,
         "supports_hash": True,
         "supports_sampling": True,
     }
@@ -102,7 +101,6 @@ class DatabricksDatasetAnalyzer(DatasetAnalyzer):
     """
 
     capabilities = {
-        "supports_pushdown": True,
         "supports_hash": True,
         "supports_sampling": True,
     }

@@ -3,25 +3,32 @@ services:
     image: postgres:16
     container_name: v1-comparator-postgres
     restart: unless-stopped
+
     environment:
       POSTGRES_DB: comparator
       POSTGRES_USER: comparator
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-comparator}
+
     ports:
       - "5432:5432"
+
     volumes:
       - comparator_postgres_data:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U comparator -d comparator"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+
   spark-master:
     image: spark:3.5.3-java17-python3
     container_name: v1-comparator-spark-master
     restart: unless-stopped
+
     entrypoint: ["/opt/spark/bin/spark-class"]
+
     command:
       - org.apache.spark.deploy.master.Master
       - --host
@@ -30,17 +37,22 @@ services:
       - "7077"
       - --webui-port
       - "8080"
+
     ports:
       - "7077:7077"
       - "8080:8080"
+
 
   spark-worker-1:
     image: spark:3.5.3-java17-python3
     container_name: v1-comparator-spark-worker-1
     restart: unless-stopped
+
     depends_on:
       - spark-master
+
     entrypoint: ["/opt/spark/bin/spark-class"]
+
     command:
       - org.apache.spark.deploy.worker.Worker
       - spark://spark-master:7077
@@ -50,18 +62,24 @@ services:
       - "1"
       - --memory
       - "1g"
+
     ports:
       - "8081:8081"
+
     volumes:
       - ./data:/app/data:ro
+
 
   spark-worker-2:
     image: spark:3.5.3-java17-python3
     container_name: v1-comparator-spark-worker-2
     restart: unless-stopped
+
     depends_on:
       - spark-master
+
     entrypoint: ["/opt/spark/bin/spark-class"]
+
     command:
       - org.apache.spark.deploy.worker.Worker
       - spark://spark-master:7077
@@ -71,49 +89,74 @@ services:
       - "1"
       - --memory
       - "1g"
+
     ports:
       - "8082:8081"
 
     volumes:
-    - ./data:/app/data:ro
+      - ./data:/app/data:ro
+
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile
+
     container_name: v1-comparator-backend
     restart: unless-stopped
+
     depends_on:
       postgres:
         condition: service_healthy
+
       spark-master:
         condition: service_started
+
     environment:
       DATABASE_URL: postgresql://comparator:${POSTGRES_PASSWORD:-comparator}@postgres:5432/comparator
+
       SPARK_MASTER_URL: spark://spark-master:7077
       SPARK_DRIVER_HOST: backend
+
+      # Large/default Spark shuffle workloads.
       SPARK_SQL_SHUFFLE_PARTITIONS: ${SPARK_SQL_SHUFFLE_PARTITIONS:-8}
+
+      # CSV files between tiny and small threshold.
+      SPARK_SMALL_SHUFFLE_PARTITIONS: ${SPARK_SMALL_SHUFFLE_PARTITIONS:-4}
+
+      # Tiny CSV files. We have 2 Spark worker cores total,
+      # so use both instead of forcing all shuffle work into 1 partition.
+      SPARK_TINY_SHUFFLE_PARTITIONS: ${SPARK_TINY_SHUFFLE_PARTITIONS:-1}
+
       SPARK_EVIDENCE_LIMIT: ${SPARK_EVIDENCE_LIMIT:-100}
       SPARK_LOCAL_DIRS: /tmp/spark-local
+
       GROQ_API_KEY: ${GROQ_API_KEY}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+
     volumes:
       - .:/workspace:ro
       - spark_backend_tmp:/tmp/spark-local
       - ./data:/app/data
+
     ports:
-      - "8000:8000"    
+      - "8000:8000"
+
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+
     container_name: v1-comparator-frontend
     restart: unless-stopped
+
     depends_on:
       - backend
+
     ports:
       - "5173:80"
+
 
 volumes:
   comparator_postgres_data:

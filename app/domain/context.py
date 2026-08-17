@@ -7,7 +7,6 @@ from app.execution.models import (
     ComparisonLevel,
     ExecutionMode,
     ExecutionLocation,
-    DataAccessMode,
 )
 from app.connectors.filters import RowFilter
 
@@ -215,7 +214,6 @@ class StrategyPolicy(BaseModel):
     max_exact_bytes: int
     sampling_min_rows: int
     allow_sampling: bool = False
-    prefer_pushdown: bool = True
 
 class RuntimeConfiguration(BaseModel):
     configuration_id: int
@@ -312,7 +310,6 @@ class LevelStrategy(BaseModel):
     comparison_level: ComparisonLevel
     comparison_mode: ExecutionMode
     execution_location: ExecutionLocation
-    data_access_mode: DataAccessMode | None = None
 
 
 class StrategyDecision(BaseModel):

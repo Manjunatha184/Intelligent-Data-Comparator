@@ -245,20 +245,7 @@ class ConnectorManager:
             chunk_size=chunk_size,
         )
 
-    def supports_pushdown(
-        self,
-        connector_type: str,
-        comparison_level: str,
-    ) -> bool:
-
-        provider = self.get_data_provider(
-            connector_type
-        )
-
-        return provider.supports_pushdown(
-            comparison_level
-        )
-
+ 
     def get_volume_statistics(
         self,
         connector_type: str,
