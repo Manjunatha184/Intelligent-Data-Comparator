@@ -1,0 +1,57 @@
+name: Enable comparison cancellation
+
+on:
+  push:
+    branches:
+      - agent/refactor-spark-comparators
+    paths:
+      - tools/enable_comparison_cancel.py
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/refactor-spark-comparators
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Apply cancellation migration
+        run: python3 tools/enable_comparison_cancel.py
+
+      - name: Compile backend
+        run: python3 -m compileall -q app
+
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Commit verified cancellation
+        run: |
+          rm tools/enable_comparison_cancel.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/api/routes/comparisons.py frontend/src/main.jsx tools/enable_comparison_cancel.py
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "enable real comparison cancellation (ChatGPT-assisted)"
+          git push origin HEAD:agent/refactor-spark-comparators
