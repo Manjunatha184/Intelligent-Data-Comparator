@@ -1,31 +1,28 @@
 """Spark comparison level adapters.
 
-This module gives each comparison level a small, explicit class without
-changing the existing Spark comparison algorithms. The algorithms still live
-on SparkExecutor during this first extraction step, so shared reconciliation,
-statistics, dataset caches, and L3 -> L4 behavior remain exactly the same.
-
-A later mechanical move can relocate each level's private implementation into
-its own module once regression tests cover the current contracts.
+L1 and L2 are physically extracted into dedicated comparator modules. L3-L6
+remain thin adapters to the existing SparkExecutor methods until their shared
+reconciliation and cache dependencies are extracted in the next refactor step.
 """
 
 from __future__ import annotations
 
 from typing import Any, Protocol
 
+from app.comparators.schema import SparkSchemaComparator
+from app.comparators.volume import SparkVolumeComparator
+
 
 class SparkComparatorHost(Protocol):
-    """Methods exposed by SparkExecutor to level adapters."""
+    """Methods still exposed by SparkExecutor to legacy level adapters."""
 
-    def _l1(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
-    def _l2(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
     def _l3(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
     def _l4(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
     def _l5(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
     def _l6(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
 
 
-class _SparkLevelComparator:
+class _LegacySparkLevelComparator:
     method_name: str
 
     def execute(
@@ -38,37 +35,35 @@ class _SparkLevelComparator:
         return getattr(host, self.method_name)(source, target, configuration)
 
 
-class SparkSchemaComparator(_SparkLevelComparator):
-    """L1 schema comparison."""
-
-    method_name = "_l1"
-
-
-class SparkVolumeComparator(_SparkLevelComparator):
-    """L2 volume/statistics comparison."""
-
-    method_name = "_l2"
-
-
-class SparkRecordComparator(_SparkLevelComparator):
-    """L3 record and group reconciliation."""
+class SparkRecordComparator(_LegacySparkLevelComparator):
+    """L3 record and group reconciliation adapter."""
 
     method_name = "_l3"
 
 
-class SparkFieldComparator(_SparkLevelComparator):
-    """L4 hash-gated field comparison."""
+class SparkFieldComparator(_LegacySparkLevelComparator):
+    """L4 hash-gated field comparison adapter."""
 
     method_name = "_l4"
 
 
-class SparkAggregateComparator(_SparkLevelComparator):
-    """L5 Spark aggregate comparison."""
+class SparkAggregateComparator(_LegacySparkLevelComparator):
+    """L5 Spark aggregate comparison adapter."""
 
     method_name = "_l5"
 
 
-class SparkDQComparator(_SparkLevelComparator):
-    """L6 Spark data-quality comparison."""
+class SparkDQComparator(_LegacySparkLevelComparator):
+    """L6 Spark data-quality comparison adapter."""
 
     method_name = "_l6"
+
+
+SPARK_COMPARATORS = {
+    "L1": SparkSchemaComparator(),
+    "L2": SparkVolumeComparator(),
+    "L3": SparkRecordComparator(),
+    "L4": SparkFieldComparator(),
+    "L5": SparkAggregateComparator(),
+    "L6": SparkDQComparator(),
+}
