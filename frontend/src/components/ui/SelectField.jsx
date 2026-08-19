@@ -5,6 +5,7 @@ export default function SelectField({
   label,
   required = false,
   value,
+  setValue,
   onChange,
   options = [],
   placeholder,
@@ -12,21 +13,28 @@ export default function SelectField({
   className = "",
   ...props
 }) {
+  function handleChange(event) {
+    if (setValue) setValue(event.target.value);
+    if (onChange) onChange(event);
+  }
+
   return (
     <Field label={label} required={required}>
       <select
         className={className}
         value={value ?? ""}
-        onChange={onChange}
+        onChange={handleChange}
         disabled={disabled}
         {...props}
       >
         {placeholder !== undefined && <option value="">{placeholder}</option>}
         {options.map((option) => {
-          const normalized =
-            typeof option === "object"
+          const normalized = Array.isArray(option)
+            ? { value: option[0], label: option[1] }
+            : typeof option === "object"
               ? option
               : { value: option, label: option };
+
           return (
             <option
               key={String(normalized.value)}
