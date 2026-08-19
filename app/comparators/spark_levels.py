@@ -1,8 +1,8 @@
-"""Spark comparison level adapters.
+"""Spark comparison level registry.
 
-L1 and L2 are physically extracted into dedicated comparator modules. L3-L6
-remain thin adapters to the existing SparkExecutor methods until their shared
-reconciliation and cache dependencies are extracted in the next refactor step.
+L1-L4 are physically extracted into dedicated Spark comparator modules.
+L5-L6 remain thin adapters to the proven executor methods until their own
+extraction step.
 """
 
 from __future__ import annotations
@@ -11,13 +11,13 @@ from typing import Any, Protocol
 
 from app.comparators.schema import SparkSchemaComparator
 from app.comparators.volume import SparkVolumeComparator
+from app.comparators.record import SparkRecordComparator
+from app.comparators.field import SparkFieldComparator
 
 
 class SparkComparatorHost(Protocol):
-    """Methods still exposed by SparkExecutor to legacy level adapters."""
+    """Executor services used by extracted and legacy Spark comparators."""
 
-    def _l3(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
-    def _l4(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
     def _l5(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
     def _l6(self, source: Any, target: Any, configuration: dict[str, Any]) -> dict[str, Any]: ...
 
@@ -33,18 +33,6 @@ class _LegacySparkLevelComparator:
         configuration: dict[str, Any],
     ) -> dict[str, Any]:
         return getattr(host, self.method_name)(source, target, configuration)
-
-
-class SparkRecordComparator(_LegacySparkLevelComparator):
-    """L3 record and group reconciliation adapter."""
-
-    method_name = "_l3"
-
-
-class SparkFieldComparator(_LegacySparkLevelComparator):
-    """L4 hash-gated field comparison adapter."""
-
-    method_name = "_l4"
 
 
 class SparkAggregateComparator(_LegacySparkLevelComparator):
