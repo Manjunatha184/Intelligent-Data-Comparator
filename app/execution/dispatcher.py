@@ -10,7 +10,7 @@ from app.execution.models import (
     ExecutionLocation,
 )
 
-from app.execution.spark_executor import SparkExecutor
+from app.execution.spark_executor_refactored import SparkExecutor
 
 
 # ============================================================
@@ -157,7 +157,7 @@ class ExecutionDispatcher:
             if (
                 raw_result.get(
                     "execution_location"
-                )   
+                )
                 and not metrics.get(
                     "execution_location"
                 )
@@ -267,4 +267,4 @@ class ExecutionDispatcher:
             ),
             error=error,
             runtime_context={}
-        )   
+        )
