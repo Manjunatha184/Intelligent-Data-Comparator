@@ -1,0 +1,63 @@
+name: Spark executor cleanup
+
+on:
+  push:
+    branches:
+      - agent/spark-executor-cleanup
+    paths:
+      - tools/cleanup_spark_executor.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/spark-executor-cleanup
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply executor cleanup
+        run: python3 tools/cleanup_spark_executor.py
+
+      - name: Compile backend
+        run: python3 -m compileall -q app
+
+      - name: Verify single executor architecture
+        run: |
+          test ! -f app/execution/spark_executor_refactored.py
+          ! grep -R "spark_executor_refactored" -n app --exclude-dir='__pycache__'
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          p = Path('app/execution/spark_executor.py')
+          tree = ast.parse(p.read_text())
+          cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'SparkExecutor')
+          names = {n.name for n in cls.body if isinstance(n, ast.FunctionDef)}
+          duplicate = names & {'_l1','_l2','_l3','_l4','_l5','_l6'}
+          assert not duplicate, duplicate
+          assert 'execute' in names
+          text = p.read_text()
+          assert 'SPARK_COMPARATORS' in text
+          print('single SparkExecutor verified; lines=', len(text.splitlines()))
+          PY
+
+      - name: Commit verified cleanup
+        run: |
+          rm tools/cleanup_spark_executor.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/execution/spark_executor.py app/execution/dispatcher.py app/execution/spark_executor_refactored.py tools/cleanup_spark_executor.py
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "consolidate Spark executor and remove duplicate level logic (ChatGPT-assisted)"
+          git push origin HEAD:agent/spark-executor-cleanup
