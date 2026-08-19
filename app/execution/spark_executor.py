@@ -9,8 +9,7 @@ from time import perf_counter
 from typing import Any
 
 from app.execution.models import ComparisonLevel, ExecutionTask
-from app.comparators.aggregate import AggregateComparator
-from app.comparators.dq import DQComparator
+from app.comparators.spark_levels import SPARK_COMPARATORS
 from app.metrics import safe_percent_change, safe_rate_pct
 
 
@@ -109,37 +108,51 @@ class SparkExecutor:
             logger.warning("Spark cache cleanup skipped because the driver is unavailable")
 
     def execute(self, task: ExecutionTask) -> dict[str, Any]:
+        """Load datasets and delegate the selected level to its comparator."""
         load_started = perf_counter()
         source = self._load(task.configuration["source"])
         target = self._load(task.configuration["target"])
-        logger.info("SPARK_TIMING task_id=%s level=%s dataset_loading_ms=%.1f", task.task_id, task.comparison_level.value, (perf_counter() - load_started) * 1000)
-        print(f"SPARK_TIMING task_id={task.task_id} level={task.comparison_level.value} dataset_loading_ms={(perf_counter() - load_started) * 1000:.1f}")
+        logger.info(
+            "SPARK_TIMING task_id=%s level=%s dataset_loading_ms=%.1f",
+            task.task_id,
+            task.comparison_level.value,
+            (perf_counter() - load_started) * 1000,
+        )
+        print(
+            f"SPARK_TIMING task_id={task.task_id} "
+            f"level={task.comparison_level.value} "
+            f"dataset_loading_ms={(perf_counter() - load_started) * 1000:.1f}"
+        )
+
         level = task.comparison_level
-        level_started = perf_counter()
-        if level == ComparisonLevel.L1:
-            result = self._l1(source, target, task.configuration)
-        elif level == ComparisonLevel.L2:
-            result = self._l2(source, target, task.configuration)
-        elif level == ComparisonLevel.L3:
-            result = self._l3(source, target, task.configuration)
-        elif level == ComparisonLevel.L4:
-            result = self._l4(source, target, task.configuration)
-        elif level == ComparisonLevel.L5:
-            result = self._l5(source, target, task.configuration)
-        elif level == ComparisonLevel.L6:
-            result = self._l6(source, target, task.configuration)
-        else:
+        comparator = SPARK_COMPARATORS.get(level.value)
+        if comparator is None:
             raise ValueError(f"Unsupported Spark comparison level: {level}")
-        logger.info("SPARK_TIMING task_id=%s level=%s comparison_ms=%.1f", task.task_id, level.value, (perf_counter() - level_started) * 1000)
-        print(f"SPARK_TIMING task_id={task.task_id} level={level.value} comparison_ms={(perf_counter() - level_started) * 1000:.1f}")
+
+        level_started = perf_counter()
+        result = comparator.execute(self, source, target, task.configuration)
+        logger.info(
+            "SPARK_TIMING task_id=%s level=%s comparison_ms=%.1f",
+            task.task_id,
+            level.value,
+            (perf_counter() - level_started) * 1000,
+        )
+        print(
+            f"SPARK_TIMING task_id={task.task_id} "
+            f"level={level.value} "
+            f"comparison_ms={(perf_counter() - level_started) * 1000:.1f}"
+        )
+
         result = self._normalize_contract(level, result)
-        result.setdefault("runtime_context", {}).update({
-            "engine": "SPARK",
-            "spark_master": self.spark.sparkContext.master,
-            "spark_app_id": self.spark.sparkContext.applicationId,
-            "distributed": True,
-            "full_collect_used": False,
-        })
+        result.setdefault("runtime_context", {}).update(
+            {
+                "engine": "SPARK",
+                "spark_master": self.spark.sparkContext.master,
+                "spark_app_id": self.spark.sparkContext.applicationId,
+                "distributed": True,
+                "full_collect_used": False,
+            }
+        )
         result["execution_location"] = "SPARK"
         return result
 
@@ -468,41 +481,6 @@ class SparkExecutor:
     def _maps(cfg):
         return {m["source_column"]: m["target_column"] for m in cfg.get("column_mappings", [])}
 
-    def _l1(self, s, t, cfg):
-        maps, ignored = self._maps(cfg), set(cfg.get("ignored_columns", []))
-        sf = {f.name: f.dataType.simpleString() for f in s.schema.fields if f.name not in ignored and maps.get(f.name, f.name) not in ignored}
-        tf = {f.name: f.dataType.simpleString() for f in t.schema.fields if f.name not in ignored}
-        source_nullable = {f.name: f.nullable for f in s.schema.fields if f.name not in ignored}
-        target_nullable = {f.name: f.nullable for f in t.schema.fields if f.name not in ignored}
-        missing, unexpected, types, matched = [], [], [], []
-        nullable_mismatches, length_mismatches = [], []
-        mapped_targets = set()
-        for sc, st in sf.items():
-            tc = maps.get(sc, sc); mapped_targets.add(tc)
-            if tc not in tf:
-                missing.append({"source_column": sc, "expected_target_column": tc})
-            else:
-                matched.append({"source_column": sc, "target_column": tc})
-                if st != tf[tc]: types.append({"source_column": sc, "target_column": tc, "source_type": st, "target_type": tf[tc]})
-                if source_nullable[sc] != target_nullable[tc]:
-                    nullable_mismatches.append({"source_column": sc, "target_column": tc, "source_nullable": source_nullable[sc], "target_nullable": target_nullable[tc]})
-        for tc in tf:
-            if tc not in mapped_targets and tc not in sf: unexpected.append({"target_column": tc})
-        mismatch = len(missing)+len(unexpected)+len(types)+len(nullable_mismatches)
-        return {"metrics": {"status": "PASS" if mismatch == 0 else "FAIL", "source_column_count": len(sf),
-                "target_column_count": len(tf), "matched_column_count": len(matched), "missing_column_count": len(missing),
-                "unexpected_column_count": len(unexpected), "data_type_mismatch_count": len(types), "schema_drift_count": mismatch,
-                "nullable_mismatch_count": len(nullable_mismatches), "length_mismatch_count": len(length_mismatches),
-                "precision_scale_mismatch_count": 0, "order_mismatch_count": 0, "mismatch_count": mismatch,
-                "source_column_coverage_pct": safe_rate_pct(len(matched), len(sf), zero_value=100.0),
-                "target_column_coverage_pct": safe_rate_pct(len(matched), len(tf), zero_value=100.0)},
-                "evidence": {"matched_columns": matched, "missing_columns": missing, "unexpected_columns": unexpected,
-                "type_mismatches": types, "data_type_mismatches": types, "nullable_mismatches": nullable_mismatches,
-                "length_mismatches": length_mismatches, "precision_scale_mismatches": [], "order_mismatch": {},
-                "schema_drift": ([{"type": "MISSING_COLUMN", **item} for item in missing] +
-                                 [{"type": "UNEXPECTED_COLUMN", **item} for item in unexpected] +
-                                 [{"type": "DATA_TYPE_CHANGED", **item} for item in types] +
-                                 [{"type": "NULLABILITY_CHANGED", **item} for item in nullable_mismatches])}}
 
     def _key_exprs(self, cfg, side):
         from pyspark.sql import functions as F
@@ -544,96 +522,6 @@ class SparkExecutor:
         self._stats_cache[cache_key] = result
         return result
 
-    def _l2(self, s, t, cfg):
-        ss, ts = self._stats(s,cfg,"source"), self._stats(t,cfg,"target")
-        checks = {}
-
-        for k in ("total_rows","filtered_rows","partition_rows","distinct_key_count","duplicate_key_count"):
-            available = ss[k] is not None or ts[k] is not None
-            difference = None if not available or ss[k] is None or ts[k] is None else ts[k] - ss[k]
-            checks[k] = {
-                "source": ss[k],
-                "target": ts[k],
-                "difference": difference,
-                "percentage_difference": safe_percent_change(ss[k], ts[k]),
-                "tolerance": None,
-                "matched": ss[k] == ts[k],
-                "available": available,
-            }
-
-        # IMPORTANT:
-        # Null counts must be compared using the same source -> target column
-        # mapping used by L1/L4. Comparing the two raw dictionaries directly
-        # produces a false failure for renamed columns such as:
-        #     Email -> Target_Email
-        #
-        # Example:
-        #     {"Email": 0} != {"Target_Email": 0}
-        # even though the mapped null counts are equal.
-        source_nulls = ss["null_counts"]
-        target_nulls = ts["null_counts"]
-        column_mappings = self._maps(cfg)
-        ignored = set(cfg.get("ignored_columns", []))
-
-        null_count_differences = []
-        mapped_null_counts = []
-
-        for source_column, source_count in source_nulls.items():
-            if source_column in ignored:
-                continue
-
-            # Explicit mapping wins; otherwise same-name matching is used.
-            target_column = column_mappings.get(source_column, source_column)
-
-            if target_column in ignored:
-                continue
-
-            # Missing/unexpected schema columns belong to L1, not L2.
-            # L2 compares null counts only for columns that exist on both sides.
-            if target_column not in target_nulls:
-                continue
-
-            target_count = target_nulls[target_column]
-            matched = source_count == target_count
-
-            item = {
-                "source_column": source_column,
-                "target_column": target_column,
-                "source": source_count,
-                "target": target_count,
-                "difference": target_count - source_count,
-                "matched": matched,
-            }
-            mapped_null_counts.append(item)
-
-            if not matched:
-                null_count_differences.append(item)
-
-        checks["null_counts"] = {
-            "source": source_nulls,
-            "target": target_nulls,
-            "mapped_columns": mapped_null_counts,
-            "differences": null_count_differences,
-            "matched": len(null_count_differences) == 0,
-            "available": True,
-        }
-
-        # filtered_rows and partition_rows are execution diagnostics, not
-        # independent business validations. Counting them as failures inflated
-        # L2 from one row-count problem into three identical failures.
-        validation_names = ["total_rows", "distinct_key_count", "duplicate_key_count", "null_counts"]
-        applicable = [name for name in validation_names if checks[name].get("available", True)]
-        failed=[name for name in applicable if not checks[name]["matched"]]
-        return {"metrics":{"status":"PASS" if not failed else "FAIL","checks_total":len(applicable),"checks_failed":len(failed),
-                "checks_passed":len(applicable)-len(failed),"total_rows_source":ss["total_rows"],"total_rows_target":ts["total_rows"],
-                "distinct_key_count_source":ss["distinct_key_count"],"distinct_key_count_target":ts["distinct_key_count"],
-                "duplicate_key_count_source":ss["duplicate_key_count"],"duplicate_key_count_target":ts["duplicate_key_count"],
-                "row_count_percent_change":safe_percent_change(ss["total_rows"],ts["total_rows"]),
-                "volume_coverage_pct":safe_rate_pct(ts["total_rows"],ss["total_rows"],zero_value=100.0 if ts["total_rows"] == 0 else None),
-                "distinct_key_percent_change":safe_percent_change(ss["distinct_key_count"],ts["distinct_key_count"]),
-                "source_duplicate_key_rate_pct":safe_rate_pct(ss["duplicate_key_count"],ss["total_rows"]),
-                "target_duplicate_key_rate_pct":safe_rate_pct(ts["duplicate_key_count"],ts["total_rows"])},
-                "evidence":{"checks":checks,"failed_checks":failed,"source":ss,"target":ts}}
 
     def _joined(self, s, t, cfg):
         from pyspark.sql import functions as F
@@ -1030,205 +918,6 @@ class SparkExecutor:
         self._match_cache[cache_key] = result
         return result
 
-    def _l3(self,s,t,cfg):
-        from pyspark.sql import functions as F
-
-        if not cfg.get("comparison_keys"):
-            if cfg.get("matching_mode") == "GROUP_RECONCILIATION": return self._group(s,t,cfg)
-            raise ValueError("Spark L3 requires comparison_keys")
-        reconciliation, counts, pk_timing = self._matched_pairs(s,t,cfg)
-        pairs = reconciliation.filter(F.col("reconciliation_status") == "MATCHED").select("_s", "_t", "match_type", "match_key")
-        missing = reconciliation.filter(F.col("reconciliation_status") == "MISSING_IN_TARGET").select(F.col("match_key").alias("key"), F.col("_s").alias("record"))
-        extra = reconciliation.filter(F.col("reconciliation_status") == "EXTRA_IN_TARGET").select(F.col("match_key").alias("key"), F.col("_t").alias("record"))
-        source_duplicates = reconciliation.filter(F.col("reconciliation_status") == "DUPLICATE_IN_SOURCE").groupBy("match_key").agg(
-            F.count(F.lit(1)).alias("duplicate_count"), F.first("_s", ignorenulls=True).alias("record")
-        ).select(F.col("match_key").alias("key"), "duplicate_count", "record")
-        target_duplicates = reconciliation.filter(F.col("reconciliation_status") == "DUPLICATE_IN_TARGET").groupBy("match_key").agg(
-            F.count(F.lit(1)).alias("duplicate_count"), F.first("_t", ignorenulls=True).alias("record")
-        ).select(F.col("match_key").alias("key"), "duplicate_count", "record")
-        duplicate_key_reconciliation = reconciliation.filter(
-            F.col("normalized_primary_key").isNotNull()
-        ).groupBy("normalized_primary_key").agg(
-            F.first("match_key", ignorenulls=True).alias("key"),
-            F.max(F.coalesce(F.col("_source_key_count"), F.lit(0))).alias("source_occurrences"),
-            F.max(F.coalesce(F.col("_target_key_count"), F.lit(0))).alias("target_occurrences"),
-            F.sum(F.when(
-                F.col("_source_key_count").isNotNull() & F.col("_target_key_count").isNotNull(), 1
-            ).otherwise(0)).alias("compared_pairs"),
-            F.first(F.when(F.col("_source_key_count").isNotNull(), F.col("_s")), ignorenulls=True).alias("source_record"),
-            F.first(F.when(F.col("_target_key_count").isNotNull(), F.col("_t")), ignorenulls=True).alias("target_record"),
-        ).filter(
-            (F.col("source_occurrences") > 1) | (F.col("target_occurrences") > 1)
-        ).select("key", "source_occurrences", "target_occurrences", "compared_pairs", "source_record", "target_record")
-        unmatchable_source = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_SOURCE").select(F.col("_s").alias("record"))
-        unmatchable_target = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_TARGET").select(F.col("_t").alias("record"))
-        source_stats = self._stats(s, cfg, "source")
-        target_stats = self._stats(t, cfg, "target")
-        sc=source_stats["total_rows"]; tc=target_stats["total_rows"]
-        mic=counts["missing_count"]; ec=counts["extra_count"]
-        mc=counts["matched_key_count"]; pmc=counts["primary_matched_count"]
-        # Keep the public duplicate counters identical to L2: these are the
-        # duplicate occurrences beyond the first row for each populated key.
-        # The number of distinct duplicated key values is exposed separately.
-        sdk=int(source_stats.get("duplicate_key_count") or 0)
-        tdk=int(target_stats.get("duplicate_key_count") or 0)
-        sdg=counts["source_duplicate_key_count"]; tdg=counts["target_duplicate_key_count"]
-        sdr=sdk+sdg; tdr=tdk+tdg
-        usc=counts["unmatchable_source_count"]; utc=counts["unmatchable_target_count"]
-        all_rows_have_usable_keys = usc == 0 and utc == 0
-        needs_secondary_reconciliation = (usc + utc + mic + ec) > 0
-        effective_matching_mode = (
-            cfg.get("matching_mode", "ROW_LEVEL")
-            if needs_secondary_reconciliation
-            else "ROW_LEVEL"
-        )
-        metrics={"status":"PASS" if mic+ec+usc+utc==0 else "FAIL","source_record_count":sc,"target_record_count":tc,
-                 "source_unique_key_count":source_stats["distinct_key_count"], "target_unique_key_count":target_stats["distinct_key_count"],
-                 "matched_key_count":mc,"primary_matched_count":pmc,
-                 "missing_key_count":mic,"extra_key_count":ec,
-                 "source_duplicate_key_count":sdk,"target_duplicate_key_count":tdk,
-                 "source_duplicated_key_value_count":sdg,"target_duplicated_key_value_count":tdg,
-                 "source_duplicate_record_count":sdr,"target_duplicate_record_count":tdr,
-                 "unmatchable_source_count":usc,"unmatchable_target_count":utc,
-                 "ambiguous_record_count":usc+utc,
-                 "mismatch_count":mic+ec+usc+utc,
-                 "source_record_coverage_pct":safe_rate_pct(counts["matched_source_record_count"],sc,zero_value=100.0),
-                 "target_record_coverage_pct":safe_rate_pct(counts["matched_target_record_count"],tc,zero_value=100.0),
-                 "missing_record_rate_pct":safe_rate_pct(mic,sc),"extra_record_rate_pct":safe_rate_pct(ec,tc),
-                 "ambiguous_record_rate_pct":safe_rate_pct(usc+utc,sc+tc),
-                 "matching_mode":effective_matching_mode,
-                 "all_rows_have_usable_keys":all_rows_have_usable_keys,
-                 "needs_secondary_reconciliation":needs_secondary_reconciliation}
-        if cfg.get("matching_mode") == "GROUP_RECONCILIATION" and needs_secondary_reconciliation:
-            group_started = perf_counter()
-            groups = cfg.get("grouping_attributes", []) or []
-            mapping_lookup = self._mapping_lookup(cfg)
-
-            def with_secondary_group_key(df, side):
-                expressions = []
-                for item in groups:
-                    source_column = item["source_column"]
-                    target_column = item["target_column"]
-                    column = source_column if side == "source" else target_column
-                    mapping = mapping_lookup.get(source_column, {})
-                    if mapping.get("target_column") != target_column:
-                        mapping = {}
-                    expressions.append(self._apply_mapping_normalization(F.col(column), mapping).cast("string"))
-                return df.withColumn("__secondary_group_key", F.to_json(F.array(*expressions)))
-
-            null_source = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_SOURCE").select("_s.*")
-            null_target = reconciliation.filter(F.col("reconciliation_status") == "UNMATCHABLE_TARGET").select("_t.*")
-            missing_source = reconciliation.filter(F.col("reconciliation_status") == "MISSING_IN_TARGET").select("_s.*")
-            extra_target = reconciliation.filter(F.col("reconciliation_status") == "EXTRA_IN_TARGET").select("_t.*")
-
-            # A populated missing/extra key may participate in grouped
-            # reconciliation only when the opposite matching group contains a
-            # row with no usable key. Populated key vs populated key is never
-            # reinterpreted by grouping.
-            keyed_null_source = with_secondary_group_key(null_source, "source")
-            keyed_null_target = with_secondary_group_key(null_target, "target")
-            target_null_groups = keyed_null_target.select("__secondary_group_key").distinct()
-            source_null_groups = keyed_null_source.select("__secondary_group_key").distinct()
-            related_missing_source = with_secondary_group_key(missing_source, "source").join(
-                target_null_groups, "__secondary_group_key", "left_semi"
-            )
-            related_extra_target = with_secondary_group_key(extra_target, "target").join(
-                source_null_groups, "__secondary_group_key", "left_semi"
-            )
-            # Persist the unresolved fallback rows once. Both secondary matching
-            # and grouped reconciliation consume the same rows; without this
-            # cache Spark rebuilds the reconciliation/distinct/semi-join lineage
-            # for each downstream branch. The secondary summary below naturally
-            # materializes these caches, so no extra count() job is introduced.
-            fallback_source = (
-                keyed_null_source
-                .unionByName(related_missing_source)
-                .drop("__secondary_group_key")
-                .persist()
-            )
-            fallback_target = (
-                keyed_null_target
-                .unionByName(related_extra_target)
-                .drop("__secondary_group_key")
-                .persist()
-            )
-            secondary_matches = self._possible_key_changes(fallback_source, fallback_target, cfg).persist()
-            possible_key_changes = secondary_matches.filter(F.col("status") == "POSSIBLE_KEY_CHANGE")
-            missing_business_keys = secondary_matches.filter(F.col("status") == "MISSING_BUSINESS_KEY")
-
-            # One Spark action computes all secondary-reconciliation counters.
-            # Previously this path launched three separate count() jobs.
-            secondary_summary = secondary_matches.agg(
-                F.count(F.lit(1)).alias("total"),
-                F.sum(F.when(F.col("status") == "POSSIBLE_KEY_CHANGE", 1).otherwise(0)).alias("possible_key_changes"),
-                F.sum(F.when(F.col("status") == "MISSING_BUSINESS_KEY", 1).otherwise(0)).alias("missing_business_keys"),
-            ).first()
-            secondary_match_count = int(secondary_summary["total"] or 0)
-            possible_key_change_count = int(secondary_summary["possible_key_changes"] or 0)
-            missing_business_key_count = int(secondary_summary["missing_business_keys"] or 0)
-            metrics["secondary_match_count"] = secondary_match_count
-            metrics["possible_key_change_count"] = possible_key_change_count
-            metrics["missing_business_key_count"] = missing_business_key_count
-            gr = None
-
-            # related_missing_source can only exist when target has an unmatchable
-            # row; related_extra_target can only exist when source has one.
-            # Therefore fallback data exists iff usc + utc > 0.  Reuse those
-            # already-computed exact counts instead of launching limit().count()
-            # jobs against both fallback DataFrames.
-            if (usc + utc) > 0:
-                # Reconcile every key-unresolved row by configured grouping
-                # attributes. Duplicate primary keys stay in the PK section.
-                gr=self._group(fallback_source,fallback_target,cfg)
-                row_metrics=dict(metrics)
-                unresolved_populated_keys = max(0, mic + ec - missing_business_key_count)
-                final_status = "FAIL" if (
-                    unresolved_populated_keys > 0
-                    or missing_business_key_count > 0
-                    or gr["metrics"]["status"] == "FAIL"
-                ) else "PASS"
-                metrics={**metrics,**gr["metrics"],"row_reconciliation":row_metrics,"group_reconciliation":gr["metrics"],
-                    "status":final_status}
-                metrics["secondary_match_count"] = secondary_match_count
-                metrics["possible_key_change_count"] = possible_key_change_count
-                metrics["missing_business_key_count"] = missing_business_key_count
-            else:
-                metrics["matching_mode"] = "ROW_LEVEL"
-
-            # Group reconciliation has finished consuming the fallback rows.
-            # Secondary-match evidence is backed by its own persisted DataFrame,
-            # so the fallback caches can be released before evidence collection.
-            try:
-                fallback_source.unpersist(blocking=False)
-                fallback_target.unpersist(blocking=False)
-            except Exception:
-                logger.debug("Unable to unpersist L3 fallback datasets", exc_info=True)
-
-            group_ms = (perf_counter() - group_started) * 1000
-            evidence_started = perf_counter()
-            row_evidence = {"matched_pairs":self._bounded(pairs, pmc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec),
-                "duplicate_source_records":self._bounded(source_duplicates, sdk),"duplicate_target_records":self._bounded(target_duplicates, tdk),
-                "duplicate_key_reconciliation":self._bounded(duplicate_key_reconciliation, sdg + tdg),
-                "unmatchable_source_records":self._bounded(unmatchable_source, usc),"unmatchable_target_records":self._bounded(unmatchable_target, utc)}
-            evidence = {**row_evidence, "row_reconciliation": row_evidence,
-                "secondary_matches":self._bounded(secondary_matches, secondary_match_count),
-                "missing_business_keys":self._bounded(missing_business_keys, missing_business_key_count),
-                "possible_key_changes":self._bounded(possible_key_changes, possible_key_change_count)}
-            if gr is not None:
-                evidence["group_reconciliation"] = gr["evidence"].get("group_reconciliation",[])
-            evidence_ms = (perf_counter() - evidence_started) * 1000
-            logger.info("SPARK_L3_TIMING pk_build_ms=%.1f pk_summary_ms=%.1f pk_evidence_ms=%.1f group_ms=%.1f", pk_timing["pk_build_ms"], pk_timing["pk_summary_ms"], evidence_ms, group_ms)
-            print(f"SPARK_L3_TIMING pk_path={pk_timing.get('pk_path','UNKNOWN')} pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms={group_ms:.1f}")
-            return {"metrics":metrics,"evidence":evidence}
-        evidence_started = perf_counter()
-        evidence = {"matched_pairs":self._bounded(pairs, pmc),"missing_records":self._bounded(missing, mic),"extra_records":self._bounded(extra, ec),
-            "duplicate_source_records":self._bounded(source_duplicates, sdk),"duplicate_target_records":self._bounded(target_duplicates, tdk),
-            "duplicate_key_reconciliation":self._bounded(duplicate_key_reconciliation, sdg + tdg),
-            "unmatchable_source_records":self._bounded(unmatchable_source, usc),"unmatchable_target_records":self._bounded(unmatchable_target, utc)}
-        evidence_ms = (perf_counter() - evidence_started) * 1000
-        logger.info("SPARK_L3_TIMING pk_build_ms=%.1f pk_summary_ms=%.1f pk_evidence_ms=%.1f group_ms=0.0", pk_timing["pk_build_ms"], pk_timing["pk_summary_ms"], evidence_ms)
-        print(f"SPARK_L3_TIMING pk_path={pk_timing.get('pk_path','UNKNOWN')} pk_build_ms={pk_timing['pk_build_ms']:.1f} pk_summary_ms={pk_timing['pk_summary_ms']:.1f} pk_evidence_ms={evidence_ms:.1f} group_ms=0.0")
-        return {"metrics":metrics,"evidence":evidence}
 
     def _possible_key_changes(self, source, target, cfg):
         """Match unresolved rows one-to-one using configured grouping fields."""
@@ -1389,297 +1078,11 @@ class SparkExecutor:
             resolved.append((source_column, target_column, mapping))
         return resolved
 
-    def _l4(self,s,t,cfg):
-        from pyspark.sql import functions as F
-        from pyspark.sql.types import NumericType
-        keys=cfg.get("comparison_keys",[])
-        if not keys: return {"metrics":{"status":"NOT_APPLICABLE","comparison_mode":"GROUP_RECONCILIATION","reason":"Row-level field comparison is not applicable without row matches."},"evidence":{}}
-        reconciliation, match_counts, _ = self._matched_pairs(s,t,cfg)
-        matched_reconciliation = reconciliation.filter(F.col("reconciliation_status") == "MATCHED")
-        pairs = matched_reconciliation.select("_s", "_t", "match_type", "match_key")
-        duplicate_pairs = matched_reconciliation.filter(
-            (F.col("_source_key_count") > 1) | (F.col("_target_key_count") > 1)
-        ).groupBy("normalized_primary_key").agg(
-            F.first("match_key", ignorenulls=True).alias("key"),
-            F.max("_source_key_count").alias("source_occurrences"),
-            F.max("_target_key_count").alias("target_occurrences"),
-            F.count(F.lit(1)).alias("compared_pairs"),
-            F.first("_s", ignorenulls=True).alias("source_record"),
-            F.first("_t", ignorenulls=True).alias("target_record"),
-        ).select(
-            "key", "source_occurrences", "target_occurrences", "compared_pairs",
-            "source_record", "target_record",
-        )
-
-        resolved_pairs = self._resolve_l4_column_pairs(s.columns, t.columns, cfg)
-        hashed_pairs = self._matched_row_hashes(pairs, resolved_pairs).persist()
-        hash_summary = hashed_pairs.agg(
-            F.sum(F.when(F.col("__source_row_hash") == F.col("__target_row_hash"), 1).otherwise(0)).alias("hash_equal"),
-            F.sum(F.when(~F.col("__source_row_hash").eqNullSafe(F.col("__target_row_hash")), 1).otherwise(0)).alias("hash_changed"),
-        ).first()
-        hash_equal = int(hash_summary["hash_equal"] or 0)
-        hash_changed = int(hash_summary["hash_changed"] or 0)
-        # Only changed hash candidates need field expressions.  A tolerance can
-        # still make a changed-hash field PASS, so all candidates are evaluated.
-        comparison_pairs = hashed_pairs.filter(~F.col("__source_row_hash").eqNullSafe(F.col("__target_row_hash")))
-
-        # Schema types let us distinguish a real arithmetic difference from
-        # a textual/value mismatch.  Numeric fields expose target - source even
-        # when no tolerance is configured; non-numeric fields expose N/A.
-        source_types = {field.name: field.dataType for field in s.schema.fields}
-        target_types = {field.name: field.dataType for field in t.schema.fields}
-
-        comps=[]
-        for sc,tc,mapping in resolved_pairs:
-            source_value = F.col(f"_s.`{sc}`")
-            target_value = F.col(f"_t.`{tc}`")
-            source_compare = self._apply_mapping_normalization(source_value, mapping)
-            target_compare = self._apply_mapping_normalization(target_value, mapping)
-
-            exact_match = source_compare.eqNullSafe(target_compare)
-            tolerance_pct = mapping.get("tolerance_pct")
-            tolerance = mapping.get("tolerance")
-            comparison_type = "EXACT"
-            tolerance_type = None
-            tolerance_value = None
-
-            is_numeric_field = (
-                isinstance(source_types.get(sc), NumericType)
-                and isinstance(target_types.get(tc), NumericType)
-            )
-
-            # Difference is meaningful for numeric fields whether comparison is
-            # exact or tolerance-based.
-            if is_numeric_field:
-                source_number = source_compare.cast("double")
-                target_number = target_compare.cast("double")
-                numeric_difference = target_number - source_number
-                numeric_values = source_number.isNotNull() & target_number.isNotNull()
-                difference = F.when(numeric_values, numeric_difference).otherwise(
-                    F.lit(None).cast("double")
-                )
-            else:
-                source_number = None
-                target_number = None
-                numeric_difference = None
-                numeric_values = None
-                difference = F.lit(None).cast("double")
-
-            if tolerance_pct is not None:
-                # Percentage tolerance is valid only for numeric data.
-                if is_numeric_field:
-                    allowed = F.abs(source_number) * (
-                        F.lit(float(tolerance_pct)) / F.lit(100.0)
-                    )
-                    tolerance_match = numeric_values & (
-                        F.abs(numeric_difference) <= allowed
-                    )
-                else:
-                    tolerance_match = F.lit(False)
-
-                comparison_type = "PERCENTAGE_TOLERANCE"
-                tolerance_value = float(tolerance_pct)
-                tolerance_type = "PERCENTAGE"
-                matched_expr = exact_match | tolerance_match
-
-            elif tolerance is not None:
-                # Absolute numeric tolerance.
-                if is_numeric_field:
-                    tolerance_match = numeric_values & (
-                        F.abs(numeric_difference) <= F.lit(float(tolerance))
-                    )
-                else:
-                    tolerance_match = F.lit(False)
-
-                comparison_type = "NUMERIC_TOLERANCE"
-                tolerance_value = float(tolerance)
-                tolerance_type = "ABSOLUTE"
-                matched_expr = exact_match | tolerance_match
-
-            else:
-                matched_expr = exact_match
-
-            bad = ~matched_expr
-            comps.append(
-                (
-                    sc,
-                    tc,
-                    bad,
-                    difference,
-                    comparison_type,
-                    tolerance_value,
-                    tolerance_type,
-                )
-            )
-        count_row = comparison_pairs.agg(
-            F.count(F.lit(1)).alias("matched_record_count"),
-            *[
-            F.sum(F.when(bad, 1).otherwise(0)).cast("long").alias(f"mismatch_{index}")
-            for index, (_, _, bad, _, _, _, _) in enumerate(comps)
-            ],
-        ).first() if comps else None
-        field_statistics=[]; total_mismatch=0
-        for index, (sc,tc,bad,_,comparison_type,_,_) in enumerate(comps):
-            n = int(count_row[f"mismatch_{index}"] or 0)
-            total_mismatch+=n; field_statistics.append({"field":sc,"target_field":tc,"mismatches":n,"comparison_type":comparison_type})
-        mr=int(match_counts.get("primary_matched_count") or 0)
-        compared=mr*len(comps)
-        mismatch_rows = F.array(*[
-            F.when(bad, F.struct(
-                F.col("match_key").alias("key"), F.col("match_type"),
-                F.lit(sc).alias("source_column"), F.lit(tc).alias("target_column"),
-                F.col(f"_s.`{sc}`").alias("source_value"), F.col(f"_t.`{tc}`").alias("target_value"),
-                F.col("_s").alias("source_record"), F.col("_t").alias("target_record"),
-                F.lit(False).alias("matched"), F.lit(comparison_type).alias("comparison_type"),
-                difference.alias("difference"), F.lit(tolerance_value).cast("double").alias("tolerance"),
-                F.lit(tolerance_type).cast("string").alias("tolerance_type"),
-            ))
-            for sc, tc, bad, difference, comparison_type, tolerance_value, tolerance_type in comps
-        ])
-        field_mismatches = comparison_pairs.select(F.explode(mismatch_rows).alias("mismatch")).filter(F.col("mismatch").isNotNull()).select("mismatch.*") if comps else None
-        evidence_summary = field_mismatches.agg(F.countDistinct("key").alias("records_with_mismatch")).first() if field_mismatches is not None else None
-        records_with_mismatch = int(evidence_summary["records_with_mismatch"] or 0) if evidence_summary is not None else 0
-        source_stats = self._stats(s, cfg, "source")
-        target_stats = self._stats(t, cfg, "target")
-        return {"metrics":{"status":"PASS" if total_mismatch==0 else "FAIL","source_record_count":source_stats["total_rows"],"target_record_count":target_stats["total_rows"],
-                "matched_record_count":mr,"compared_field_count":compared,"matched_field_count":compared-total_mismatch,"mismatch_count":total_mismatch,
-                "field_conformity_pct":safe_rate_pct(compared-total_mismatch,compared,zero_value=100.0),"field_mismatch_rate_pct":safe_rate_pct(total_mismatch,compared),
-                "records_with_mismatch": records_with_mismatch,
-                "affected_record_rate_pct":safe_rate_pct(records_with_mismatch,mr),
-                "hash_equal_record_count": hash_equal,
-                "hash_changed_candidate_count": hash_changed,
-                "hash_algorithm": "SHA-256",
-                "source_duplicate_key_count":source_stats["duplicate_key_count"],
-                "target_duplicate_key_count":target_stats["duplicate_key_count"],
-                "missing_record_count":match_counts["missing_count"],"extra_record_count":match_counts["extra_count"],"ambiguous_record_count":0},
-                "evidence":{"field_statistics":field_statistics,"comparison_keys":keys,
-                            "effective_column_mappings":[{
-                                "source_column": sc, "target_column": tc,
-                                "normalization": dict((mapping or {}).get("normalization") or {}),
-                                "tolerance": (mapping or {}).get("tolerance"),
-                                "tolerance_pct": (mapping or {}).get("tolerance_pct"),
-                                "comparison_type": comparison_type,
-                            } for sc, tc, mapping in resolved_pairs
-                              for comparison_type in [(
-                                  "PERCENTAGE_TOLERANCE" if (mapping or {}).get("tolerance_pct") is not None
-                                  else "NUMERIC_TOLERANCE" if (mapping or {}).get("tolerance") is not None
-                                  else "EXACT"
-                              )]],
-                            "field_mismatches":self._bounded(field_mismatches, total_mismatch),
-                            "duplicate_matched_pairs":self._bounded(duplicate_pairs, match_counts["source_duplicate_key_count"] + match_counts["target_duplicate_key_count"])}}
 
     def _agg_expr(self, op, col):
         from pyspark.sql import functions as F
         return {"SUM":F.sum,"AVG":F.avg,"MIN":F.min,"MAX":F.max,"COUNT":F.count}[op](F.col(col) if col else F.lit(1))
 
-    def _l5(self,s,t,cfg):
-        from pyspark.sql import functions as F
-
-        rules = []
-        ignored = set(cfg.get("ignored_columns", []))
-        for r in cfg.get("aggregate_rules",[]):
-            if AggregateComparator._uses_ignored_column(r, ignored):
-                continue
-            op=str(r.get("function",r.get("operation",""))).upper(); sc=r.get("source_column"); tc=r.get("target_column") or sc
-            if op not in {"SUM","AVG","MIN","MAX","COUNT"}: continue
-            sg=r.get("source_group_by") or r.get("group_by_columns") or []; tg=r.get("target_group_by") or r.get("group_by_columns") or []
-            rules.append((r, op, sc, tc, sg, tg))
-
-        result_by_index={}
-        ungrouped = [(index, rule) for index, rule in enumerate(rules) if not rule[4] and not rule[5]]
-        if ungrouped:
-            source_values = s.agg(*[
-                self._agg_expr(op, sc).alias(f"value_{index}")
-                for index, (_, op, sc, _, _, _) in ungrouped
-            ]).first().asDict()
-            target_values = t.agg(*[
-                self._agg_expr(op, tc).alias(f"value_{index}")
-                for index, (_, op, _, tc, _, _) in ungrouped
-            ]).first().asDict()
-            for index, (r, op, sc, tc, _, _) in ungrouped:
-                sv=source_values[f"value_{index}"]; tv=target_values[f"value_{index}"]
-                diff=None if sv is None or tv is None else float(tv)-float(sv)
-                tol=r.get("tolerance"); tol_pct=r.get("tolerance_pct")
-                if diff is None:
-                    matched = sv == tv
-                elif tol_pct is not None and sv is not None:
-                    matched = abs(diff) <= abs(float(sv)) * (float(tol_pct) / 100.0)
-                elif tol is not None:
-                    matched = abs(diff) <= float(tol)
-                else:
-                    matched = sv == tv
-                tolerance_evidence = ({"percentage": float(tol_pct)} if tol_pct is not None else tol)
-                result_by_index[index] = {"rule_name":r.get("name"),"operation":op,"source_column":sc,"target_column":tc,"group":None,"source":sv,"target":tv,"difference":diff,"matched":matched,"tolerance":tolerance_evidence,"tolerance_pct":tol_pct}
-        for index, (r, op, sc, tc, sg, tg) in enumerate(rules):
-            if not sg and not tg:
-                continue
-            sa=s.groupBy(*sg).agg(self._agg_expr(op,sc).alias("sv")); ta=t.groupBy(*tg).agg(self._agg_expr(op,tc).alias("tv"))
-            cond=None
-            for a,b in zip(sg,tg):
-                x=F.col(f"s.`{a}`").eqNullSafe(F.col(f"t.`{b}`")); cond=x if cond is None else cond & x
-            g=sa.alias("s").join(ta.alias("t"),cond,"full_outer")
-            diff_expr = F.col("tv").cast("double") - F.col("sv").cast("double")
-            if r.get("tolerance_pct") is not None:
-                allowed = F.abs(F.col("sv").cast("double")) * (F.lit(float(r["tolerance_pct"])) / F.lit(100.0))
-                matched_expr = F.col("sv").eqNullSafe(F.col("tv")) | (F.col("sv").isNotNull() & F.col("tv").isNotNull() & (F.abs(diff_expr) <= allowed))
-            elif r.get("tolerance") is not None:
-                matched_expr = F.col("sv").eqNullSafe(F.col("tv")) | (F.col("sv").isNotNull() & F.col("tv").isNotNull() & (F.abs(diff_expr) <= F.lit(float(r["tolerance"]))))
-            else:
-                matched_expr = F.col("sv").eqNullSafe(F.col("tv"))
-            g=g.withColumn("matched", matched_expr)
-            summary = g.agg(
-                F.count(F.lit(1)).alias("total"),
-                F.sum(F.when(~F.col("matched"), 1).otherwise(0)).alias("failed"),
-            ).first()
-            total = int(summary["total"] or 0); failed = int(summary["failed"] or 0)
-            group_columns = [
-                F.coalesce(F.col(f"s.`{source_group}`"), F.col(f"t.`{target_group}`")).alias(f"group_{group_index}")
-                for group_index, (source_group, target_group) in enumerate(zip(sg, tg))
-            ]
-            failed_group_rows = (
-                g.filter(~F.col("matched"))
-                .select(
-                    *group_columns,
-                    F.col("sv").alias("source"),
-                    F.col("tv").alias("target"),
-                    diff_expr.alias("difference"),
-                )
-                .limit(self.evidence_limit)
-                .collect()
-            )
-            tolerance = (
-                {"percentage": float(r["tolerance_pct"])}
-                if r.get("tolerance_pct") is not None
-                else r.get("tolerance")
-            )
-            group_results = []
-            for failed_row in failed_group_rows:
-                group_values = [failed_row[f"group_{group_index}"] for group_index in range(len(sg))]
-                group_results.append({
-                    "rule_name": r.get("name"),
-                    "operation": op,
-                    "source_column": sc,
-                    "target_column": tc,
-                    "group": group_values[0] if len(group_values) == 1 else group_values,
-                    "source": failed_row["source"],
-                    "target": failed_row["target"],
-                    "difference": failed_row["difference"],
-                    "tolerance": tolerance,
-                    "tolerance_pct": r.get("tolerance_pct"),
-                    "matched": False,
-                })
-            result_by_index[index] = {
-                "rule_name":r.get("name"),"operation":op,"source_column":sc,"target_column":tc,
-                "grouped":True,"checks":total,"failed":failed,"matched":failed==0,
-                "group_results":group_results,
-            }
-        results = [result_by_index[index] for index in range(len(rules))]
-        failed=sum(1 for x in results if not x["matched"])
-        checks_total = sum(item.get("checks", 1) for item in results)
-        checks_failed = sum(item.get("failed", 0) if item.get("grouped") else int(not item["matched"]) for item in results)
-        return {"metrics":{"status":"PASS" if failed==0 else "FAIL","rules_total":len(rules),"checks_total":checks_total,"checks_passed":checks_total-checks_failed,"checks_failed":checks_failed,
-                "aggregate_check_pass_rate_pct":safe_rate_pct(checks_total-checks_failed,checks_total,zero_value=100.0),"aggregate_check_failure_rate_pct":safe_rate_pct(checks_failed,checks_total)},
-                "evidence":{"aggregate_results":results}}
 
     def _group(self,s,t,cfg):
         from pyspark.sql import functions as F
@@ -1953,69 +1356,6 @@ class SparkExecutor:
             logger.debug("Unable to unpersist group reconciliation join", exc_info=True)
         return {"metrics":metrics,"evidence":{"group_reconciliation":bounded_evidence}}
 
-    def _l6(self,s,t,cfg):
-        from pyspark.sql import functions as F
-        out=[]
-        rules_by_side={"SOURCE":[],"TARGET":[]}
-        ignored = set(cfg.get("ignored_columns", []))
-        for r in cfg.get("dq_rules",[]):
-            if DQComparator._uses_ignored_column(r, ignored):
-                continue
-            if not r.get("enabled",True): continue
-            typ=str(r.get("rule_type","")).upper(); apply=str(r.get("apply_to","BOTH")).upper()
-            for side,df in (("SOURCE",s),("TARGET",t)):
-                if apply not in ("BOTH",side): continue
-                col=r.get("source_column" if side=="SOURCE" else "target_column") or r.get("column")
-                if not col or col not in df.columns: continue
-                c=F.col(col); invalid=None
-                if typ=="PATTERN": invalid=c.isNotNull() & ~c.cast("string").rlike(r.get("regex",""))
-                elif typ=="COMPLETENESS": invalid=c.isNull() | (F.trim(c.cast("string"))=="")
-                elif typ=="VALIDITY":
-                    allowed=r.get("allowed_values") or (r.get("value") if isinstance(r.get("value"),list) else None)
-                    if allowed is not None:
-                        invalid=~c.isin(allowed)
-                    elif r.get("min") is not None or r.get("max") is not None:
-                        numeric = c.cast("double")
-                        invalid=F.lit(False) | numeric.isNull()
-                        if r.get("min") is not None: invalid=invalid | (numeric < float(r["min"]))
-                        if r.get("max") is not None: invalid=invalid | (numeric > float(r["max"]))
-                if invalid is not None:
-                    rules_by_side[side].append((r,typ,col,invalid))
-        for side, df in (("SOURCE",s),("TARGET",t)):
-            side_rules=rules_by_side[side]
-            if not side_rules:
-                continue
-            summary=df.agg(
-                F.count(F.lit(1)).alias("total"),
-                *[
-                    F.sum(F.when(invalid,1).otherwise(0)).alias(f"failed_{index}")
-                    for index, (_,_,_,invalid) in enumerate(side_rules)
-                ],
-            ).first()
-            total=int(summary["total"] or 0)
-            for index,(r,typ,col,invalid) in enumerate(side_rules):
-                failed=int(summary[f"failed_{index}"] or 0)
-                item={"rule_id":r.get("rule_id"),"rule_name":r.get("name"),"rule_type":typ,"side":side,"column":col,"total_count":total,"failed_count":failed,"passed_count":total-failed,"status":"PASS" if failed==0 else "FAIL"}
-                if failed:
-                    # Bounded evidence only; full data remains distributed.
-                    failed_rows = df.filter(invalid).limit(self.evidence_limit).collect()
-                    records=[]
-                    for row in failed_rows:
-                        record=row.asDict(recursive=True)
-                        records.append({
-                            "record": record,
-                            "column": col,
-                            "value": record.get(col),
-                            "rule": {"rule_id": r.get("rule_id"), "name": r.get("name"), "rule_type": typ},
-                            "reason": f"{typ} validation failed",
-                            "status": "FAIL",
-                        })
-                    item["source_failed_records" if side=="SOURCE" else "target_failed_records"] = records
-                out.append(item)
-        failed=sum(1 for x in out if x["status"]=="FAIL")
-        checks_total=sum(x["total_count"] for x in out); checks_failed=sum(x["failed_count"] for x in out)
-        dq_results = [{**item, "matched": item["status"] == "PASS"} for item in out]
-        return {"metrics":{"status":"PASS" if checks_failed==0 else "FAIL","rules_total":len(out),"rules_failed":failed,"rules_passed":len(out)-failed,"checks_total":checks_total,"checks_passed":checks_total-checks_failed,"checks_failed":checks_failed,"pass_percentage":safe_rate_pct(checks_total-checks_failed,checks_total,zero_value=100.0),"failure_percentage":safe_rate_pct(checks_failed,checks_total)},"evidence":{"dq_results":dq_results, "rule_results":dq_results}}
 
     def _bounded(self, df, total_count: int | None = None):
         if df is None:

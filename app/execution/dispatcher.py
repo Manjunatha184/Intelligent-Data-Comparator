@@ -10,7 +10,7 @@ from app.execution.models import (
     ExecutionLocation,
 )
 
-from app.execution.spark_executor_refactored import SparkExecutor
+from app.execution.spark_executor import SparkExecutor
 
 
 # ============================================================
