@@ -1,0 +1,194 @@
+/* Shared UI normalization layer.
+   Visual-only: no API, payload, validation, or comparison behavior changes. */
+
+:root {
+  --control-height: 36px;
+  --control-radius: 6px;
+  --control-border: #d5deea;
+  --control-border-hover: #b9c8dc;
+  --control-border-focus: #7aa5e8;
+  --control-bg: #fff;
+  --control-text: #183250;
+  --control-placeholder: #7a8ba3;
+  --control-shadow-focus: 0 0 0 3px rgba(23, 105, 238, .08);
+}
+
+/* One compact language for text inputs and every native select. */
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.field select,
+.connectionSelector select,
+.modalBody input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.modalBody select,
+.mappingPickerBlock select {
+  width: 100%;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+  background-color: var(--control-bg);
+  color: var(--control-text);
+  padding: 0 34px 0 11px;
+  font-size: 11px;
+  line-height: 1;
+  outline: none;
+  box-shadow: none;
+  transition: border-color .14s ease, box-shadow .14s ease, background-color .14s ease;
+}
+
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.modalBody input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  padding-right: 11px;
+}
+
+.field select,
+.connectionSelector select,
+.modalBody select,
+.mappingPickerBlock select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #657a98 50%),
+    linear-gradient(135deg, #657a98 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 11px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.field input:hover,
+.field select:hover,
+.connectionSelector select:hover,
+.modalBody input:hover,
+.modalBody select:hover,
+.mappingPickerBlock select:hover {
+  border-color: var(--control-border-hover);
+}
+
+.field input:focus,
+.field select:focus,
+.connectionSelector select:focus,
+.modalBody input:focus,
+.modalBody select:focus,
+.mappingPickerBlock select:focus {
+  border-color: var(--control-border-focus);
+  box-shadow: var(--control-shadow-focus);
+}
+
+.field select:disabled,
+.connectionSelector select:disabled,
+.modalBody select:disabled {
+  cursor: not-allowed;
+  background-color: #f6f8fb;
+  color: #93a0b2;
+}
+
+.field > span,
+.field > label,
+.mappingPickerBlock > label {
+  color: #526987;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+/* Make the existing custom multi-select match native selects. */
+.multiSelectTrigger {
+  min-height: var(--control-height);
+  height: var(--control-height);
+  border-color: var(--control-border) !important;
+  border-radius: var(--control-radius) !important;
+  background: var(--control-bg) !important;
+  color: var(--control-text) !important;
+  padding: 0 11px !important;
+  font-size: 11px !important;
+}
+
+.multiSelectTrigger:hover {
+  border-color: var(--control-border-hover) !important;
+}
+
+.multiSelectField:focus-within .multiSelectTrigger {
+  border-color: var(--control-border-focus) !important;
+  box-shadow: var(--control-shadow-focus) !important;
+}
+
+.multiSelectMenu {
+  margin-top: 5px !important;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 7px !important;
+  background: #fff !important;
+  box-shadow: 0 10px 28px rgba(31, 55, 86, .12) !important;
+  padding: 4px !important;
+}
+
+.multiSelectOption {
+  min-height: 30px !important;
+  border-radius: 5px !important;
+  font-size: 10px !important;
+}
+
+/* Rule creation is a focused form, not a full-page dialog. */
+.modalBackdrop .modalBackdrop {
+  left: 0;
+  z-index: 120;
+  background: rgba(15, 23, 42, .34);
+}
+
+.modalBackdrop .modalBackdrop .modal,
+.rulesRepositoryPage .modal {
+  width: min(620px, calc(100vw - 48px));
+  max-height: min(82vh, 760px);
+  border-radius: 9px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalBackdrop .modalBackdrop .modalHead,
+.rulesRepositoryPage .modal .modalHead {
+  flex: 0 0 auto;
+  padding: 15px 18px;
+  min-height: 56px;
+  align-items: center;
+}
+
+.modalBackdrop .modalBackdrop .modalHead h2,
+.rulesRepositoryPage .modal .modalHead h2 {
+  margin: 0;
+  font-size: 15px;
+  color: #102442;
+}
+
+.modalBackdrop .modalBackdrop .modalBody,
+.rulesRepositoryPage .modal .modalBody {
+  display: grid;
+  gap: 11px;
+  padding: 16px 18px 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.modalBackdrop .modalBackdrop .modalFooter,
+.rulesRepositoryPage .modal .modalFooter {
+  position: sticky;
+  bottom: 0;
+  margin: 4px -18px 0;
+  padding: 12px 18px;
+  background: #fff;
+  border-top: 1px solid #e4eaf2;
+  z-index: 2;
+}
+
+/* Rule picker remains visible behind its child editor without competing with it. */
+.modalBackdrop:has(> .modal + .modalBackdrop) > .modal {
+  filter: none;
+}
+
+@media (max-width: 760px) {
+  .modalBackdrop .modalBackdrop .modal,
+  .rulesRepositoryPage .modal {
+    width: min(100%, calc(100vw - 24px));
+    max-height: 90vh;
+  }
+}
