@@ -1,26 +1,133 @@
 import React from "react";
-import { Check, Loader2, X } from "lucide-react";
+import { Loader2, X, Zap } from "lucide-react";
+import Panel from "../ui/Panel.jsx";
 
-function connectionName(connection) { return connection?.name || `Connection #${connection?.connection_id || "—"}`; }
+export default function ReviewModal({
+  source,
+  target,
+  levels,
+  comparisonKeys,
+  sourceFiltersCount,
+  targetFiltersCount,
+  ignoredColumnsCount,
+  mappingsCount,
+  dqRulesCount,
+  aggregateRulesCount,
+  onClose,
+  onRun,
+  running
+}) {
+  return (
+    <div className="modalBackdrop">
+      <div className="modal">
+        <div className="modalHead">
+          <div>
+            <h3>Review & Run</h3>
+            <p className="helper">Review your comparison configuration before running</p>
+          </div>
+          <button type="button" className="iconButton" onClick={onClose} disabled={running}>
+            <X size={18} />
+          </button>
+        </div>
 
-export default function ReviewModal({ source, target, levels = [], comparisonKeys = [], sourceFiltersCount = 0, targetFiltersCount = 0, ignoredColumnsCount = 0, mappingsCount = 0, dqRulesCount = 0, aggregateRulesCount = 0, onClose, onRun, running }) {
-  const key = comparisonKeys?.[0];
-  const items = [
-    ["Source", connectionName(source)],
-    ["Target", connectionName(target)],
-    ["Levels", levels.join(", ") || "None"],
-    ["Primary key", key?.source_column && key?.target_column ? `${key.source_column} → ${key.target_column}` : "Not configured"],
-    ["Field mappings", String(mappingsCount)],
-    ["Source filters", String(sourceFiltersCount)],
-    ["Target filters", String(targetFiltersCount)],
-    ["Ignored columns", String(ignoredColumnsCount)],
-    ["Aggregate rules", String(aggregateRulesCount)],
-    ["DQ rules", String(dqRulesCount)],
-  ];
+        <div className="modalBody stack">
+          <div className="reviewGrid">
+            <Panel title="Configuration summary">
+              <ReviewRow
+                label="Source"
+                value={
+                  source?.name ||
+                  "Not selected"
+                }
+              />
 
-  return <div className="modalBackdrop"><div className="modal wide reviewModal">
-    <div className="modalHead"><div><span className="sectionEyebrow">FINAL REVIEW</span><h3>Review comparison</h3><p>Confirm the configuration before execution.</p></div><button type="button" className="iconButton" onClick={onClose} disabled={running}><X size={18} /></button></div>
-    <div className="reviewGrid">{items.map(([label, value]) => <div className="reviewItem" key={label}><span>{label}</span><b>{value}</b></div>)}</div>
-    <div className="modalFooter"><button type="button" className="secondary" onClick={onClose} disabled={running}>Back to configuration</button><button type="button" className="primary" onClick={onRun} disabled={running}>{running ? <><Loader2 className="spin" size={15} /> Running comparison…</> : <><Check size={15} /> Run comparison</>}</button></div>
-  </div></div>;
+              <ReviewRow
+                label="Target"
+                value={
+                  target?.name ||
+                  "Not selected"
+                }
+              />
+
+              <ReviewRow
+                label="Levels"
+                value={levels.join(" · ")}
+              />
+
+              <ReviewRow
+                label="Record keys"
+                value={(comparisonKeys || [])
+                  .filter((key) => key.source_column && key.target_column)
+                  .map((key) => `${key.source_column} → ${key.target_column}`)
+                  .join(", ") || "Not selected"}
+              />
+
+
+              <ReviewRow label="Source filters" value={String(sourceFiltersCount)} />
+              <ReviewRow label="Target filters" value={String(targetFiltersCount)} />
+              <ReviewRow label="Ignored columns" value={String(ignoredColumnsCount)} />
+              <ReviewRow label="Column mappings" value={String(mappingsCount)} />
+
+              <ReviewRow
+                label="DQ rules"
+                value={String(dqRulesCount)}
+              />
+
+              <ReviewRow
+                label="Aggregate rules"
+                value={String(aggregateRulesCount)}
+              />
+            </Panel>
+          </div>
+        </div>
+
+        <div className="modalFooter">
+          <button type="button" className="secondary" onClick={onClose} disabled={running}>
+            Cancel
+          </button>
+          <button className="primary" onClick={onRun} disabled={running}>
+            {running ? (
+              <>
+                <Loader2 size={16} className="spin" />
+                Executing…
+              </>
+            ) : (
+              <>
+                <Zap size={16} />
+                Run comparison
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
+
+
+function ReviewRow({ label, value }) {
+  return (
+    <div className="reviewRow">
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
+/* ============================================================
+   RESULTS
+============================================================ */
+
+const RESULT_PAGE_SIZE = 50;
+
+const LEVEL_NAMES = {
+  L1: "Schema",
+  L2: "Volume",
+  L3: "Record",
+  L4: "Field Transformation",
+  L5: "Aggregate",
+  L6: "Data Quality",
+  L7: "Analysis & Recommendations",
+};
+
+
