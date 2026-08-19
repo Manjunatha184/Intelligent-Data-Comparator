@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from time import perf_counter
 from typing import Any
 
 from app.comparators.spark_levels import SPARK_COMPARATORS
 from app.execution.spark_executor import SparkExecutor as LegacySparkExecutor
+
+
+logger = logging.getLogger(__name__)
 
 
 class SparkExecutor(LegacySparkExecutor):
@@ -19,6 +23,17 @@ class SparkExecutor(LegacySparkExecutor):
         load_started = perf_counter()
         source = self._load(task.configuration["source"])
         target = self._load(task.configuration["target"])
+        logger.info(
+            "SPARK_TIMING task_id=%s level=%s dataset_loading_ms=%.1f",
+            task.task_id,
+            task.comparison_level.value,
+            (perf_counter() - load_started) * 1000,
+        )
+        print(
+            f"SPARK_TIMING task_id={task.task_id} "
+            f"level={task.comparison_level.value} "
+            f"dataset_loading_ms={(perf_counter() - load_started) * 1000:.1f}"
+        )
 
         level = task.comparison_level
         level_started = perf_counter()
@@ -27,9 +42,19 @@ class SparkExecutor(LegacySparkExecutor):
             raise ValueError(f"Unsupported Spark comparison level: {level}")
 
         result = comparator.execute(self, source, target, task.configuration)
+        logger.info(
+            "SPARK_TIMING task_id=%s level=%s comparison_ms=%.1f",
+            task.task_id,
+            level.value,
+            (perf_counter() - level_started) * 1000,
+        )
+        print(
+            f"SPARK_TIMING task_id={task.task_id} "
+            f"level={level.value} "
+            f"comparison_ms={(perf_counter() - level_started) * 1000:.1f}"
+        )
 
-        # Keep the existing public result envelope and runtime metadata exactly
-        # as before; only the level dispatch boundary changes.
+        # Preserve the existing public result envelope exactly.
         result = self._normalize_contract(level, result)
         result.setdefault("runtime_context", {}).update(
             {
@@ -38,8 +63,6 @@ class SparkExecutor(LegacySparkExecutor):
                 "spark_app_id": self.spark.sparkContext.applicationId,
                 "distributed": True,
                 "full_collect_used": False,
-                "dataset_loading_ms": (perf_counter() - load_started) * 1000,
-                "comparison_ms": (perf_counter() - level_started) * 1000,
             }
         )
         result["execution_location"] = "SPARK"
