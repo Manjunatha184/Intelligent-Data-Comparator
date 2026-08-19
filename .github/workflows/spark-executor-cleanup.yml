@@ -6,6 +6,7 @@ on:
       - agent/spark-executor-cleanup
     paths:
       - tools/cleanup_spark_executor.py
+      - .github/workflows/spark-executor-cleanup.yml
   workflow_dispatch:
 
 permissions:
@@ -32,8 +33,10 @@ jobs:
 
       - name: Verify single executor architecture
         run: |
+          test -f app/execution/spark_executor.py
           test ! -f app/execution/spark_executor_refactored.py
           ! grep -R "spark_executor_refactored" -n app --exclude-dir='__pycache__'
+          grep -q "from app.execution.spark_executor import SparkExecutor" app/execution/dispatcher.py
           python3 - <<'PY'
           import ast
           from pathlib import Path
@@ -44,9 +47,8 @@ jobs:
           duplicate = names & {'_l1','_l2','_l3','_l4','_l5','_l6'}
           assert not duplicate, duplicate
           assert 'execute' in names
-          text = p.read_text()
-          assert 'SPARK_COMPARATORS' in text
-          print('single SparkExecutor verified; lines=', len(text.splitlines()))
+          assert 'SPARK_COMPARATORS' in p.read_text()
+          print('single SparkExecutor verified; lines=', len(p.read_text().splitlines()))
           PY
 
       - name: Commit verified cleanup
@@ -54,7 +56,7 @@ jobs:
           rm tools/cleanup_spark_executor.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/execution/spark_executor.py app/execution/dispatcher.py app/execution/spark_executor_refactored.py tools/cleanup_spark_executor.py
+          git add -A app/execution tools/cleanup_spark_executor.py
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
