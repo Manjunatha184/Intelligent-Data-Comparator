@@ -1032,7 +1032,8 @@ class ExecutionEngine:
                     # available executors.
                     1
                     if any(
-                        task.configuration.get("execution_location") == "SPARK"
+                        task.configuration.get("execution_location")
+                        in {"SPARK", "DUCKDB"}
                         for task in runtime_tasks
                     )
                     else self.plan.rules.max_parallel_workers

@@ -157,18 +157,19 @@ class SparkExecutor:
         return result
 
     def _load(self, dataset: dict[str, Any]):
-        from pyspark.sql import functions as F
+        from pyspark.sql import functions as spark_functions
+
         cache_key = json.dumps(dataset, sort_keys=True, default=str)
         cached = self._dataset_cache.get(cache_key)
         if cached is not None:
             return cached
 
         connector = str(dataset.get("connector_type", "")).lower()
-        props = dataset.get("properties", {}) or {}
+        properties = dataset.get("properties", {}) or {}
         filters_already_applied = False
 
         if connector == "csv":
-            path = props.get("path")
+            path = properties.get("path")
             if not path:
                 raise ValueError("Spark CSV dataset requires properties.path")
             size_bytes = os.path.getsize(path)
@@ -179,26 +180,41 @@ class SparkExecutor:
                 self.spark.conf.set("spark.sql.shuffle.partitions", os.getenv("SPARK_SMALL_SHUFFLE_PARTITIONS", "4"))
             else:
                 self.spark.conf.set("spark.sql.shuffle.partitions", os.getenv("SPARK_SQL_SHUFFLE_PARTITIONS", "16"))
-            df = (self.spark.read.schema(self._csv_schema(dataset))
-                  .option("header", "true")
-                  .option("delimiter", props.get("delimiter", ","))
-                  .csv(path))
+            dataframe = (
+                self.spark.read.schema(self._csv_schema(dataset))
+                .option("header", "true")
+                .option("delimiter", properties.get("delimiter", ","))
+                .csv(path)
+            )
         elif connector in {"postgres", "postgresql"}:
-            conn = props.get("connection", props)
-            host = conn.get("host", "postgres")
-            port = conn.get("port", 5432)
-            db = conn.get("database") or conn.get("dbname")
-            table = props.get("table")
-            schema = props.get("schema")
+            connection_properties = properties.get("connection", properties)
+            host = connection_properties.get("host", "postgres")
+            port = connection_properties.get("port", 5432)
+            database = (
+                connection_properties.get("database")
+                or connection_properties.get("dbname")
+            )
+            table = properties.get("table")
+            schema = properties.get("schema")
             if schema and table:
                 table = f"{schema}.{table}"
-            url = f"jdbc:postgresql://{host}:{port}/{db}"
-            df = (self.spark.read.format("jdbc").option("url", url).option("dbtable", table)
-                  .option("user", conn.get("user") or conn.get("username"))
-                  .option("password", conn.get("password")).option("driver", "org.postgresql.Driver").load())
+            url = f"jdbc:postgresql://{host}:{port}/{database}"
+            dataframe = (
+                self.spark.read.format("jdbc")
+                .option("url", url)
+                .option("dbtable", table)
+                .option(
+                    "user",
+                    connection_properties.get("user")
+                    or connection_properties.get("username"),
+                )
+                .option("password", connection_properties.get("password"))
+                .option("driver", "org.postgresql.Driver")
+                .load()
+            )
 
         elif connector == "databricks":
-            df = self._load_databricks(dataset)
+            dataframe = self._load_databricks(dataset)
             # DatabricksConnector.iter_chunks() executes the configured
             # filter clause in Databricks SQL before returning rows.
             filters_already_applied = True
@@ -209,36 +225,73 @@ class SparkExecutor:
                 f"datasets; got '{connector}'"
             )
 
-        for flt in ([] if filters_already_applied else (props.get("_filters", []) or [])):
-            field, raw_operator, value = flt.get("field"), str(flt.get("operator", "EQ")).upper().strip(), flt.get("value")
-            op = {
-                "=": "EQ",
-                "!=": "NE",
-                ">": "GT",
-                ">=": "GTE",
-                "<": "LT",
-                "<=": "LTE",
-                "IS NULL": "IS_NULL",
-                "IS NOT NULL": "IS_NOT_NULL",
-            }.get(raw_operator, raw_operator.replace(" ", "_"))
-            if field not in df.columns:
+        filters = (
+            []
+            if filters_already_applied
+            else (properties.get("_filters", []) or [])
+        )
+        for filter_item in filters:
+            field = filter_item.get("field")
+            if field not in dataframe.columns:
                 raise ValueError(f"Unknown filter field: {field}")
-            c = F.col(field)
-            expr = {"EQ": c == value, "NE": c != value, "GT": c > value, "GTE": c >= value,
-                    "LT": c < value, "LTE": c <= value}.get(op)
-            if op == "IN": expr = c.isin(value if isinstance(value, list) else [value])
-            if op == "IS_NULL": expr = c.isNull()
-            if op == "IS_NOT_NULL": expr = c.isNotNull()
-            if expr is None: raise ValueError(f"Unsupported Spark filter operator: {op}")
-            df = df.filter(expr)
+
+            value = filter_item.get("value")
+            operator = self._normalize_filter_operator(
+                filter_item.get("operator", "EQ")
+            )
+            expression = self._filter_expression(
+                spark_functions.col(field),
+                operator,
+                value,
+            )
+            dataframe = dataframe.filter(expression)
+
         # L1-L6 reuse the same filtered datasets. Persisting prevents every
         # level from rereading CSV/JDBC input while keeping data distributed.
-        df = df.persist()
+        dataframe = dataframe.persist()
         # Materialize once now; subsequent L1-L6 actions reuse this cached,
         # filtered DataFrame rather than re-reading the input file.
-        df.count()
-        self._dataset_cache[cache_key] = df
-        return df
+        dataframe.count()
+        self._dataset_cache[cache_key] = dataframe
+        return dataframe
+
+    @staticmethod
+    def _normalize_filter_operator(operator: Any) -> str:
+        aliases = {
+            "=": "EQ",
+            "!=": "NE",
+            ">": "GT",
+            ">=": "GTE",
+            "<": "LT",
+            "<=": "LTE",
+            "IS NULL": "IS_NULL",
+            "IS NOT NULL": "IS_NOT_NULL",
+        }
+        raw_operator = str(operator).upper().strip()
+        return aliases.get(raw_operator, raw_operator.replace(" ", "_"))
+
+    @staticmethod
+    def _filter_expression(column, operator: str, value: Any):
+        comparisons = {
+            "EQ": column == value,
+            "NE": column != value,
+            "GT": column > value,
+            "GTE": column >= value,
+            "LT": column < value,
+            "LTE": column <= value,
+        }
+        expression = comparisons.get(operator)
+
+        if operator == "IN":
+            return column.isin(value if isinstance(value, list) else [value])
+        if operator == "IS_NULL":
+            return column.isNull()
+        if operator == "IS_NOT_NULL":
+            return column.isNotNull()
+        if expression is None:
+            raise ValueError(f"Unsupported Spark filter operator: {operator}")
+
+        return expression
 
     def _load_databricks(self, dataset: dict[str, Any]):
         """
@@ -263,6 +316,13 @@ class SparkExecutor:
 
         if connector is None:
             connector = DatabricksConnector()
+
+        metadata = (
+            self.connector_manager.get_schema("databricks", dataset)
+            if self.connector_manager is not None
+            else connector.get_schema(dataset)
+        )
+        spark_schema = self._spark_schema_from_databricks_metadata(metadata)
 
         chunk_size = int(
             os.getenv(
@@ -296,8 +356,8 @@ class SparkExecutor:
                 continue
 
             chunk_df = self._databricks_chunk_dataframe(
-                dataset,
                 chunk,
+                spark_schema,
             )
 
             if expected_columns is None:
@@ -321,34 +381,21 @@ class SparkExecutor:
             # remaining levels can still run deterministically.
             combined = self.spark.createDataFrame(
                 [],
-                schema=self._databricks_spark_schema(dataset),
+                schema=spark_schema,
             )
 
         return combined
 
     def _databricks_chunk_dataframe(
         self,
-        dataset: dict[str, Any],
         records: list[dict[str, Any]],
+        schema,
     ):
-        """
-        Prefer Spark's native Python-value inference for normal data.  If a
-        chunk contains only NULL values for a column, inference can fail; in
-        that case use the Databricks metadata schema.
-        """
-        try:
-            return self.spark.createDataFrame(records)
-        except Exception as inference_error:
-            logger.info(
-                "Databricks Spark schema inference failed; using metadata "
-                "schema instead: %s",
-                inference_error,
-            )
-            schema = self._databricks_spark_schema(dataset)
-            return self.spark.createDataFrame(
-                self._coerce_records_for_schema(records, schema),
-                schema=schema,
-            )
+        """Apply the declared Databricks schema in both execution engines."""
+        return self.spark.createDataFrame(
+            self._coerce_records_for_schema(records, schema),
+            schema=schema,
+        )
 
     @staticmethod
     def _coerce_records_for_schema(records, schema):
@@ -381,6 +428,11 @@ class SparkExecutor:
     @staticmethod
     def _databricks_spark_schema(dataset: dict[str, Any]):
         from app.connectors.databricks import DatabricksConnector
+        metadata = DatabricksConnector().get_schema(dataset)
+        return SparkExecutor._spark_schema_from_databricks_metadata(metadata)
+
+    @staticmethod
+    def _spark_schema_from_databricks_metadata(metadata):
         from pyspark.sql.types import (
             BinaryType,
             BooleanType,
@@ -393,8 +445,6 @@ class SparkExecutor:
             StructType,
             TimestampType,
         )
-
-        metadata = DatabricksConnector().get_schema(dataset)
 
         fields = []
         decimal_pattern = re.compile(
@@ -411,6 +461,8 @@ class SparkExecutor:
                 precision = min(int(decimal_match.group(1)), 38)
                 scale = min(int(decimal_match.group(2)), precision)
                 data_type = DecimalType(precision, scale)
+            elif upper_type in {"DECIMAL", "NUMERIC"}:
+                data_type = DecimalType(38, 18)
             elif upper_type in {
                 "TINYINT",
                 "SMALLINT",
@@ -459,8 +511,16 @@ class SparkExecutor:
     def _csv_schema(dataset: dict[str, Any]):
         """Use the connector's bounded CSV inference instead of Spark's full
         inferSchema pass, preserving the application's CSV type semantics."""
-        from pyspark.sql.types import BooleanType, DecimalType, LongType, StringType, StructField, StructType, TimestampType
         from app.connectors.csv import CSVMetadataProvider
+        from pyspark.sql.types import (
+            BooleanType,
+            DecimalType,
+            LongType,
+            StringType,
+            StructField,
+            StructType,
+            TimestampType,
+        )
 
         type_map = {
             "BOOLEAN": BooleanType,
@@ -478,62 +538,143 @@ class SparkExecutor:
         return StructType(fields)
 
     @staticmethod
-    def _maps(cfg):
-        return {m["source_column"]: m["target_column"] for m in cfg.get("column_mappings", [])}
+    def _maps(configuration):
+        return {
+            mapping["source_column"]: mapping["target_column"]
+            for mapping in configuration.get("column_mappings", [])
+        }
 
 
-    def _key_exprs(self, cfg, side):
-        from pyspark.sql import functions as F
-        name = "source_column" if side == "source" else "target_column"
-        return [F.col(k[name]).cast("string") for k in cfg.get("comparison_keys", [])]
+    def _key_exprs(self, configuration, side):
+        from pyspark.sql import functions as spark_functions
 
-    def _stats(self, df, cfg, side):
-        from pyspark.sql import functions as F
-        cache_key = (id(df), side)
+        column_key = "source_column" if side == "source" else "target_column"
+        return [
+            spark_functions.col(key[column_key]).cast("string")
+            for key in configuration.get("comparison_keys", [])
+        ]
+
+    @staticmethod
+    def _keys_populated(keys):
+        from pyspark.sql import functions as spark_functions
+
+        populated_expression = None
+        for key in keys:
+            key_populated = key.isNotNull() & (spark_functions.trim(key) != "")
+            populated_expression = (
+                key_populated
+                if populated_expression is None
+                else populated_expression & key_populated
+            )
+        return populated_expression
+
+    def _stats(self, dataframe, configuration, side):
+        from pyspark.sql import functions as spark_functions
+
+        cache_key = (id(dataframe), side)
         if cache_key in self._stats_cache:
             return self._stats_cache[cache_key]
-        keys = self._key_exprs(cfg, side)
-        key_value = F.concat_ws("\u001f", *keys) if keys else None
-        valid = None
-        for key in keys:
-            populated = key.isNotNull() & (F.trim(key) != "")
-            valid = populated if valid is None else valid & populated
+
+        keys = self._key_exprs(configuration, side)
+        key_value = spark_functions.concat_ws("\u001f", *keys) if keys else None
+        valid = self._keys_populated(keys)
+
         aggregates = [
-            F.count(F.lit(1)).alias("total_rows"),
-            *[F.sum(F.when(F.col(c).isNull(), 1).otherwise(0)).alias(c) for c in df.columns],
+            spark_functions.count(spark_functions.lit(1)).alias("total_rows"),
+            *[
+                spark_functions.sum(
+                    spark_functions.when(
+                        spark_functions.col(column).isNull(),
+                        1,
+                    ).otherwise(0)
+                ).alias(column)
+                for column in dataframe.columns
+            ],
         ]
         if valid is not None:
-            aggregates.extend([
-                F.sum(F.when(valid, 1).otherwise(0)).alias("keyed_rows"),
-                F.countDistinct(F.when(valid, key_value)).alias("distinct_key_count"),
-            ])
-        base = df.agg(*aggregates).first().asDict()
+            aggregates.extend(
+                [
+                    spark_functions.sum(
+                        spark_functions.when(valid, 1).otherwise(0)
+                    ).alias("keyed_rows"),
+                    spark_functions.countDistinct(
+                        spark_functions.when(valid, key_value)
+                    ).alias("distinct_key_count"),
+                ]
+            )
+
+        base = dataframe.agg(*aggregates).first().asDict()
         total = int(base.pop("total_rows") or 0)
         if keys:
             distinct = base.pop("distinct_key_count") or 0
             dup = (base.pop("keyed_rows") or 0) - distinct
-        else: distinct = dup = None
+        else:
+            distinct = dup = None
+
         null_counts = {
             column: int(count or 0)
             for column, count in base.items()
         }
-        result = {"total_rows": total, "filtered_rows": total, "partition_rows": total, "distinct_key_count": distinct,
-                "duplicate_key_count": dup, "null_counts": null_counts}
+        result = {
+            "total_rows": total,
+            "filtered_rows": total,
+            "partition_rows": total,
+            "distinct_key_count": distinct,
+            "duplicate_key_count": dup,
+            "null_counts": null_counts,
+        }
         self._stats_cache[cache_key] = result
         return result
 
 
-    def _joined(self, s, t, cfg):
-        from pyspark.sql import functions as F
-        keys=cfg.get("comparison_keys",[])
-        if not keys: raise ValueError("Spark row comparison requires comparison_keys")
-        ss=s.alias("s"); tt=t.alias("t")
-        cond=None
-        for k in keys:
-            x=F.col(f"s.`{k['source_column']}`").eqNullSafe(F.col(f"t.`{k['target_column']}`")); cond=x if cond is None else cond & x
-        return ss.join(tt,cond,"full_outer"), cond
+    def _joined(self, source_dataframe, target_dataframe, configuration):
+        from pyspark.sql import functions as spark_functions
 
-    def _matched_pairs(self, s, t, cfg):
+        keys = configuration.get("comparison_keys", [])
+        if not keys:
+            raise ValueError("Spark row comparison requires comparison_keys")
+
+        source = source_dataframe.alias("source")
+        target = target_dataframe.alias("target")
+        condition = None
+        for key in keys:
+            pair_condition = spark_functions.col(f"source.`{key['source_column']}`").eqNullSafe(
+                spark_functions.col(f"target.`{key['target_column']}`")
+            )
+            condition = (
+                pair_condition
+                if condition is None
+                else condition & pair_condition
+            )
+
+        return source.join(target, condition, "full_outer"), condition
+
+    @staticmethod
+    def _match_cache_key(configuration, keys):
+        return json.dumps(
+            {
+                "source": configuration.get("source"),
+                "target": configuration.get("target"),
+                "comparison_keys": keys,
+            },
+            sort_keys=True,
+            default=str,
+        )
+
+    @staticmethod
+    def _business_key_available(columns):
+        from pyspark.sql import functions as spark_functions
+
+        available = None
+        for column in columns:
+            part = (
+                spark_functions.col(column).isNotNull()
+                & (spark_functions.trim(spark_functions.col(column).cast("string")) != "")
+            )
+            available = part if available is None else available & part
+        return available
+
+    def _matched_pairs(self, source_dataframe, target_dataframe, configuration):
         """Build the authoritative PK reconciliation using the cheapest safe Spark path.
 
         L2 normally computes and caches per-side key statistics before L3.  When
@@ -544,41 +685,43 @@ class SparkExecutor:
         existing deterministic occurrence-matching implementation is used
         unchanged.
         """
-        from pyspark.sql import functions as F
+        from pyspark.sql import functions as spark_functions
 
-        keys = cfg.get("comparison_keys", [])
+        keys = configuration.get("comparison_keys", [])
         if not keys:
             raise ValueError("Spark row comparison requires comparison_keys")
 
-        cache_key = json.dumps(
-            {
-                "source": cfg.get("source"),
-                "target": cfg.get("target"),
-                "comparison_keys": keys,
-            },
-            sort_keys=True,
-            default=str,
-        )
+        cache_key = self._match_cache_key(configuration, keys)
         cached = self._match_cache.get(cache_key)
         if cached is not None:
             return cached
 
         # These are normally cache hits because L2 runs before L3.  If L3 is
         # invoked independently they are still exact distributed Spark stats.
-        source_stats = self._stats(s, cfg, "source")
-        target_stats = self._stats(t, cfg, "target")
+        source_stats = self._stats(source_dataframe, configuration, "source")
+        target_stats = self._stats(target_dataframe, configuration, "target")
         source_duplicates = int(source_stats.get("duplicate_key_count") or 0)
         target_duplicates = int(target_stats.get("duplicate_key_count") or 0)
 
         # Preserve the full deterministic duplicate-occurrence algorithm for
         # the complex case.  Nothing about duplicate semantics changes.
         if source_duplicates > 0 or target_duplicates > 0:
-            return self._matched_pairs_with_duplicates(s, t, cfg)
+            return self._matched_pairs_with_duplicates(
+                source_dataframe,
+                target_dataframe,
+                configuration,
+            )
 
         build_started = perf_counter()
 
-        source = s.withColumn("__source_row_id", F.monotonically_increasing_id())
-        target = t.withColumn("__target_row_id", F.monotonically_increasing_id())
+        source = source_dataframe.withColumn(
+            "__source_row_id",
+            spark_functions.monotonically_increasing_id(),
+        )
+        target = target_dataframe.withColumn(
+            "__target_row_id",
+            spark_functions.monotonically_increasing_id(),
+        )
 
         source_valid = None
         target_valid = None
@@ -586,12 +729,22 @@ class SparkExecutor:
             source_column = item["source_column"]
             target_column = item["target_column"]
             source_populated = (
-                F.col(source_column).isNotNull()
-                & (F.trim(F.col(source_column).cast("string")) != "")
+                spark_functions.col(source_column).isNotNull()
+                & (
+                    spark_functions.trim(
+                        spark_functions.col(source_column).cast("string")
+                    )
+                    != ""
+                )
             )
             target_populated = (
-                F.col(target_column).isNotNull()
-                & (F.trim(F.col(target_column).cast("string")) != "")
+                spark_functions.col(target_column).isNotNull()
+                & (
+                    spark_functions.trim(
+                        spark_functions.col(target_column).cast("string")
+                    )
+                    != ""
+                )
             )
             source_valid = (
                 source_populated
@@ -604,111 +757,127 @@ class SparkExecutor:
                 else target_valid & target_populated
             )
 
-        source_key = F.concat_ws(
+        source_key = spark_functions.concat_ws(
             "\u001f",
-            *[F.col(item["source_column"]).cast("string") for item in keys],
+            *[spark_functions.col(item["source_column"]).cast("string") for item in keys],
         )
-        target_key = F.concat_ws(
+        target_key = spark_functions.concat_ws(
             "\u001f",
-            *[F.col(item["target_column"]).cast("string") for item in keys],
+            *[spark_functions.col(item["target_column"]).cast("string") for item in keys],
         )
 
         source_prepared = (
             source
             .withColumn(
                 "__normalized_primary_key",
-                F.when(source_valid, source_key),
+                spark_functions.when(source_valid, source_key),
             )
             .withColumn(
                 "__key_count",
-                F.when(source_valid, F.lit(1)).otherwise(F.lit(None).cast("int")),
+                spark_functions.when(
+                    source_valid,
+                    spark_functions.lit(1),
+                ).otherwise(spark_functions.lit(None).cast("int")),
             )
         )
         target_prepared = (
             target
             .withColumn(
                 "__normalized_primary_key",
-                F.when(target_valid, target_key),
+                spark_functions.when(target_valid, target_key),
             )
             .withColumn(
                 "__key_count",
-                F.when(target_valid, F.lit(1)).otherwise(F.lit(None).cast("int")),
+                spark_functions.when(
+                    target_valid,
+                    spark_functions.lit(1),
+                ).otherwise(spark_functions.lit(None).cast("int")),
             )
         )
 
         # Normal equality deliberately does NOT match NULL keys.  Rows without
         # usable PKs therefore remain separate UNMATCHABLE_SOURCE/TARGET rows.
-        joined = source_prepared.alias("s").join(
-            target_prepared.alias("t"),
-            F.col("s.__normalized_primary_key")
-            == F.col("t.__normalized_primary_key"),
+        joined = source_prepared.alias("source").join(
+            target_prepared.alias("target"),
+            spark_functions.col("source.__normalized_primary_key")
+            == spark_functions.col("target.__normalized_primary_key"),
             "full_outer",
         )
 
-        source_struct = F.struct(
+        source_struct = spark_functions.struct(
             *[
-                F.col(f"s.`{field.name}`").alias(field.name)
-                for field in s.schema.fields
+                spark_functions.col(f"source.`{field.name}`").alias(field.name)
+                for field in source_dataframe.schema.fields
             ]
         )
-        target_struct = F.struct(
+        target_struct = spark_functions.struct(
             *[
-                F.col(f"t.`{field.name}`").alias(field.name)
-                for field in t.schema.fields
+                spark_functions.col(f"target.`{field.name}`").alias(field.name)
+                for field in target_dataframe.schema.fields
             ]
         )
-        source_key_json = F.to_json(
-            F.struct(*[F.col(f"s.`{item['source_column']}`") for item in keys])
+        source_key_json = spark_functions.to_json(
+            spark_functions.struct(
+                *[
+                    spark_functions.col(f"source.`{item['source_column']}`")
+                    for item in keys
+                ]
+            )
         )
-        target_key_json = F.to_json(
-            F.struct(*[F.col(f"t.`{item['target_column']}`") for item in keys])
+        target_key_json = spark_functions.to_json(
+            spark_functions.struct(
+                *[
+                    spark_functions.col(f"target.`{item['target_column']}`")
+                    for item in keys
+                ]
+            )
         )
 
         reconciliation = joined.select(
             source_struct.alias("_s"),
             target_struct.alias("_t"),
-            F.coalesce(
-                F.col("s.__normalized_primary_key"),
-                F.col("t.__normalized_primary_key"),
+            spark_functions.coalesce(
+                spark_functions.col("source.__normalized_primary_key"),
+                spark_functions.col("target.__normalized_primary_key"),
             ).alias("normalized_primary_key"),
-            F.when(
-                F.col("s.__source_row_id").isNotNull()
-                & F.col("t.__target_row_id").isNotNull(),
-                F.lit("MATCHED"),
+            spark_functions.when(
+                spark_functions.col("source.__source_row_id").isNotNull()
+                & spark_functions.col("target.__target_row_id").isNotNull(),
+                spark_functions.lit("MATCHED"),
             )
             .when(
-                F.col("s.__source_row_id").isNotNull()
-                & F.col("s.__normalized_primary_key").isNull(),
-                F.lit("UNMATCHABLE_SOURCE"),
+                spark_functions.col("source.__source_row_id").isNotNull()
+                & spark_functions.col("source.__normalized_primary_key").isNull(),
+                spark_functions.lit("UNMATCHABLE_SOURCE"),
             )
             .when(
-                F.col("t.__target_row_id").isNotNull()
-                & F.col("t.__normalized_primary_key").isNull(),
-                F.lit("UNMATCHABLE_TARGET"),
+                spark_functions.col("target.__target_row_id").isNotNull()
+                & spark_functions.col("target.__normalized_primary_key").isNull(),
+                spark_functions.lit("UNMATCHABLE_TARGET"),
             )
             .when(
-                F.col("s.__source_row_id").isNotNull(),
-                F.lit("MISSING_IN_TARGET"),
+                spark_functions.col("source.__source_row_id").isNotNull(),
+                spark_functions.lit("MISSING_IN_TARGET"),
             )
-            .otherwise(F.lit("EXTRA_IN_TARGET"))
+            .otherwise(spark_functions.lit("EXTRA_IN_TARGET"))
             .alias("reconciliation_status"),
-            F.when(
-                F.col("s.__source_row_id").isNotNull()
-                & F.col("t.__target_row_id").isNotNull(),
-                F.lit("PRIMARY_KEY"),
+            spark_functions.when(
+                spark_functions.col("source.__source_row_id").isNotNull()
+                & spark_functions.col("target.__target_row_id").isNotNull(),
+                spark_functions.lit("PRIMARY_KEY"),
             )
-            .otherwise(F.lit(None).cast("string"))
+            .otherwise(spark_functions.lit(None).cast("string"))
             .alias("match_type"),
-            F.when(
-                F.col("s.__source_row_id").isNotNull(),
+            spark_functions.when(
+                spark_functions.col("source.__source_row_id").isNotNull(),
                 source_key_json,
             )
             .otherwise(target_key_json)
             .alias("match_key"),
-            F.col("s.__key_count").alias("_source_key_count"),
-            F.col("t.__key_count").alias("_target_key_count"),
-            F.col("s.__source_row_id").alias("_source_row_id"),
-            F.col("t.__target_row_id").alias("_target_row_id"),
+            spark_functions.col("source.__key_count").alias("_source_key_count"),
+            spark_functions.col("target.__key_count").alias("_target_key_count"),
+            spark_functions.col("source.__source_row_id").alias("_source_row_id"),
+            spark_functions.col("target.__target_row_id").alias("_target_row_id"),
         ).persist()
 
         pk_build_ms = (perf_counter() - build_started) * 1000
@@ -717,27 +886,27 @@ class SparkExecutor:
         # Unique keys make matched keys == matched records.  Avoid expensive
         # countDistinct expressions and duplicate bookkeeping on this path.
         summary = reconciliation.agg(
-            F.sum(
-                F.when(F.col("reconciliation_status") == "MATCHED", 1).otherwise(0)
+            spark_functions.sum(
+                spark_functions.when(spark_functions.col("reconciliation_status") == "MATCHED", 1).otherwise(0)
             ).alias("matched"),
-            F.sum(
-                F.when(
-                    F.col("reconciliation_status") == "MISSING_IN_TARGET", 1
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "MISSING_IN_TARGET", 1
                 ).otherwise(0)
             ).alias("missing"),
-            F.sum(
-                F.when(
-                    F.col("reconciliation_status") == "EXTRA_IN_TARGET", 1
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "EXTRA_IN_TARGET", 1
                 ).otherwise(0)
             ).alias("extra"),
-            F.sum(
-                F.when(
-                    F.col("reconciliation_status") == "UNMATCHABLE_SOURCE", 1
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "UNMATCHABLE_SOURCE", 1
                 ).otherwise(0)
             ).alias("unmatchable_source"),
-            F.sum(
-                F.when(
-                    F.col("reconciliation_status") == "UNMATCHABLE_TARGET", 1
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "UNMATCHABLE_TARGET", 1
                 ).otherwise(0)
             ).alias("unmatchable_target"),
         ).first().asDict()
@@ -774,128 +943,322 @@ class SparkExecutor:
         self._match_cache[cache_key] = result
         return result
 
-    def _matched_pairs_with_duplicates(self, s, t, cfg):
+    def _matched_pairs_with_duplicates(
+        self,
+        source_dataframe,
+        target_dataframe,
+        configuration,
+    ):
         """Build the one authoritative, full-outer PK reconciliation stream."""
-        from pyspark.sql import functions as F
+        from pyspark.sql import functions as spark_functions
         from pyspark.sql.window import Window
-        keys = cfg.get("comparison_keys", [])
+
+        keys = configuration.get("comparison_keys", [])
         if not keys:
             raise ValueError("Spark row comparison requires comparison_keys")
 
-        cache_key = json.dumps({"source": cfg.get("source"), "target": cfg.get("target"), "comparison_keys": keys}, sort_keys=True, default=str)
+        cache_key = self._match_cache_key(configuration, keys)
         cached = self._match_cache.get(cache_key)
         if cached is not None:
             return cached
 
         build_started = perf_counter()
-        source = s.withColumn("__source_row_id", F.monotonically_increasing_id())
-        target = t.withColumn("__target_row_id", F.monotonically_increasing_id())
-        source_valid = None
-        target_valid = None
-        for k in keys:
-            source_populated = F.col(k["source_column"]).isNotNull() & (F.trim(F.col(k["source_column"]).cast("string")) != "")
-            target_populated = F.col(k["target_column"]).isNotNull() & (F.trim(F.col(k["target_column"]).cast("string")) != "")
-            source_valid = source_populated if source_valid is None else source_valid & source_populated
-            target_valid = target_populated if target_valid is None else target_valid & target_populated
+        source = source_dataframe.withColumn(
+            "__source_row_id",
+            spark_functions.monotonically_increasing_id(),
+        )
+        target = target_dataframe.withColumn(
+            "__target_row_id",
+            spark_functions.monotonically_increasing_id(),
+        )
 
-        source_key = F.concat_ws("\u001f", *[F.col(k["source_column"]).cast("string") for k in keys])
-        target_key = F.concat_ws("\u001f", *[F.col(k["target_column"]).cast("string") for k in keys])
-        source_prepared = source.withColumn("__normalized_primary_key", F.when(source_valid, source_key))
-        target_prepared = target.withColumn("__normalized_primary_key", F.when(target_valid, target_key))
+        source_key_columns = [key["source_column"] for key in keys]
+        target_key_columns = [key["target_column"] for key in keys]
+        source_valid = self._business_key_available(source_key_columns)
+        target_valid = self._business_key_available(target_key_columns)
+
+        source_key = spark_functions.concat_ws(
+            "\u001f",
+            *[spark_functions.col(column).cast("string") for column in source_key_columns],
+        )
+        target_key = spark_functions.concat_ws(
+            "\u001f",
+            *[spark_functions.col(column).cast("string") for column in target_key_columns],
+        )
+        source_prepared = source.withColumn(
+            "__normalized_primary_key",
+            spark_functions.when(source_valid, source_key),
+        )
+        target_prepared = target.withColumn(
+            "__normalized_primary_key",
+            spark_functions.when(target_valid, target_key),
+        )
         source_prepared = source_prepared.withColumn(
             "__key_count",
-            F.when(source_valid, F.count("__source_row_id").over(Window.partitionBy("__normalized_primary_key"))),
+            spark_functions.when(
+                source_valid,
+                spark_functions.count("__source_row_id").over(
+                    Window.partitionBy("__normalized_primary_key")
+                ),
+            ),
         )
         target_prepared = target_prepared.withColumn(
             "__key_count",
-            F.when(target_valid, F.count("__target_row_id").over(Window.partitionBy("__normalized_primary_key"))),
+            spark_functions.when(
+                target_valid,
+                spark_functions.count("__target_row_id").over(
+                    Window.partitionBy("__normalized_primary_key")
+                ),
+            ),
         )
         # Pair repeated populated keys by a deterministic occurrence number.
         # This avoids a Cartesian join while allowing every paired occurrence
         # to continue to L4. Any excess occurrence remains missing/extra in L3.
-        source_order = F.to_json(F.struct(*[F.col(column) for column in sorted(s.columns)]))
-        target_order = F.to_json(F.struct(*[F.col(column) for column in sorted(t.columns)]))
+        source_order = spark_functions.to_json(
+            spark_functions.struct(
+                *[
+                    spark_functions.col(column)
+                    for column in sorted(source_dataframe.columns)
+                ]
+            )
+        )
+        target_order = spark_functions.to_json(
+            spark_functions.struct(
+                *[
+                    spark_functions.col(column)
+                    for column in sorted(target_dataframe.columns)
+                ]
+            )
+        )
         source_prepared = source_prepared.withColumn(
             "__key_ordinal",
-            F.when(source_valid, F.row_number().over(Window.partitionBy("__normalized_primary_key").orderBy(source_order, "__source_row_id"))),
+            spark_functions.when(
+                source_valid,
+                spark_functions.row_number().over(
+                    Window.partitionBy("__normalized_primary_key")
+                    .orderBy(source_order, "__source_row_id")
+                ),
+            ),
         )
         target_prepared = target_prepared.withColumn(
             "__key_ordinal",
-            F.when(target_valid, F.row_number().over(Window.partitionBy("__normalized_primary_key").orderBy(target_order, "__target_row_id"))),
+            spark_functions.when(
+                target_valid,
+                spark_functions.row_number().over(
+                    Window.partitionBy("__normalized_primary_key")
+                    .orderBy(target_order, "__target_row_id")
+                ),
+            ),
         )
-        source_population = source_prepared.filter(F.col("__normalized_primary_key").isNotNull()).groupBy(
-            "__normalized_primary_key"
-        ).agg(F.count(F.lit(1)).alias("__source_population_count"))
-        target_population = target_prepared.filter(F.col("__normalized_primary_key").isNotNull()).groupBy(
-            "__normalized_primary_key"
-        ).agg(F.count(F.lit(1)).alias("__target_population_count"))
-        source_prepared = source_prepared.join(target_population, "__normalized_primary_key", "left").fillna(
-            0, subset=["__target_population_count"]
+        source_population = (
+            source_prepared
+            .filter(spark_functions.col("__normalized_primary_key").isNotNull())
+            .groupBy("__normalized_primary_key")
+            .agg(spark_functions.count(spark_functions.lit(1)).alias("__source_population_count"))
         )
-        target_prepared = target_prepared.join(source_population, "__normalized_primary_key", "left").fillna(
-            0, subset=["__source_population_count"]
+        target_population = (
+            target_prepared
+            .filter(spark_functions.col("__normalized_primary_key").isNotNull())
+            .groupBy("__normalized_primary_key")
+            .agg(spark_functions.count(spark_functions.lit(1)).alias("__target_population_count"))
         )
-        source_pair_ordinal = F.when(
-            (F.col("__target_population_count") > 0) & (F.col("__key_ordinal") > F.col("__target_population_count")),
-            F.lit(1),
-        ).otherwise(F.col("__key_ordinal"))
-        target_pair_ordinal = F.when(
-            (F.col("__source_population_count") > 0) & (F.col("__key_ordinal") > F.col("__source_population_count")),
-            F.lit(1),
-        ).otherwise(F.col("__key_ordinal"))
+        source_prepared = (
+            source_prepared
+            .join(target_population, "__normalized_primary_key", "left")
+            .fillna(0, subset=["__target_population_count"])
+        )
+        target_prepared = (
+            target_prepared
+            .join(source_population, "__normalized_primary_key", "left")
+            .fillna(0, subset=["__source_population_count"])
+        )
+        source_pair_ordinal = spark_functions.when(
+            (spark_functions.col("__target_population_count") > 0)
+            & (spark_functions.col("__key_ordinal") > spark_functions.col("__target_population_count")),
+            spark_functions.lit(1),
+        ).otherwise(spark_functions.col("__key_ordinal"))
+        target_pair_ordinal = spark_functions.when(
+            (spark_functions.col("__source_population_count") > 0)
+            & (spark_functions.col("__key_ordinal") > spark_functions.col("__source_population_count")),
+            spark_functions.lit(1),
+        ).otherwise(spark_functions.col("__key_ordinal"))
         source_prepared = source_prepared.withColumn(
             "__join_key",
-            F.when(source_valid, F.concat(F.lit("KEY:"), F.col("__normalized_primary_key"), F.lit(":"), source_pair_ordinal))
-            .otherwise(F.concat(F.lit("SOURCE_UNMATCHED:"), F.col("__source_row_id").cast("string"))),
+            spark_functions.when(
+                source_valid,
+                spark_functions.concat(
+                    spark_functions.lit("KEY:"),
+                    spark_functions.col("__normalized_primary_key"),
+                    spark_functions.lit(":"),
+                    source_pair_ordinal,
+                ),
+            ).otherwise(
+                spark_functions.concat(
+                    spark_functions.lit("SOURCE_UNMATCHED:"),
+                    spark_functions.col("__source_row_id").cast("string"),
+                )
+            ),
         )
         target_prepared = target_prepared.withColumn(
             "__join_key",
-            F.when(target_valid, F.concat(F.lit("KEY:"), F.col("__normalized_primary_key"), F.lit(":"), target_pair_ordinal))
-            .otherwise(F.concat(F.lit("TARGET_UNMATCHED:"), F.col("__target_row_id").cast("string"))),
+            spark_functions.when(
+                target_valid,
+                spark_functions.concat(
+                    spark_functions.lit("KEY:"),
+                    spark_functions.col("__normalized_primary_key"),
+                    spark_functions.lit(":"),
+                    target_pair_ordinal,
+                ),
+            ).otherwise(
+                spark_functions.concat(
+                    spark_functions.lit("TARGET_UNMATCHED:"),
+                    spark_functions.col("__target_row_id").cast("string"),
+                )
+            ),
         )
 
-        source_struct = F.struct(*[F.col(f"s.`{field.name}`").alias(field.name) for field in s.schema.fields])
-        target_struct = F.struct(*[F.col(f"t.`{field.name}`").alias(field.name) for field in t.schema.fields])
-        source_key_json = F.to_json(F.struct(*[F.col(f"s.`{k['source_column']}`") for k in keys]))
-        target_key_json = F.to_json(F.struct(*[F.col(f"t.`{k['target_column']}`") for k in keys]))
-        joined = source_prepared.alias("s").join(
-            target_prepared.alias("t"),
-            F.col("s.__join_key") == F.col("t.__join_key"),
+        source_struct = spark_functions.struct(
+            *[
+                spark_functions.col(f"source.`{field.name}`").alias(field.name)
+                for field in source_dataframe.schema.fields
+            ]
+        )
+        target_struct = spark_functions.struct(
+            *[
+                spark_functions.col(f"target.`{field.name}`").alias(field.name)
+                for field in target_dataframe.schema.fields
+            ]
+        )
+        source_key_json = spark_functions.to_json(
+            spark_functions.struct(*[spark_functions.col(f"source.`{key['source_column']}`") for key in keys])
+        )
+        target_key_json = spark_functions.to_json(
+            spark_functions.struct(*[spark_functions.col(f"target.`{key['target_column']}`") for key in keys])
+        )
+        joined = source_prepared.alias("source").join(
+            target_prepared.alias("target"),
+            spark_functions.col("source.__join_key") == spark_functions.col("target.__join_key"),
             "full_outer",
         )
         reconciliation = joined.select(
             source_struct.alias("_s"),
             target_struct.alias("_t"),
-            F.coalesce(F.col("s.__normalized_primary_key"), F.col("t.__normalized_primary_key")).alias("normalized_primary_key"),
-            F.when(F.col("s.__source_row_id").isNotNull() & F.col("t.__target_row_id").isNotNull(), F.lit("MATCHED"))
-            .when(F.col("s.__source_row_id").isNotNull() & F.col("s.__normalized_primary_key").isNull(), F.lit("UNMATCHABLE_SOURCE"))
-            .when(F.col("t.__target_row_id").isNotNull() & F.col("t.__normalized_primary_key").isNull(), F.lit("UNMATCHABLE_TARGET"))
-            .when(F.col("s.__source_row_id").isNotNull(), F.lit("MISSING_IN_TARGET"))
-            .otherwise(F.lit("EXTRA_IN_TARGET")).alias("reconciliation_status"),
-            F.when(F.col("s.__source_row_id").isNotNull() & F.col("t.__target_row_id").isNotNull(), F.lit("PRIMARY_KEY")).otherwise(F.lit(None).cast("string")).alias("match_type"),
-            F.when(F.col("s.__source_row_id").isNotNull(), source_key_json).otherwise(target_key_json).alias("match_key"),
-            F.col("s.__key_count").alias("_source_key_count"),
-            F.col("t.__key_count").alias("_target_key_count"),
-            F.col("s.__source_row_id").alias("_source_row_id"),
-            F.col("t.__target_row_id").alias("_target_row_id"),
+            spark_functions.coalesce(
+                spark_functions.col("source.__normalized_primary_key"),
+                spark_functions.col("target.__normalized_primary_key"),
+            ).alias("normalized_primary_key"),
+            spark_functions.when(
+                spark_functions.col("source.__source_row_id").isNotNull()
+                & spark_functions.col("target.__target_row_id").isNotNull(),
+                spark_functions.lit("MATCHED"),
+            )
+            .when(
+                spark_functions.col("source.__source_row_id").isNotNull()
+                & spark_functions.col("source.__normalized_primary_key").isNull(),
+                spark_functions.lit("UNMATCHABLE_SOURCE"),
+            )
+            .when(
+                spark_functions.col("target.__target_row_id").isNotNull()
+                & spark_functions.col("target.__normalized_primary_key").isNull(),
+                spark_functions.lit("UNMATCHABLE_TARGET"),
+            )
+            .when(
+                spark_functions.col("source.__source_row_id").isNotNull(),
+                spark_functions.lit("MISSING_IN_TARGET"),
+            )
+            .otherwise(spark_functions.lit("EXTRA_IN_TARGET"))
+            .alias("reconciliation_status"),
+            spark_functions.when(
+                spark_functions.col("source.__source_row_id").isNotNull()
+                & spark_functions.col("target.__target_row_id").isNotNull(),
+                spark_functions.lit("PRIMARY_KEY"),
+            )
+            .otherwise(spark_functions.lit(None).cast("string"))
+            .alias("match_type"),
+            spark_functions.when(
+                spark_functions.col("source.__source_row_id").isNotNull(),
+                source_key_json,
+            )
+            .otherwise(target_key_json)
+            .alias("match_key"),
+            spark_functions.col("source.__key_count").alias("_source_key_count"),
+            spark_functions.col("target.__key_count").alias("_target_key_count"),
+            spark_functions.col("source.__source_row_id").alias("_source_row_id"),
+            spark_functions.col("target.__target_row_id").alias("_target_row_id"),
         ).persist()
         pk_build_ms = (perf_counter() - build_started) * 1000
         summary_started = perf_counter()
         summary = reconciliation.agg(
-            F.sum(F.when(F.col("reconciliation_status") == "MATCHED", 1).otherwise(0)).alias("matched"),
-            F.countDistinct(F.when(F.col("reconciliation_status") == "MATCHED", F.col("normalized_primary_key"))).alias("matched_keys"),
-            F.countDistinct(F.when(F.col("reconciliation_status") == "MATCHED", F.col("_source_row_id"))).alias("matched_source_records"),
-            F.countDistinct(F.when(F.col("reconciliation_status") == "MATCHED", F.col("_target_row_id"))).alias("matched_target_records"),
-            F.sum(F.when(F.col("reconciliation_status") == "MISSING_IN_TARGET", 1).otherwise(0)).alias("missing"),
-            F.sum(F.when(F.col("reconciliation_status") == "EXTRA_IN_TARGET", 1).otherwise(0)).alias("extra"),
-            F.sum(F.when(F.col("_source_key_count") > 1, 1).otherwise(0)).alias("source_duplicate_records"),
-            F.sum(F.when(F.col("_target_key_count") > 1, 1).otherwise(0)).alias("target_duplicate_records"),
-            F.countDistinct(F.when(F.col("_source_key_count") > 1, F.col("normalized_primary_key"))).alias("source_duplicate_keys"),
-            F.countDistinct(F.when(F.col("_target_key_count") > 1, F.col("normalized_primary_key"))).alias("target_duplicate_keys"),
-            F.sum(F.when(F.col("reconciliation_status") == "UNMATCHABLE_SOURCE", 1).otherwise(0)).alias("unmatchable_source"),
-            F.sum(F.when(F.col("reconciliation_status") == "UNMATCHABLE_TARGET", 1).otherwise(0)).alias("unmatchable_target"),
-            F.sum(F.when(F.col("_source_key_count") == 1, 1).otherwise(0)).alias("source_unique"),
-            F.sum(F.when(F.col("_target_key_count") == 1, 1).otherwise(0)).alias("target_unique"),
+            spark_functions.sum(
+                spark_functions.when(spark_functions.col("reconciliation_status") == "MATCHED", 1)
+                .otherwise(0)
+            ).alias("matched"),
+            spark_functions.countDistinct(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "MATCHED",
+                    spark_functions.col("normalized_primary_key"),
+                )
+            ).alias("matched_keys"),
+            spark_functions.countDistinct(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "MATCHED",
+                    spark_functions.col("_source_row_id"),
+                )
+            ).alias("matched_source_records"),
+            spark_functions.countDistinct(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "MATCHED",
+                    spark_functions.col("_target_row_id"),
+                )
+            ).alias("matched_target_records"),
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "MISSING_IN_TARGET",
+                    1,
+                ).otherwise(0)
+            ).alias("missing"),
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "EXTRA_IN_TARGET",
+                    1,
+                ).otherwise(0)
+            ).alias("extra"),
+            spark_functions.sum(
+                spark_functions.when(spark_functions.col("_source_key_count") > 1, 1).otherwise(0)
+            ).alias("source_duplicate_records"),
+            spark_functions.sum(
+                spark_functions.when(spark_functions.col("_target_key_count") > 1, 1).otherwise(0)
+            ).alias("target_duplicate_records"),
+            spark_functions.countDistinct(
+                spark_functions.when(
+                    spark_functions.col("_source_key_count") > 1,
+                    spark_functions.col("normalized_primary_key"),
+                )
+            ).alias("source_duplicate_keys"),
+            spark_functions.countDistinct(
+                spark_functions.when(
+                    spark_functions.col("_target_key_count") > 1,
+                    spark_functions.col("normalized_primary_key"),
+                )
+            ).alias("target_duplicate_keys"),
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "UNMATCHABLE_SOURCE",
+                    1,
+                ).otherwise(0)
+            ).alias("unmatchable_source"),
+            spark_functions.sum(
+                spark_functions.when(
+                    spark_functions.col("reconciliation_status") == "UNMATCHABLE_TARGET",
+                    1,
+                ).otherwise(0)
+            ).alias("unmatchable_target"),
+            spark_functions.sum(
+                spark_functions.when(spark_functions.col("_source_key_count") == 1, 1).otherwise(0)
+            ).alias("source_unique"),
+            spark_functions.sum(
+                spark_functions.when(spark_functions.col("_target_key_count") == 1, 1).otherwise(0)
+            ).alias("target_unique"),
         ).first().asDict()
         pk_summary_ms = (perf_counter() - summary_started) * 1000
         counts = {
@@ -914,105 +1277,163 @@ class SparkExecutor:
             "source_unique_key_count": int(summary.get("source_unique") or 0),
             "target_unique_key_count": int(summary.get("target_unique") or 0),
         }
-        result = (reconciliation, counts, {"pk_build_ms": pk_build_ms, "pk_summary_ms": pk_summary_ms, "pk_path": "DUPLICATE_KEY_PATH"})
+        result = (
+            reconciliation,
+            counts,
+            {
+                "pk_build_ms": pk_build_ms,
+                "pk_summary_ms": pk_summary_ms,
+                "pk_path": "DUPLICATE_KEY_PATH",
+            },
+        )
         self._match_cache[cache_key] = result
         return result
 
 
-    def _possible_key_changes(self, source, target, cfg):
+    def _possible_key_changes(self, source, target, configuration):
         """Match unresolved rows one-to-one using configured grouping fields."""
-        from pyspark.sql import functions as F
+        from pyspark.sql import functions as spark_functions
 
-        groups = cfg.get("grouping_attributes", []) or []
-        keys = cfg.get("comparison_keys", []) or []
+        groups = configuration.get("grouping_attributes", []) or []
+        keys = configuration.get("comparison_keys", []) or []
         if not groups or not keys:
-            return source.limit(0).select(F.lit(None).cast("string").alias("source_key"))
+            return source.limit(0).select(
+                spark_functions.lit(None).cast("string").alias("source_key")
+            )
 
         source_group_columns = [item["source_column"] for item in groups]
         target_group_columns = [item["target_column"] for item in groups]
-        source_record = F.struct(*[F.col(column) for column in source.columns])
-        target_record = F.struct(*[F.col(column) for column in target.columns])
-        source_key = F.to_json(F.struct(*[F.col(item["source_column"]) for item in keys]))
-        target_key = F.to_json(F.struct(*[F.col(item["target_column"]) for item in keys]))
-        source_key_available = None
-        target_key_available = None
-        for item in keys:
-            source_part = F.col(item["source_column"]).isNotNull() & (F.trim(F.col(item["source_column"]).cast("string")) != "")
-            target_part = F.col(item["target_column"]).isNotNull() & (F.trim(F.col(item["target_column"]).cast("string")) != "")
-            source_key_available = source_part if source_key_available is None else source_key_available & source_part
-            target_key_available = target_part if target_key_available is None else target_key_available & target_part
+        source_record = spark_functions.struct(
+            *[spark_functions.col(column) for column in source.columns]
+        )
+        target_record = spark_functions.struct(
+            *[spark_functions.col(column) for column in target.columns]
+        )
+        source_key_columns = [item["source_column"] for item in keys]
+        target_key_columns = [item["target_column"] for item in keys]
+        source_key = spark_functions.to_json(
+            spark_functions.struct(
+                *[spark_functions.col(column) for column in source_key_columns]
+            )
+        )
+        target_key = spark_functions.to_json(
+            spark_functions.struct(
+                *[spark_functions.col(column) for column in target_key_columns]
+            )
+        )
+        source_key_available = self._business_key_available(source_key_columns)
+        target_key_available = self._business_key_available(target_key_columns)
 
         source_groups = source.groupBy(*source_group_columns).agg(
-            F.count(F.lit(1)).alias("source_candidates"),
-            F.first(source_record, ignorenulls=True).alias("source_record"),
-            F.first(source_key, ignorenulls=True).alias("source_key"),
-            F.max(source_key_available.cast("int")).alias("source_key_available"),
-        ).alias("s")
+            spark_functions.count(spark_functions.lit(1)).alias("source_candidates"),
+            spark_functions.first(source_record, ignorenulls=True).alias("source_record"),
+            spark_functions.first(source_key, ignorenulls=True).alias("source_key"),
+            spark_functions.max(source_key_available.cast("int")).alias("source_key_available"),
+        ).alias("source")
         target_groups = target.groupBy(*target_group_columns).agg(
-            F.count(F.lit(1)).alias("target_candidates"),
-            F.first(target_record, ignorenulls=True).alias("target_record"),
-            F.first(target_key, ignorenulls=True).alias("target_key"),
-            F.max(target_key_available.cast("int")).alias("target_key_available"),
-        ).alias("t")
+            spark_functions.count(spark_functions.lit(1)).alias("target_candidates"),
+            spark_functions.first(target_record, ignorenulls=True).alias("target_record"),
+            spark_functions.first(target_key, ignorenulls=True).alias("target_key"),
+            spark_functions.max(target_key_available.cast("int")).alias("target_key_available"),
+        ).alias("target")
 
         condition = None
-        for source_column, target_column in zip(source_group_columns, target_group_columns):
-            pair = F.col(f"s.`{source_column}`").eqNullSafe(F.col(f"t.`{target_column}`"))
+        for source_column, target_column in zip(
+            source_group_columns,
+            target_group_columns,
+        ):
+            pair = spark_functions.col(f"source.`{source_column}`").eqNullSafe(
+                spark_functions.col(f"target.`{target_column}`")
+            )
             condition = pair if condition is None else condition & pair
 
-        group_value = F.array(*[
-            F.coalesce(F.col(f"s.`{source_column}`"), F.col(f"t.`{target_column}`")).cast("string")
-            for source_column, target_column in zip(source_group_columns, target_group_columns)
-        ])
+        group_value = spark_functions.array(
+            *[
+                spark_functions.coalesce(
+                    spark_functions.col(f"source.`{source_column}`"),
+                    spark_functions.col(f"target.`{target_column}`"),
+                ).cast("string")
+                for source_column, target_column in zip(
+                    source_group_columns,
+                    target_group_columns,
+                )
+            ]
+        )
+        paired_unique_group = (
+            (spark_functions.col("source_candidates") == 1)
+            & (spark_functions.col("target_candidates") == 1)
+        )
+        asymmetric_key_availability = (
+            spark_functions.col("source_key_available")
+            != spark_functions.col("target_key_available")
+        )
+
         return source_groups.join(target_groups, condition, "inner").filter(
-            ((F.col("source_candidates") == 1) & (F.col("target_candidates") == 1))
-            | (F.col("source_key_available") != F.col("target_key_available"))
+            paired_unique_group | asymmetric_key_availability
         ).select(
             group_value.alias("group_key"),
             "source_key",
             "target_key",
             "source_record",
             "target_record",
-            F.when(
-                F.col("source_key_available") != F.col("target_key_available"),
-                F.lit("The configured matching attributes identify the same record, but its business key is missing on one side"),
+            spark_functions.when(
+                spark_functions.col("source_key_available") != spark_functions.col("target_key_available"),
+                spark_functions.lit(
+                    "The configured matching attributes identify the same record, "
+                    "but its business key is missing on one side"
+                ),
             ).when(
-                (F.col("source_key_available") == 1) & (F.col("target_key_available") == 1),
-                F.lit("Records share the configured matching attributes but use different business keys"),
+                (spark_functions.col("source_key_available") == 1) & (spark_functions.col("target_key_available") == 1),
+                spark_functions.lit(
+                    "Records share the configured matching attributes but use "
+                    "different business keys"
+                ),
             ).otherwise(
-                F.lit("Records have no usable business key and were paired by the configured matching attributes")
+                spark_functions.lit(
+                    "Records have no usable business key and were paired by the "
+                    "configured matching attributes"
+                )
             ).alias("reason"),
-            F.when(
-                F.col("source_key_available") != F.col("target_key_available"),
-                F.lit("MISSING_BUSINESS_KEY"),
+            spark_functions.when(
+                spark_functions.col("source_key_available") != spark_functions.col("target_key_available"),
+                spark_functions.lit("MISSING_BUSINESS_KEY"),
             ).when(
-                (F.col("source_key_available") == 1) & (F.col("target_key_available") == 1),
-                F.lit("POSSIBLE_KEY_CHANGE"),
-            ).otherwise(F.lit("MATCHED_BY_ATTRIBUTES")).alias("status"),
+                (spark_functions.col("source_key_available") == 1) & (spark_functions.col("target_key_available") == 1),
+                spark_functions.lit("POSSIBLE_KEY_CHANGE"),
+            )
+            .otherwise(spark_functions.lit("MATCHED_BY_ATTRIBUTES"))
+            .alias("status"),
         )
 
     @staticmethod
-    def _mapping_lookup(cfg):
+    def _mapping_lookup(configuration):
         return {
             item.get("source_column"): item
-            for item in (cfg.get("column_mappings", []) or [])
-            if isinstance(item, dict) and item.get("source_column") and item.get("target_column")
+            for item in (configuration.get("column_mappings", []) or [])
+            if (
+                isinstance(item, dict)
+                and item.get("source_column")
+                and item.get("target_column")
+            )
         }
 
     @staticmethod
-    def _apply_mapping_normalization(expr, mapping):
+    def _apply_mapping_normalization(expression, mapping):
         """Apply only value normalization; matching identity is never changed."""
-        from pyspark.sql import functions as F
+        from pyspark.sql import functions as spark_functions
         normalization = dict((mapping or {}).get("normalization") or {})
-        value = expr
+        value = expression
         if normalization.get("empty_as_null"):
-            value = F.when(F.trim(value.cast("string")) == "", F.lit(None)).otherwise(value)
+            value = spark_functions.when(
+                spark_functions.trim(value.cast("string")) == "",
+                spark_functions.lit(None),
+            ).otherwise(value)
         if normalization.get("trim"):
-            value = F.trim(value.cast("string"))
+            value = spark_functions.trim(value.cast("string"))
         if normalization.get("case_insensitive"):
-            value = F.lower(value.cast("string"))
+            value = spark_functions.lower(value.cast("string"))
         if normalization.get("round") is not None:
-            value = F.round(value.cast("double"), int(normalization["round"]))
+            value = spark_functions.round(value.cast("double"), int(normalization["round"]))
         return value
 
     def _matched_row_hashes(self, pairs, resolved_pairs):
@@ -1024,25 +1445,59 @@ class SparkExecutor:
         normalization; unequal hashes remain candidates for normal field/tolerance
         evaluation.
         """
-        from pyspark.sql import functions as F
+        from pyspark.sql import functions as spark_functions
         if not resolved_pairs:
-            return pairs.withColumn("__source_row_hash", F.lit(None).cast("string")).withColumn("__target_row_hash", F.lit(None).cast("string"))
+            return (
+                pairs
+                .withColumn("__source_row_hash", spark_functions.lit(None).cast("string"))
+                .withColumn("__target_row_hash", spark_functions.lit(None).cast("string"))
+            )
 
         source_parts = []
         target_parts = []
-        for sc, tc, mapping in resolved_pairs:
-            sv = self._apply_mapping_normalization(F.col(f"_s.`{sc}`"), mapping)
-            tv = self._apply_mapping_normalization(F.col(f"_t.`{tc}`"), mapping)
+        for source_column, target_column, mapping in resolved_pairs:
+            source_value = self._apply_mapping_normalization(
+                spark_functions.col(f"_s.`{source_column}`"),
+                mapping,
+            )
+            target_value = self._apply_mapping_normalization(
+                spark_functions.col(f"_t.`{target_column}`"),
+                mapping,
+            )
             # Length-prefixing/field separators avoid ambiguous concatenations.
-            source_parts.append(F.concat(F.lit(sc + "="), F.coalesce(sv.cast("string"), F.lit("<NULL>"))))
-            target_parts.append(F.concat(F.lit(sc + "="), F.coalesce(tv.cast("string"), F.lit("<NULL>"))))
+            source_parts.append(
+                spark_functions.concat(
+                    spark_functions.lit(source_column + "="),
+                    spark_functions.coalesce(
+                        source_value.cast("string"),
+                        spark_functions.lit("<NULL>"),
+                    ),
+                )
+            )
+            target_parts.append(
+                spark_functions.concat(
+                    spark_functions.lit(source_column + "="),
+                    spark_functions.coalesce(
+                        target_value.cast("string"),
+                        spark_functions.lit("<NULL>"),
+                    ),
+                )
+            )
 
-        return (pairs
-            .withColumn("__source_row_hash", F.sha2(F.concat_ws("\u001e", *source_parts), 256))
-            .withColumn("__target_row_hash", F.sha2(F.concat_ws("\u001e", *target_parts), 256)))
+        return (
+            pairs
+            .withColumn(
+                "__source_row_hash",
+                spark_functions.sha2(spark_functions.concat_ws("\u001e", *source_parts), 256),
+            )
+            .withColumn(
+                "__target_row_hash",
+                spark_functions.sha2(spark_functions.concat_ws("\u001e", *target_parts), 256),
+            )
+        )
 
     @staticmethod
-    def _resolve_l4_column_pairs(source_columns, target_columns, cfg):
+    def _resolve_l4_column_pairs(source_columns, target_columns, configuration):
         """Resolve L4 fields exactly like the canonical FieldComparator.
 
         Explicit column mappings are overrides, not an allow-list. Any source
@@ -1052,15 +1507,15 @@ class SparkExecutor:
         """
         explicit_mappings = {
             mapping.get("source_column"): mapping
-            for mapping in cfg.get("column_mappings", [])
+            for mapping in configuration.get("column_mappings", [])
             if isinstance(mapping, dict)
             and mapping.get("source_column")
             and mapping.get("target_column")
         }
-        ignored = set(cfg.get("ignored_columns", []))
+        ignored = set(configuration.get("ignored_columns", []))
         key_sources = {
             key.get("source_column")
-            for key in cfg.get("comparison_keys", [])
+            for key in configuration.get("comparison_keys", [])
             if isinstance(key, dict) and key.get("source_column")
         }
         target_set = set(target_columns)
@@ -1079,21 +1534,34 @@ class SparkExecutor:
         return resolved
 
 
-    def _agg_expr(self, op, col):
-        from pyspark.sql import functions as F
-        return {"SUM":F.sum,"AVG":F.avg,"MIN":F.min,"MAX":F.max,"COUNT":F.count}[op](F.col(col) if col else F.lit(1))
+    def _agg_expr(self, operation, column):
+        from pyspark.sql import functions as spark_functions
+
+        aggregate_functions = {
+            "SUM": spark_functions.sum,
+            "AVG": spark_functions.avg,
+            "MIN": spark_functions.min,
+            "MAX": spark_functions.max,
+            "COUNT": spark_functions.count,
+        }
+        value = spark_functions.col(column) if column else spark_functions.lit(1)
+        return aggregate_functions[operation](value)
 
 
-    def _group(self,s,t,cfg):
-        from pyspark.sql import functions as F
+    def _group(self, source_dataframe, target_dataframe, configuration):
+        from pyspark.sql import functions as spark_functions
+
         group_started = perf_counter()
-        groups=cfg.get("grouping_attributes",[]) or []
-        aggs=cfg.get("aggregation_columns",[]) or []
+        groups = configuration.get("grouping_attributes", []) or []
+        aggregation_columns = configuration.get("aggregation_columns", []) or []
         if not groups:
             raise ValueError("Group reconciliation requires grouping_attributes")
 
-        mapping_lookup = self._mapping_lookup(cfg)
-        group_aliases = [f"__g{i}" for i in range(len(groups))]
+        mapping_lookup = self._mapping_lookup(configuration)
+        group_aliases = [
+            f"__group_{group_index}"
+            for group_index in range(len(groups))
+        ]
 
         def mapping_for_pair(source_column, target_column):
             mapping = mapping_lookup.get(source_column)
@@ -1101,51 +1569,69 @@ class SparkExecutor:
                 return mapping
             return {}
 
-        def prepare(df, side):
-            prepared = df
-            for i, item in enumerate(groups):
-                sc=item["source_column"]; tc=item["target_column"]
-                col = sc if side == "source" else tc
-                mapping = mapping_for_pair(sc, tc)
+        def prepare(dataframe, side):
+            prepared = dataframe
+            for group_index, item in enumerate(groups):
+                source_column = item["source_column"]
+                target_column = item["target_column"]
+                column = source_column if side == "source" else target_column
+                mapping = mapping_for_pair(source_column, target_column)
                 prepared = prepared.withColumn(
-                    group_aliases[i],
-                    self._apply_mapping_normalization(F.col(col), mapping),
+                    group_aliases[group_index],
+                    self._apply_mapping_normalization(spark_functions.col(column), mapping),
                 )
             return prepared
 
-        def agg_expr(op, expr):
-            op = op.upper()
-            if op == "SUM": return F.sum(expr)
-            if op == "AVG": return F.avg(expr)
-            if op == "MIN": return F.min(expr)
-            if op == "MAX": return F.max(expr)
-            if op == "COUNT": return F.count(expr)
-            raise ValueError(f"Unsupported group aggregation operation: {op}")
+        def aggregate_expression(operation, expression):
+            operation = operation.upper()
+            if operation == "SUM":
+                return spark_functions.sum(expression)
+            if operation == "AVG":
+                return spark_functions.avg(expression)
+            if operation == "MIN":
+                return spark_functions.min(expression)
+            if operation == "MAX":
+                return spark_functions.max(expression)
+            if operation == "COUNT":
+                return spark_functions.count(expression)
+            raise ValueError(
+                f"Unsupported group aggregation operation: {operation}"
+            )
 
         prepared_caches = []
 
-        def build(df, side):
+        def build(dataframe, side):
             # Base aggregates and MODE calculations reuse the same normalized
             # rows. Persist once so Spark does not rebuild normalization and the
             # upstream fallback lineage for each aggregation branch.
-            prepared = prepare(df, side).persist()
+            prepared = prepare(dataframe, side).persist()
             prepared_caches.append(prepared)
-            record_struct = F.struct(*[F.col(column) for column in df.columns])
-            aggregate_exprs=[
-                F.count(F.lit(1)).alias("__present"),
-                F.first(record_struct, ignorenulls=True).alias("__record"),
+            record_struct = spark_functions.struct(
+                *[spark_functions.col(column) for column in dataframe.columns]
+            )
+            aggregate_exprs = [
+                spark_functions.count(spark_functions.lit(1)).alias("__present"),
+                spark_functions.first(record_struct, ignorenulls=True).alias("__record"),
             ]
-            mode_specs=[]
-            for i,item in enumerate(aggs):
-                sc=item["source_column"]; tc=item["target_column"]
-                col = sc if side == "source" else tc
-                op=str(item.get("operation","AVG")).upper()
-                mapping = mapping_for_pair(sc, tc)
-                value_expr = self._apply_mapping_normalization(F.col(col), mapping)
-                if op == "MODE":
-                    mode_specs.append((i, value_expr))
+            mode_specs = []
+            for aggregate_index, item in enumerate(aggregation_columns):
+                source_column = item["source_column"]
+                target_column = item["target_column"]
+                column = source_column if side == "source" else target_column
+                operation = str(item.get("operation", "AVG")).upper()
+                mapping = mapping_for_pair(source_column, target_column)
+                value_expr = self._apply_mapping_normalization(
+                    spark_functions.col(column),
+                    mapping,
+                )
+                if operation == "MODE":
+                    mode_specs.append((aggregate_index, value_expr))
                 else:
-                    aggregate_exprs.append(agg_expr(op, value_expr).alias(f"a{i}"))
+                    aggregate_exprs.append(
+                        aggregate_expression(operation, value_expr).alias(
+                            f"__aggregate_{aggregate_index}"
+                        )
+                    )
 
             result = prepared.groupBy(*group_aliases).agg(*aggregate_exprs)
 
@@ -1156,60 +1642,76 @@ class SparkExecutor:
             # before. min_by is available in Spark 3.5.3.
             for index, value_expr in mode_specs:
                 mode_values = prepared.select(
-                    *[F.col(alias) for alias in group_aliases],
+                    *[spark_functions.col(alias) for alias in group_aliases],
                     value_expr.alias("__mode_value"),
-                ).filter(F.col("__mode_value").isNotNull())
+                ).filter(spark_functions.col("__mode_value").isNotNull())
 
                 counts = mode_values.groupBy(
                     *group_aliases, "__mode_value"
                 ).agg(
-                    F.count(F.lit(1)).alias("__mode_count")
+                    spark_functions.count(spark_functions.lit(1)).alias("__mode_count")
                 )
 
-                ordering = F.struct(
-                    (-F.col("__mode_count")).alias("frequency_order"),
-                    F.col("__mode_value").cast("string").alias("lexical_order"),
+                ordering = spark_functions.struct(
+                    (-spark_functions.col("__mode_count")).alias("frequency_order"),
+                    spark_functions.col("__mode_value").cast("string").alias("lexical_order"),
                 )
 
                 modes = counts.groupBy(*group_aliases).agg(
-                    F.min_by(F.col("__mode_value"), ordering).alias(f"a{index}")
+                    spark_functions.min_by(
+                        spark_functions.col("__mode_value"),
+                        ordering,
+                    ).alias(f"__aggregate_{index}")
                 )
 
                 result = result.join(modes, group_aliases, "left")
 
             return result
 
-        a=build(s,"source").alias("s")
-        b=build(t,"target").alias("t")
-        cond=None
+        source_groups = build(source_dataframe, "source").alias("source")
+        target_groups = build(target_dataframe, "target").alias("target")
+        condition = None
         for alias in group_aliases:
-            q=F.col(f"s.`{alias}`").eqNullSafe(F.col(f"t.`{alias}`"))
-            cond=q if cond is None else cond&q
+            group_match = spark_functions.col(f"source.`{alias}`").eqNullSafe(
+                spark_functions.col(f"target.`{alias}`")
+            )
+            condition = (
+                group_match
+                if condition is None
+                else condition & group_match
+            )
 
         # Cache the expensive grouped source/target join.  The summary action
         # below materializes it once; bounded evidence reuses the cached rows.
-        j=a.join(b,cond,"full_outer").persist()
+        joined_groups = source_groups.join(
+            target_groups,
+            condition,
+            "full_outer",
+        ).persist()
 
-        source_present = F.col("s.__present").isNotNull()
-        target_present = F.col("t.__present").isNotNull()
+        source_present = spark_functions.col("source.__present").isNotNull()
+        target_present = spark_functions.col("target.__present").isNotNull()
         common_present = source_present & target_present
-        row_count_mismatch = common_present & (F.col("s.__present") != F.col("t.__present"))
+        row_count_mismatch = common_present & (
+            spark_functions.col("source.__present") != spark_functions.col("target.__present")
+        )
         duplicate_group = (
-            (F.coalesce(F.col("s.__present"), F.lit(0)) > 1)
-            | (F.coalesce(F.col("t.__present"), F.lit(0)) > 1)
+            (spark_functions.coalesce(spark_functions.col("source.__present"), spark_functions.lit(0)) > 1)
+            | (spark_functions.coalesce(spark_functions.col("target.__present"), spark_functions.lit(0)) > 1)
         )
 
         # Build the aggregate mismatch/applicability expressions once.  These
         # are evaluated directly on one joined group row, so all metrics can be
-        # computed in the same Spark aggregation that materializes `j`.
-        aggregate_applicable=[]
-        aggregate_failed=[]
-        for index,item in enumerate(aggs):
-            source_value=F.col(f"s.a{index}")
-            target_value=F.col(f"t.a{index}")
-            both_null=source_value.isNull() & target_value.isNull()
-            applicable=common_present & ~both_null
-            failed=applicable & ~source_value.eqNullSafe(target_value)
+        # computed in the same Spark aggregation that materializes
+        # `joined_groups`.
+        aggregate_applicable = []
+        aggregate_failed = []
+        for aggregate_index, item in enumerate(aggregation_columns):
+            source_value = spark_functions.col(f"source.__aggregate_{aggregate_index}")
+            target_value = spark_functions.col(f"target.__aggregate_{aggregate_index}")
+            both_null = source_value.isNull() & target_value.isNull()
+            applicable = common_present & ~both_null
+            failed = applicable & ~source_value.eqNullSafe(target_value)
             aggregate_applicable.append(applicable)
             aggregate_failed.append(failed)
 
@@ -1217,161 +1719,276 @@ class SparkExecutor:
         for failed in aggregate_failed:
             any_group_failure = any_group_failure | failed
 
-        summary_exprs=[
-            F.sum(F.when(source_present,1).otherwise(0)).alias("source_groups"),
-            F.sum(F.when(target_present,1).otherwise(0)).alias("target_groups"),
-            F.sum(F.when(common_present,1).otherwise(0)).alias("common_groups"),
-            F.sum(F.when(row_count_mismatch,1).otherwise(0)).alias("row_count_checks_failed"),
-            F.sum(F.when(duplicate_group,1).otherwise(0)).alias("duplicate_checks_failed"),
-            F.sum(F.when(any_group_failure,1).otherwise(0)).alias("mismatch_groups"),
+        summary_exprs = [
+            spark_functions.sum(spark_functions.when(source_present, 1).otherwise(0)).alias("source_groups"),
+            spark_functions.sum(spark_functions.when(target_present, 1).otherwise(0)).alias("target_groups"),
+            spark_functions.sum(spark_functions.when(common_present, 1).otherwise(0)).alias("common_groups"),
+            spark_functions.sum(spark_functions.when(row_count_mismatch, 1).otherwise(0)).alias(
+                "row_count_checks_failed"
+            ),
+            spark_functions.sum(spark_functions.when(duplicate_group, 1).otherwise(0)).alias(
+                "duplicate_checks_failed"
+            ),
+            spark_functions.sum(spark_functions.when(any_group_failure, 1).otherwise(0)).alias(
+                "mismatch_groups"
+            ),
         ]
         for index, applicable in enumerate(aggregate_applicable):
             summary_exprs.append(
-                F.sum(F.when(applicable,1).otherwise(0)).alias(f"aggregate_applicable_{index}")
+                spark_functions.sum(spark_functions.when(applicable, 1).otherwise(0)).alias(
+                    f"aggregate_applicable_{index}"
+                )
             )
         for index, failed in enumerate(aggregate_failed):
             summary_exprs.append(
-                F.sum(F.when(failed,1).otherwise(0)).alias(f"aggregate_failed_{index}")
+                spark_functions.sum(spark_functions.when(failed, 1).otherwise(0)).alias(
+                    f"aggregate_failed_{index}"
+                )
             )
 
         summary_started = perf_counter()
-        summary=j.agg(*summary_exprs).first()
+        summary = joined_groups.agg(*summary_exprs).first()
         summary_ms = (perf_counter() - summary_started) * 1000
 
-        # `j` is now fully materialized. The normalized per-side inputs are no
-        # longer needed and can be released before evidence scans the cached join.
+        # `joined_groups` is now fully materialized. The normalized per-side
+        # inputs are no longer needed and can be released before evidence scans
+        # the cached join.
         for prepared in prepared_caches:
             try:
                 prepared.unpersist(blocking=False)
             except Exception:
                 logger.debug("Unable to unpersist prepared group dataset", exc_info=True)
 
-        source_groups=int(summary["source_groups"] or 0)
-        target_groups=int(summary["target_groups"] or 0)
-        common=int(summary["common_groups"] or 0)
-        missing=source_groups-common
-        extra=target_groups-common
+        source_group_count = int(summary["source_groups"] or 0)
+        target_group_count = int(summary["target_groups"] or 0)
+        common = int(summary["common_groups"] or 0)
+        missing = source_group_count - common
+        extra = target_group_count - common
 
-        row_count_checks_failed=int(summary["row_count_checks_failed"] or 0)
-        duplicate_checks_failed=int(summary["duplicate_checks_failed"] or 0)
-        aggregate_field_checks=sum(int(summary[f"aggregate_applicable_{i}"] or 0) for i in range(len(aggs)))
-        aggregate_field_failed=sum(int(summary[f"aggregate_failed_{i}"] or 0) for i in range(len(aggs)))
-        aggregate_checks_total=row_count_checks_failed+duplicate_checks_failed+aggregate_field_checks
-        aggregate_checks_failed=row_count_checks_failed+duplicate_checks_failed+aggregate_field_failed
-        mismatch_groups=int(summary["mismatch_groups"] or 0)
-
-        group_key = F.array(*[
-            F.coalesce(F.col(f"s.`{alias}`").cast("string"), F.col(f"t.`{alias}`").cast("string"))
-            for alias in group_aliases
-        ])
-        presence_rows=j.filter(F.col("s.__present").isNull() | F.col("t.__present").isNull()).select(
-            group_key.alias("group_key"),
-            F.col("s.__record").alias("source_record"), F.col("t.__record").alias("target_record"),
-            F.lit(None).cast("string").alias("source_aggregate"), F.lit(None).cast("string").alias("target_aggregate"),
-            F.lit(None).cast("string").alias("source_column"), F.lit(None).cast("string").alias("target_column"),
-            F.lit(None).cast("string").alias("operation"), F.lit(None).cast("double").alias("difference"),
-            F.when(F.col("s.__present").isNull(), F.lit("EXTRA_GROUP_IN_TARGET")).otherwise(F.lit("MISSING_GROUP_IN_TARGET")).alias("status"),
-        ).withColumn("matched", F.lit(False))
-
-        common_rows=j.filter(common_present)
-        count_mismatch_rows=common_rows.filter(F.col("s.__present") != F.col("t.__present")).select(
-            group_key.alias("group_key"),
-            F.col("s.__record").alias("source_record"), F.col("t.__record").alias("target_record"),
-            F.col("s.__present").cast("string").alias("source_aggregate"),
-            F.col("t.__present").cast("string").alias("target_aggregate"),
-            F.lit("Rows").alias("source_column"), F.lit("Rows").alias("target_column"),
-            F.lit("COUNT").alias("operation"),
-            (F.col("t.__present").cast("double")-F.col("s.__present").cast("double")).alias("difference"),
-            F.lit("GROUP_ROW_COUNT_MISMATCH").alias("status"), F.lit(False).alias("matched"),
+        row_count_checks_failed = int(summary["row_count_checks_failed"] or 0)
+        duplicate_checks_failed = int(summary["duplicate_checks_failed"] or 0)
+        aggregate_field_checks = sum(
+            int(summary[f"aggregate_applicable_{aggregate_index}"] or 0)
+            for aggregate_index in range(len(aggregation_columns))
         )
-        duplicate_group_rows=j.filter(
-            (F.coalesce(F.col("s.__present"), F.lit(0)) > 1)
-            | (F.coalesce(F.col("t.__present"), F.lit(0)) > 1)
+        aggregate_field_failed = sum(
+            int(summary[f"aggregate_failed_{aggregate_index}"] or 0)
+            for aggregate_index in range(len(aggregation_columns))
+        )
+        aggregate_checks_total = (
+            row_count_checks_failed
+            + duplicate_checks_failed
+            + aggregate_field_checks
+        )
+        aggregate_checks_failed = (
+            row_count_checks_failed
+            + duplicate_checks_failed
+            + aggregate_field_failed
+        )
+        mismatch_groups = int(summary["mismatch_groups"] or 0)
+
+        group_key = spark_functions.array(
+            *[
+                spark_functions.coalesce(
+                    spark_functions.col(f"source.`{alias}`").cast("string"),
+                    spark_functions.col(f"target.`{alias}`").cast("string"),
+                )
+                for alias in group_aliases
+            ]
+        )
+        presence_rows = joined_groups.filter(
+            spark_functions.col("source.__present").isNull() | spark_functions.col("target.__present").isNull()
         ).select(
             group_key.alias("group_key"),
-            F.col("s.__record").alias("source_record"), F.col("t.__record").alias("target_record"),
-            F.coalesce(F.col("s.__present"), F.lit(0)).cast("string").alias("source_aggregate"),
-            F.coalesce(F.col("t.__present"), F.lit(0)).cast("string").alias("target_aggregate"),
-            F.lit("Rows").alias("source_column"), F.lit("Rows").alias("target_column"),
-            F.lit("DUPLICATE COUNT").alias("operation"),
-            (F.coalesce(F.col("t.__present"), F.lit(0)).cast("double")
-             - F.coalesce(F.col("s.__present"), F.lit(0)).cast("double")).alias("difference"),
-            F.lit("GROUP_DUPLICATE_ROWS").alias("status"), F.lit(False).alias("matched"),
-        )
-        aggregate_structs=[]
-        for index,item in enumerate(aggs):
-            source_value,target_value=F.col(f"s.a{index}"),F.col(f"t.a{index}")
-            status=(F.when(source_value.isNull() & target_value.isNull(), F.lit("NOT_APPLICABLE"))
-                    .when(source_value.eqNullSafe(target_value), F.lit("PASS"))
-                    .otherwise(F.lit("GROUP_VALUE_MISMATCH")))
-            aggregate_structs.append(F.struct(
-                F.col("s.__record").alias("source_record"),
-                F.col("t.__record").alias("target_record"),
-                source_value.cast("string").alias("source_aggregate"),
-                target_value.cast("string").alias("target_aggregate"),
-                F.lit(item["source_column"]).alias("source_column"),
-                F.lit(item["target_column"]).alias("target_column"),
-                F.lit(str(item.get("operation","AVG")).upper()).alias("operation"),
-                (target_value.cast("double")-source_value.cast("double")).alias("difference"),
-                status.alias("status"),
-                status.isin("PASS","NOT_APPLICABLE").alias("matched"),
-            ))
-        aggregate_rows=(common_rows.select(group_key.alias("group_key"),F.explode(F.array(*aggregate_structs)).alias("aggregate"))
-                        .select("group_key","aggregate.*")) if aggregate_structs else None
-        result_rows=presence_rows.unionByName(count_mismatch_rows).unionByName(duplicate_group_rows)
-        if aggregate_rows is not None:
-            result_rows=result_rows.unionByName(aggregate_rows)
+            spark_functions.col("source.__record").alias("source_record"),
+            spark_functions.col("target.__record").alias("target_record"),
+            spark_functions.lit(None).cast("string").alias("source_aggregate"),
+            spark_functions.lit(None).cast("string").alias("target_aggregate"),
+            spark_functions.lit(None).cast("string").alias("source_column"),
+            spark_functions.lit(None).cast("string").alias("target_column"),
+            spark_functions.lit(None).cast("string").alias("operation"),
+            spark_functions.lit(None).cast("double").alias("difference"),
+            spark_functions.when(
+                spark_functions.col("source.__present").isNull(),
+                spark_functions.lit("EXTRA_GROUP_IN_TARGET"),
+            )
+            .otherwise(spark_functions.lit("MISSING_GROUP_IN_TARGET"))
+            .alias("status"),
+        ).withColumn("matched", spark_functions.lit(False))
 
-        metrics={
-            "status":"PASS" if missing+extra+mismatch_groups==0 else "FAIL",
-            "matching_mode":"GROUP_RECONCILIATION","comparison_mode":"GROUP_RECONCILIATION",
-            "source_group_count":source_groups,"target_group_count":target_groups,"group_count":source_groups+extra,
-            "common_group_count":common,"matched_group_count":common,"missing_group_count":missing,"extra_group_count":extra,
-            "groups_with_aggregate_mismatch":mismatch_groups,"groups_with_mismatch":mismatch_groups,
-            "group_mismatch_count":mismatch_groups,"group_difference_count":missing+extra+mismatch_groups,
-            "mismatch_group_count":mismatch_groups,"mismatch_count":missing+extra+mismatch_groups,
-            "source_group_coverage_pct":safe_rate_pct(common,source_groups,zero_value=100.0),
-            "target_group_coverage_pct":safe_rate_pct(common,target_groups,zero_value=100.0),
-            "source_group_coverage":safe_rate_pct(common,source_groups,zero_value=100.0),
-            "target_group_coverage":safe_rate_pct(common,target_groups,zero_value=100.0),
-            "aggregate_checks_total":aggregate_checks_total,"aggregate_check_count":aggregate_checks_total,
-            "aggregate_checks_passed":aggregate_checks_total-aggregate_checks_failed,"aggregate_checks_failed":aggregate_checks_failed,
-            "checks_total":aggregate_checks_total,"checks_passed":aggregate_checks_total-aggregate_checks_failed,"checks_failed":aggregate_checks_failed,
+        common_rows = joined_groups.filter(common_present)
+        count_mismatch_rows = common_rows.filter(
+            spark_functions.col("source.__present") != spark_functions.col("target.__present")
+        ).select(
+            group_key.alias("group_key"),
+            spark_functions.col("source.__record").alias("source_record"),
+            spark_functions.col("target.__record").alias("target_record"),
+            spark_functions.col("source.__present").cast("string").alias("source_aggregate"),
+            spark_functions.col("target.__present").cast("string").alias("target_aggregate"),
+            spark_functions.lit("Rows").alias("source_column"),
+            spark_functions.lit("Rows").alias("target_column"),
+            spark_functions.lit("COUNT").alias("operation"),
+            (
+                spark_functions.col("target.__present").cast("double")
+                - spark_functions.col("source.__present").cast("double")
+            ).alias("difference"),
+            spark_functions.lit("GROUP_ROW_COUNT_MISMATCH").alias("status"),
+            spark_functions.lit(False).alias("matched"),
+        )
+        duplicate_group_rows = joined_groups.filter(
+            (spark_functions.coalesce(spark_functions.col("source.__present"), spark_functions.lit(0)) > 1)
+            | (spark_functions.coalesce(spark_functions.col("target.__present"), spark_functions.lit(0)) > 1)
+        ).select(
+            group_key.alias("group_key"),
+            spark_functions.col("source.__record").alias("source_record"),
+            spark_functions.col("target.__record").alias("target_record"),
+            spark_functions.coalesce(spark_functions.col("source.__present"), spark_functions.lit(0)).cast("string").alias("source_aggregate"),
+            spark_functions.coalesce(spark_functions.col("target.__present"), spark_functions.lit(0)).cast("string").alias("target_aggregate"),
+            spark_functions.lit("Rows").alias("source_column"),
+            spark_functions.lit("Rows").alias("target_column"),
+            spark_functions.lit("DUPLICATE COUNT").alias("operation"),
+            (
+                spark_functions.coalesce(spark_functions.col("target.__present"), spark_functions.lit(0)).cast("double")
+                - spark_functions.coalesce(spark_functions.col("source.__present"), spark_functions.lit(0)).cast("double")
+            ).alias("difference"),
+            spark_functions.lit("GROUP_DUPLICATE_ROWS").alias("status"),
+            spark_functions.lit(False).alias("matched"),
+        )
+        aggregate_structs = []
+        for aggregate_index, item in enumerate(aggregation_columns):
+            source_value = spark_functions.col(f"source.__aggregate_{aggregate_index}")
+            target_value = spark_functions.col(f"target.__aggregate_{aggregate_index}")
+            status = (
+                spark_functions.when(
+                    source_value.isNull() & target_value.isNull(),
+                    spark_functions.lit("NOT_APPLICABLE"),
+                )
+                .when(source_value.eqNullSafe(target_value), spark_functions.lit("PASS"))
+                .otherwise(spark_functions.lit("GROUP_VALUE_MISMATCH"))
+            )
+            aggregate_structs.append(
+                spark_functions.struct(
+                    spark_functions.col("source.__record").alias("source_record"),
+                    spark_functions.col("target.__record").alias("target_record"),
+                    source_value.cast("string").alias("source_aggregate"),
+                    target_value.cast("string").alias("target_aggregate"),
+                    spark_functions.lit(item["source_column"]).alias("source_column"),
+                    spark_functions.lit(item["target_column"]).alias("target_column"),
+                    spark_functions.lit(str(item.get("operation", "AVG")).upper()).alias("operation"),
+                    (
+                        target_value.cast("double")
+                        - source_value.cast("double")
+                    ).alias("difference"),
+                    status.alias("status"),
+                    status.isin("PASS", "NOT_APPLICABLE").alias("matched"),
+                )
+            )
+
+        aggregate_rows = None
+        if aggregate_structs:
+            aggregate_rows = (
+                common_rows
+                .select(
+                    group_key.alias("group_key"),
+                    spark_functions.explode(spark_functions.array(*aggregate_structs)).alias("aggregate"),
+                )
+                .select("group_key", "aggregate.*")
+            )
+
+        result_rows = (
+            presence_rows
+            .unionByName(count_mismatch_rows)
+            .unionByName(duplicate_group_rows)
+        )
+        if aggregate_rows is not None:
+            result_rows = result_rows.unionByName(aggregate_rows)
+
+        group_difference_count = missing + extra + mismatch_groups
+        aggregate_checks_passed = aggregate_checks_total - aggregate_checks_failed
+        metrics = {
+            "status": "PASS" if group_difference_count == 0 else "FAIL",
+            "matching_mode": "GROUP_RECONCILIATION",
+            "comparison_mode": "GROUP_RECONCILIATION",
+            "source_group_count": source_group_count,
+            "target_group_count": target_group_count,
+            "group_count": source_group_count + extra,
+            "common_group_count": common,
+            "matched_group_count": common,
+            "missing_group_count": missing,
+            "extra_group_count": extra,
+            "groups_with_aggregate_mismatch": mismatch_groups,
+            "groups_with_mismatch": mismatch_groups,
+            "group_mismatch_count": mismatch_groups,
+            "group_difference_count": group_difference_count,
+            "mismatch_group_count": mismatch_groups,
+            "mismatch_count": group_difference_count,
+            "source_group_coverage_pct": safe_rate_pct(
+                common,
+                source_group_count,
+                zero_value=100.0,
+            ),
+            "target_group_coverage_pct": safe_rate_pct(
+                common,
+                target_group_count,
+                zero_value=100.0,
+            ),
+            "source_group_coverage": safe_rate_pct(
+                common,
+                source_group_count,
+                zero_value=100.0,
+            ),
+            "target_group_coverage": safe_rate_pct(
+                common,
+                target_group_count,
+                zero_value=100.0,
+            ),
+            "aggregate_checks_total": aggregate_checks_total,
+            "aggregate_check_count": aggregate_checks_total,
+            "aggregate_checks_passed": aggregate_checks_passed,
+            "aggregate_checks_failed": aggregate_checks_failed,
+            "checks_total": aggregate_checks_total,
+            "checks_passed": aggregate_checks_passed,
+            "checks_failed": aggregate_checks_failed,
         }
 
-        # Only exception evidence is collected. `j` is already materialized by
-        # the single summary action above, so this bounded sample scans cached
-        # group rows without recomputing source/target aggregation.
-        exception_rows=result_rows.filter(~F.col("status").isin("PASS","NOT_APPLICABLE"))
-        exception_count=missing+extra+aggregate_checks_failed
+        exception_rows = result_rows.filter(
+            ~spark_functions.col("status").isin("PASS", "NOT_APPLICABLE")
+        )
+        exception_count = missing + extra + aggregate_checks_failed
         evidence_started = perf_counter()
-        bounded_evidence=self._bounded(exception_rows,exception_count)
+        bounded_evidence = self._bounded(exception_rows, exception_count)
         evidence_ms = (perf_counter() - evidence_started) * 1000
         total_ms = (perf_counter() - group_started) * 1000
-        logger.info("SPARK_GROUP_OPT_TIMING summary_ms=%.1f evidence_ms=%.1f total_ms=%.1f", summary_ms, evidence_ms, total_ms)
-        print(f"SPARK_GROUP_OPT_TIMING summary_ms={summary_ms:.1f} evidence_ms={evidence_ms:.1f} total_ms={total_ms:.1f}")
+        logger.info(
+            "SPARK_GROUP_OPT_TIMING summary_ms=%.1f evidence_ms=%.1f total_ms=%.1f",
+            summary_ms,
+            evidence_ms,
+            total_ms,
+        )
+        print(
+            f"SPARK_GROUP_OPT_TIMING summary_ms={summary_ms:.1f} "
+            f"evidence_ms={evidence_ms:.1f} total_ms={total_ms:.1f}"
+        )
         try:
-            j.unpersist(blocking=False)
+            joined_groups.unpersist(blocking=False)
         except Exception:
             logger.debug("Unable to unpersist group reconciliation join", exc_info=True)
-        return {"metrics":metrics,"evidence":{"group_reconciliation":bounded_evidence}}
+        return {
+            "metrics": metrics,
+            "evidence": {"group_reconciliation": bounded_evidence},
+        }
 
 
-    def _bounded(self, df, total_count: int | None = None):
-        if df is None:
+    def _bounded(self, dataframe, total_count: int | None = None):
+        if dataframe is None:
             return {"count": 0, "sample": [], "truncated": False}
-        # If the caller already proved that this evidence bucket is empty, do
-        # not launch a Spark job merely to collect zero rows.
         if total_count is not None and int(total_count) == 0:
             return {"count": 0, "sample": [], "truncated": False}
-        # The public count remains exact. Where the caller already has it,
-        # avoid a full count() and collect one bounded extra row to determine
-        # truncation. Otherwise retain the existing exact-count contract.
-        rows = df.limit(self.evidence_limit + 1).collect()
+        rows = dataframe.limit(self.evidence_limit + 1).collect()
         truncated = len(rows) > self.evidence_limit
         sample = [row.asDict(recursive=True) for row in rows[:self.evidence_limit]]
         if total_count is None:
-            total_count = df.count()
+            total_count = dataframe.count()
         return {"count": total_count, "sample": sample, "truncated": truncated}
 
     def _normalize_contract(self, level, result):
@@ -1379,15 +1996,35 @@ class SparkExecutor:
         metrics = result.setdefault("metrics", {})
         evidence = result.setdefault("evidence", {})
         metrics.setdefault("status", "PASS")
+
         if level == ComparisonLevel.L5:
-            total = metrics.setdefault("checks_total", 0); failed = metrics.setdefault("checks_failed", 0)
+            total = metrics.setdefault("checks_total", 0)
+            failed = metrics.setdefault("checks_failed", 0)
+
             metrics.setdefault("checks_passed", total - failed)
-            metrics.setdefault("aggregate_check_pass_rate_pct", safe_rate_pct(metrics["checks_passed"], total, zero_value=100.0))
-            metrics.setdefault("aggregate_check_failure_rate_pct", safe_rate_pct(failed, total))
+            passed = metrics["checks_passed"]
+            metrics.setdefault(
+                "aggregate_check_pass_rate_pct",
+                safe_rate_pct(passed, total, zero_value=100.0),
+            )
+            metrics.setdefault(
+                "aggregate_check_failure_rate_pct",
+                safe_rate_pct(failed, total),
+            )
         elif level == ComparisonLevel.L6:
-            total = metrics.setdefault("checks_total", 0); failed = metrics.setdefault("checks_failed", 0)
+            total = metrics.setdefault("checks_total", 0)
+            failed = metrics.setdefault("checks_failed", 0)
+
             metrics.setdefault("checks_passed", total - failed)
-            metrics.setdefault("pass_percentage", safe_rate_pct(metrics["checks_passed"], total, zero_value=100.0))
-            metrics.setdefault("failure_percentage", safe_rate_pct(failed, total))
+            passed = metrics["checks_passed"]
+            metrics.setdefault(
+                "pass_percentage",
+                safe_rate_pct(passed, total, zero_value=100.0),
+            )
+            metrics.setdefault(
+                "failure_percentage",
+                safe_rate_pct(failed, total),
+            )
             evidence.setdefault("dq_results", evidence.get("rule_results", []))
+
         return result

@@ -54,12 +54,13 @@ L1-L6 are deterministic comparison layers. L7 is optional and requires a Groq AP
 ```mermaid
 flowchart LR
     UI[React web application] -->|/api/v1| API[FastAPI service]
-    API --> PLAN[Strategy planner]
-    PLAN --> EXEC[Spark execution engine]
-    EXEC --> SPARK[Apache Spark cluster]
+    API --> PLAN[Strategy and engine router]
+    PLAN -->|Bounded CSV or Databricks| DUCK[DuckDB executor]
+    PLAN -->|Large or unknown input| SPARK[Apache Spark cluster]
+    DUCK --> COMP
     SPARK --> COMP
-    CSV[CSV files] --> EXEC
-    DBX[Databricks] --> EXEC
+    CSV[CSV files] --> PLAN
+    DBX[Databricks] --> PLAN
     API <--> PG[(PostgreSQL)]
     COMP --> EVIDENCE[Metrics and sanitized evidence]
     EVIDENCE --> PG
@@ -67,7 +68,7 @@ flowchart LR
     LLM --> REPORT[Web and PDF report]
 ```
 
-The browser is served by Nginx, which proxies `/api/` requests to FastAPI. PostgreSQL stores connections, configurations, rules, execution plans, run state, results, evidence, and analysis reports. All L1-L6 comparison workloads are executed through Apache Spark; there is no separate local comparison executor.
+The browser is served by Nginx, which proxies `/api/` requests to FastAPI. PostgreSQL stores connections, configurations, rules, execution plans, run state, results, evidence, and analysis reports. The planner routes an entire bounded L1-L6 CSV or Databricks comparison to disk-backed DuckDB. Databricks routing first obtains an exact filtered count, then streams rows into DuckDB in bounded chunks. Unknown-size and oversized workloads remain on Spark. Both implementations follow the same result contract, and cross-engine conformance tests protect metrics and evidence parity.
 
 ## Quick start with Docker
 
@@ -91,6 +92,15 @@ GROQ_MODEL=llama-3.3-70b-versatile
 # Optional Spark tuning
 SPARK_SQL_SHUFFLE_PARTITIONS=8
 SPARK_EVIDENCE_LIMIT=100
+
+# Optional DuckDB routing and resource limits
+DUCKDB_EXECUTION_ENABLED=true
+DUCKDB_MAX_ROWS=1000000
+DUCKDB_MAX_INPUT_BYTES=1073741824
+DUCKDB_DATABRICKS_MAX_ROWS=100000
+DUCKDB_DATABRICKS_CHUNK_SIZE=1000
+DUCKDB_THREADS=2
+DUCKDB_MEMORY_LIMIT=2GB
 ```
 
 Never commit `.env` or real access tokens. Environment files are excluded by the repository's `.gitignore`.
@@ -141,8 +151,8 @@ Sample CSV datasets are available in [`data/`](data/).
 
 The application currently registers two user-facing connector types:
 
-- **CSV** — schema discovery and Spark-based file comparison.
-- **Databricks** — connection testing, catalog/schema/table discovery, SQL data access, and Spark-based comparison.
+- **CSV** — schema discovery, bounded DuckDB comparison, and Spark fallback for large files.
+- **Databricks** — connection testing, catalog/schema/table discovery, bounded DuckDB comparison, and Spark fallback for large or unknown-size workloads.
 
 Saved secret fields such as tokens and passwords are masked in API responses and restored internally when a saved connection is used. Keep deployment logs and the PostgreSQL instance access-controlled because connection metadata is operationally sensitive.
 
@@ -295,6 +305,14 @@ The API returns a `run_id`, `plan_id`, task count, and task IDs. Poll the status
 | `POSTGRES_PASSWORD` | Recommended | `comparator` in Compose | Password used by the bundled PostgreSQL service. |
 | `GROQ_API_KEY` | For L7 | None | API credential for language-model analysis. |
 | `GROQ_MODEL` | No | `llama-3.3-70b-versatile` | Groq model used by L7. |
+| `DUCKDB_EXECUTION_ENABLED` | No | `true` | Enables DuckDB routing for bounded CSV and Databricks comparisons. |
+| `DUCKDB_MAX_ROWS` | No | `1000000` | Maximum row count on either side for DuckDB routing. |
+| `DUCKDB_MAX_INPUT_BYTES` | No | `1073741824` | Maximum combined source and target bytes for DuckDB routing. |
+| `DUCKDB_DATABRICKS_MAX_ROWS` | No | `100000` | Maximum filtered Databricks rows on either side for DuckDB routing. Larger or unknown inputs use Spark. |
+| `DUCKDB_DATABRICKS_CHUNK_SIZE` | No | `1000` | Rows streamed from Databricks into DuckDB per insert batch. |
+| `DUCKDB_THREADS` | No | `2` | Threads used by each plan-scoped DuckDB executor. |
+| `DUCKDB_MEMORY_LIMIT` | No | `2GB` | DuckDB memory ceiling; larger intermediates spill to its temporary directory. |
+| `DUCKDB_TEMP_ROOT` | No | `/tmp/duckdb-comparator` | Location for DuckDB database and spill files. |
 | `SPARK_MASTER_URL` | Yes | Set by Compose | Spark master URL used for all comparison execution. |
 | `SPARK_DRIVER_HOST` | In Compose | `backend` | Host advertised by the Spark driver. |
 | `SPARK_APP_NAME` | No | `V1-Comparator` | Spark application name. |

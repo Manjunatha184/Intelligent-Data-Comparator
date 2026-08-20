@@ -6252,8 +6252,110 @@ select option:checked {
   z-index: 80;
 }
 
+/* Unified dropdown treatment: native selects and custom multi-selects should
+   read as the same control while preserving their separate behavior. */
+.field select,
+.mappingPickerBlock select,
+.multiSelectTrigger {
+  min-height: 40px !important;
+  height: 40px;
+  width: 100%;
+  padding: 0 34px 0 12px !important;
+  border: 1px solid #cbd7e4 !important;
+  border-radius: 4px !important;
+  background-color: #fff !important;
+  color: #263f5f !important;
+  font: inherit;
+  line-height: 38px;
+  box-shadow: none !important;
+}
+
+.multiSelectTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2339516d' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 11px center !important;
+  background-size: 12px !important;
+}
+
+.multiSelectTrigger > span:first-child {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multiSelectChevron {
+  width: 12px;
+  color: transparent !important;
+  font-size: 0;
+}
+
+.field select:hover,
+.mappingPickerBlock select:hover,
+.multiSelectTrigger:hover {
+  border-color: #9dafc1 !important;
+}
+
+.field select:focus,
+.mappingPickerBlock select:focus,
+.multiSelectTrigger:focus-visible,
+.multiSelectTrigger[aria-expanded="true"] {
+  border-color: #526b86 !important;
+  outline: 2px solid rgba(28, 44, 66, .1);
+  outline-offset: 0;
+  background-color: #fff !important;
+}
+
+.multiSelectMenu {
+  top: calc(100% + 1px);
+  padding: 0;
+  border: 1px solid #cbd7e4;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 6px 14px rgba(28, 44, 66, .14);
+  max-height: 224px;
+}
+
+.multiSelectOption {
+  min-height: 24px;
+  padding: 4px 12px;
+  gap: 0;
+  border-radius: 2px;
+  color: #2f3f50;
+  line-height: 20px;
+}
+
+.multiSelectOption:hover {
+  background: #e8edf3;
+  color: #1d2c3d;
+}
+
+.multiSelectOption[aria-selected="true"] {
+  color: #2f3f50;
+  background: #d9d9d9;
+}
+
+.multiSelectOption[aria-selected="true"] .multiSelectCheck {
+  color: transparent;
+}
+
+.multiSelectCheck {
+  display: none;
+}
+
+.multiSelectEmpty {
+  padding: 8px 12px;
+  color: #738197;
+}
+
 .modalBackdrop {
-  left: 188px;
+  inset: 0;
+  left: 0;
+  padding: 20px 20px 20px calc(188px + 20px);
   background: rgba(28, 44, 66, .48);
   -webkit-backdrop-filter: blur(1.5px);
   backdrop-filter: blur(1.5px);
@@ -6284,6 +6386,7 @@ select option:checked {
 @media (max-width: 760px) {
   .modalBackdrop {
     left: 0;
+    padding: 14px;
   }
 }
 

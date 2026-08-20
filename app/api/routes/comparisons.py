@@ -1,6 +1,8 @@
 import json
 import logging
+import re
 from time import perf_counter
+from xml.sax.saxutils import escape
 
 from app.persistence.repository import PostgresRepository
 from app.persistence.config import get_database_url
@@ -49,6 +51,70 @@ from app.analysis.engine import L7AnalysisEngine
 
 
 logger = logging.getLogger(__name__)
+
+
+def _report_text(value: Any, default: str = "") -> str:
+    """Normalize report text before handing it to ReportLab Paragraph."""
+    if value is None:
+        value = default
+    text = str(value)
+    text = text.replace("\\n", " ").replace("\n", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(
+        r"(?<=[A-Za-z0-9])n(?=(?:column|row|level|numeric|record|field|value|difference|aggregate)s?\b)",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return escape(text or default)
+
+
+def _fallback_analysis_findings(
+    report: dict[str, Any],
+    levels: dict[str, Any],
+    validation_summary: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    findings = report.get("key_findings")
+    if isinstance(findings, list) and findings:
+        return findings
+
+    fallback = []
+    for index, level_key in enumerate(["L1", "L2", "L3", "L4", "L5", "L6"], start=1):
+        level_data = levels.get(level_key) or {}
+        if str(level_data.get("status", "")).upper() != "FAIL":
+            continue
+
+        summary = validation_summary.get(level_key, {})
+        metrics = level_data.get("metrics") or {}
+        derived_statistics = [
+            f"{key.replace('_', ' ')}: {value}"
+            for key, value in metrics.items()
+            if isinstance(value, (int, float, bool))
+        ][:4]
+
+        fallback.append(
+            {
+                "finding_id": f"AUTO-{index}",
+                "title": f"{level_key} {summary.get('name') or 'validation'} failed",
+                "severity": report.get("severity", "MEDIUM"),
+                "observed_evidence": [
+                    summary.get("summary")
+                    or "This validation level reported one or more differences."
+                ],
+                "derived_statistics": derived_statistics,
+                "likely_explanation": (
+                    "The validation evidence indicates a measurable difference "
+                    "between the source and target datasets."
+                ),
+                "impact": (
+                    "Review this failed level before relying on the comparison "
+                    "output for reporting or downstream processing."
+                ),
+                "related_levels": [level_key],
+            }
+        )
+
+    return fallback
 
 
 # ============================================================
@@ -161,9 +227,8 @@ def _hydrate_dataset_for_execution(
 
     The browser correctly receives masked secrets from GET /connections.
     Those masked values must never be used for SQL execution.  Hydration is
-    performed only on the in-memory execution plan, after the persisted plan
-    has already been saved, so real credentials are not written into the
-    persisted comparison configuration/plan.
+    is limited to in-memory planning and execution copies, so real credentials
+    are never written into the persisted comparison configuration or plan.
     """
     resolved_dataset = dict(dataset or {})
 
@@ -375,10 +440,19 @@ def build_execution_plan(
     configuration: RuntimeConfiguration,
 ):
 
-    planner = StrategyPlanner()
+    planning_payload = configuration.model_dump(mode="python")
+    for side in ("source", "target"):
+        planning_payload[side] = _hydrate_dataset_for_execution(
+            planning_payload[side]
+        )
+    planning_configuration = RuntimeConfiguration.model_validate(
+        planning_payload
+    )
+
+    planner = StrategyPlanner(connector_manager=connector_manager)
 
     analysis = planner.analyze_inputs(
-        configuration
+        planning_configuration
     )
 
     strategy = planner.choose_strategy(
@@ -847,6 +921,25 @@ def _build_level_result(
     }
 
 
+def _record_counts_from_levels(
+    levels: list[dict[str, Any]],
+) -> tuple[int, int]:
+    """Resolve dataset totals from persisted deterministic level metrics."""
+    source_count = 0
+    target_count = 0
+    for level in levels:
+        metrics = level.get("metrics") or {}
+        for key in ("source_record_count", "total_rows_source"):
+            value = metrics.get(key)
+            if isinstance(value, (int, float)):
+                source_count = max(source_count, int(value))
+        for key in ("target_record_count", "total_rows_target"):
+            value = metrics.get(key)
+            if isinstance(value, (int, float)):
+                target_count = max(target_count, int(value))
+    return source_count, target_count
+
+
 def _state_status_value(state) -> str:
     status = getattr(state, "status", None)
     if hasattr(status, "value"):
@@ -1264,6 +1357,7 @@ def get_comparison_results(
         target_config = configuration_data.get("target") or {}
         source_properties = source_config.get("properties") or {}
         target_properties = target_config.get("properties") or {}
+        source_records, target_records = _record_counts_from_levels(levels)
 
         comparison_status = persisted_run.get("comparison_status")
         if (
@@ -1301,12 +1395,12 @@ def get_comparison_results(
                 "source": {
                     "type": source_config.get("connector_type"),
                     "path": source_properties.get("path"),
-                    "records": 0,
+                    "records": source_records,
                 },
                 "target": {
                     "type": target_config.get("connector_type"),
                     "path": target_properties.get("path"),
-                    "records": 0,
+                    "records": target_records,
                 },
             },
             levels=levels,
@@ -1480,6 +1574,12 @@ def get_comparison_results(
                 0,
             ),
         )
+
+    metric_source_records, metric_target_records = (
+        _record_counts_from_levels(levels)
+    )
+    source_records = max(source_records, metric_source_records)
+    target_records = max(target_records, metric_target_records)
 
     datasets = {
         "source": {
@@ -1845,7 +1945,7 @@ def download_analysis_pdf(run_id: str):
     header_table = Table(
         [
             [Paragraph("RUN ID", label_style), Paragraph("OVERALL STATUS", label_style), Paragraph("SEVERITY", label_style), Paragraph("GENERATED", label_style)],
-            [Paragraph(str(run_id), small_style), Paragraph(str(report.get("overall_status", "UNKNOWN")), body_style), Paragraph(str(report.get("severity", "UNKNOWN")), body_style), Paragraph(str(report.get("generated_at", "Not available")), small_style)],
+            [Paragraph(_report_text(run_id), small_style), Paragraph(_report_text(report.get("overall_status", "UNKNOWN")), body_style), Paragraph(_report_text(report.get("severity", "UNKNOWN")), body_style), Paragraph(_report_text(report.get("generated_at", "Not available")), small_style)],
         ],
         colWidths=[75 * mm, 30 * mm, 25 * mm, 44 * mm],
     )
@@ -1873,11 +1973,9 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            str(
-                report.get(
-                    "executive_summary",
-                    "No executive summary available.",
-                )
+            _report_text(
+                report.get("executive_summary"),
+                "No executive summary available.",
             ),
             body_style,
         )
@@ -1896,11 +1994,9 @@ def download_analysis_pdf(run_id: str):
 
     story.append(
         Paragraph(
-            str(
-                report.get(
-                    "overall_assessment",
-                    "No assessment available.",
-                )
+            _report_text(
+                report.get("overall_assessment"),
+                "No assessment available.",
             ),
             body_style,
         )
@@ -1945,10 +2041,10 @@ def download_analysis_pdf(run_id: str):
             summary = validation_summary.get(level_key, {})
             summary_rows.append(
                 [
-                    Paragraph(level_key, small_style),
-                    Paragraph(level_names.get(level_key, level_key), small_style),
-                    Paragraph(str(summary.get("summary") or "No summary was recorded."), small_style),
-                    Paragraph(str(summary.get("status") or level_data.get("status", "UNKNOWN")), small_style),
+                    Paragraph(_report_text(level_key), small_style),
+                    Paragraph(_report_text(level_names.get(level_key, level_key)), small_style),
+                    Paragraph(_report_text(summary.get("summary"), "No summary was recorded."), small_style),
+                    Paragraph(_report_text(summary.get("status") or level_data.get("status", "UNKNOWN")), small_style),
                 ]
             )
 
@@ -1986,15 +2082,15 @@ def download_analysis_pdf(run_id: str):
         )
     )
 
-    findings = report.get("key_findings", [])
+    findings = _fallback_analysis_findings(report, levels, validation_summary)
     if not findings:
         story.append(Paragraph("No key findings reported.", body_style))
         story.append(Spacer(1, 6))
     else:
         for finding in findings:
             f_dict = finding if isinstance(finding, dict) else (finding.model_dump() if hasattr(finding, "model_dump") else getattr(finding, "__dict__", {}))
-            title = f_dict.get("title", "Finding")
-            severity = f_dict.get("severity", "MEDIUM")
+            title = _report_text(f_dict.get("title"), "Finding")
+            severity = _report_text(f_dict.get("severity"), "MEDIUM")
             
             story.append(Paragraph(f"<b>{title}</b>", ParagraphStyle('FTitle', parent=styles["Heading3"], fontSize=10, leading=13)))
             story.append(Paragraph(f"<b>Severity:</b> {severity}", body_style))
@@ -2003,23 +2099,23 @@ def download_analysis_pdf(run_id: str):
             if observed:
                 story.append(Paragraph("<b>Observed Evidence:</b>", body_style))
                 for obs in observed:
-                    story.append(Paragraph(f"• {obs}", small_style))
+                    story.append(Paragraph(f"• {_report_text(obs)}", small_style))
             
             derived = f_dict.get("derived_statistics", [])
             if derived:
                 story.append(Paragraph("<b>Derived Metrics:</b>", body_style))
                 for dm in derived:
-                    story.append(Paragraph(f"• {dm}", small_style))
+                    story.append(Paragraph(f"• {_report_text(dm)}", small_style))
             
             interpretation = f_dict.get("likely_explanation")
             if interpretation:
                 story.append(Paragraph("<b>What this means:</b>", body_style))
-                story.append(Paragraph(f"• {interpretation}", small_style))
+                story.append(Paragraph(f"• {_report_text(interpretation)}", small_style))
             
             impact = f_dict.get("impact")
             if impact:
                 story.append(Paragraph("<b>Why this matters:</b>", body_style))
-                story.append(Paragraph(f"- {impact}", small_style))
+                story.append(Paragraph(f"• {_report_text(impact)}", small_style))
 
             story.append(Spacer(1, 8))
 
@@ -2036,16 +2132,16 @@ def download_analysis_pdf(run_id: str):
 
     if correlations:
         for corr in correlations:
-            story.append(Paragraph(f"<b>{corr.get('title') or corr.get('type', 'Cross-level comparison')}</b>", body_style))
-            story.append(Paragraph(str(corr.get("conclusion") or corr.get("interpretation", "")), body_style))
+            story.append(Paragraph(f"<b>{_report_text(corr.get('title') or corr.get('type'), 'Cross-level comparison')}</b>", body_style))
+            story.append(Paragraph(_report_text(corr.get("conclusion") or corr.get("interpretation", "")), body_style))
             for evidence_item in corr.get("evidence", []):
                 if isinstance(evidence_item, dict):
                     evidence_item = evidence_item.get("statement") or json.dumps(evidence_item, default=str)
-                story.append(Paragraph(f"- {evidence_item}", small_style))
+                story.append(Paragraph(f"• {_report_text(evidence_item)}", small_style))
             for k, v in corr.items():
                 if k not in ("correlation_id", "title", "type", "conclusion", "interpretation", "evidence", "levels"):
-                    story.append(Paragraph(f"• {str(k).replace('_', ' ').capitalize()}: {str(v)}", small_style))
-            story.append(Paragraph(f"<b>Levels:</b> {', '.join(corr.get('levels', []))}", body_style))
+                    story.append(Paragraph(f"• {_report_text(str(k).replace('_', ' ').capitalize())}: {_report_text(v)}", small_style))
+            story.append(Paragraph(f"<b>Levels:</b> {_report_text(', '.join(corr.get('levels', [])))}", body_style))
             story.append(Spacer(1, 6))
     else:
         story.append(Paragraph("No cross-level correlations were established.", body_style))

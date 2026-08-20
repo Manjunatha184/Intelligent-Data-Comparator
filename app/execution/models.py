@@ -44,6 +44,7 @@ class Priority(str, Enum):
 
 class ExecutionLocation(str, Enum):
     SPARK = "SPARK"
+    DUCKDB = "DUCKDB"
 
 
 class ExecutionResultStatus(str, Enum):

@@ -1,0 +1,11 @@
+ID,Name,Sales,Quantity,Email,Status,Region
+T3001,Product Alpha,125,5,alpha@test.com,ACTIVE,North
+T3002,Product Beta,250,10,beta@test.com,ACTIVE,South
+T3003,Product Gamma,375,15,gamma@test.com,INACTIVE,East
+T3004,Product Delta,500,20,delta@test.com,ACTIVE,West
+T3005,Product Epsilon,625,25,epsilon@test.com,ACTIVE,Central
+T3006,Product Zeta,750,30,zeta@test.com,INACTIVE,North
+T3007,Product Eta,875,35,eta@test.com,ACTIVE,South
+T3008,Product Theta,1000,40,theta@test.com,ACTIVE,East
+T3009,Product Iota,1125,45,iota@test.com,ACTIVE,West
+T3010,Product Kappa,1250,50,kappa@test.com,INACTIVE,Central

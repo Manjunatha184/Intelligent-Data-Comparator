@@ -11,6 +11,7 @@ from app.execution.models import (
 )
 
 from app.execution.spark_executor import SparkExecutor
+from app.execution.duckdb_executor import DuckDBExecutor
 
 
 # ============================================================
@@ -35,10 +36,14 @@ class ExecutionDispatcher:
         self.spark_executor = SparkExecutor(
             connector_manager=self.connector_manager
         )
+        self.duckdb_executor = DuckDBExecutor(
+            connector_manager=self.connector_manager
+        )
 
     def close(self) -> None:
         """Release resources owned by this plan-scoped dispatcher."""
         self.spark_executor.close()
+        self.duckdb_executor.close()
 
     # ========================================================
     # PUBLIC DISPATCH
@@ -54,7 +59,7 @@ class ExecutionDispatcher:
             timezone.utc
         )
 
-        execution_location = ExecutionLocation.SPARK
+        execution_location = self._resolve_execution_location(task)
 
         try:
 
@@ -101,12 +106,13 @@ class ExecutionDispatcher:
         execution_location: ExecutionLocation,
     ) -> Any:
 
-        if execution_location != ExecutionLocation.SPARK:
-            raise RuntimeError(
-                "Only Spark execution is supported."
-            )
-
-        return self._execute_spark(task)
+        if execution_location == ExecutionLocation.SPARK:
+            return self._execute_spark(task)
+        if execution_location == ExecutionLocation.DUCKDB:
+            return self._execute_duckdb(task)
+        raise RuntimeError(
+            f"Unsupported execution location: {execution_location.value}"
+        )
 
     # ========================================================
     # SPARK EXECUTION
@@ -118,6 +124,29 @@ class ExecutionDispatcher:
     ) -> Any:
 
         return self.spark_executor.execute(task)
+
+    def _execute_duckdb(
+        self,
+        task: ExecutionTask,
+    ) -> Any:
+        return self.duckdb_executor.execute(task)
+
+    @staticmethod
+    def _resolve_execution_location(
+        task: ExecutionTask,
+    ) -> ExecutionLocation:
+        value = task.configuration.get(
+            "execution_location",
+            ExecutionLocation.SPARK.value,
+        )
+        if isinstance(value, ExecutionLocation):
+            return value
+        try:
+            return ExecutionLocation(str(value).upper())
+        except ValueError as error:
+            raise RuntimeError(
+                f"Invalid execution location '{value}' for {task.task_id}"
+            ) from error
 
     # ========================================================
     # SUCCESS RESULT

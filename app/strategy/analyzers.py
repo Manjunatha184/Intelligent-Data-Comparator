@@ -111,6 +111,7 @@ class DatabricksDatasetAnalyzer(DatasetAnalyzer):
         properties: dict[str, Any],
     ) -> dict[str, Any]:
 
+        declared_row_count = properties.get("row_count")
         return {
             "connector_type": connector_type,
             "catalog": properties.get("catalog"),
@@ -130,10 +131,8 @@ class DatabricksDatasetAnalyzer(DatasetAnalyzer):
                     [],
                 )
             ),
-            "row_count": properties.get(
-                "row_count",
-                0,
-            ),
+            "row_count": declared_row_count,
+            "row_count_known": declared_row_count is not None,
         }
 
 

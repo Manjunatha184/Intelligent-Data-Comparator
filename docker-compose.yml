@@ -131,12 +131,24 @@ services:
       SPARK_EVIDENCE_LIMIT: ${SPARK_EVIDENCE_LIMIT:-100}
       SPARK_LOCAL_DIRS: /tmp/spark-local
 
+      # Route bounded CSV and Databricks comparisons to disk-backed DuckDB. A
+      # complete run stays on one engine so validation semantics stay aligned.
+      DUCKDB_EXECUTION_ENABLED: ${DUCKDB_EXECUTION_ENABLED:-true}
+      DUCKDB_MAX_ROWS: ${DUCKDB_MAX_ROWS:-1000000}
+      DUCKDB_MAX_INPUT_BYTES: ${DUCKDB_MAX_INPUT_BYTES:-1073741824}
+      DUCKDB_DATABRICKS_MAX_ROWS: ${DUCKDB_DATABRICKS_MAX_ROWS:-100000}
+      DUCKDB_DATABRICKS_CHUNK_SIZE: ${DUCKDB_DATABRICKS_CHUNK_SIZE:-1000}
+      DUCKDB_THREADS: ${DUCKDB_THREADS:-2}
+      DUCKDB_MEMORY_LIMIT: ${DUCKDB_MEMORY_LIMIT:-2GB}
+      DUCKDB_TEMP_ROOT: /tmp/duckdb-comparator
+
       GROQ_API_KEY: ${GROQ_API_KEY}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
 
     volumes:
       - .:/workspace:ro
       - spark_backend_tmp:/tmp/spark-local
+      - duckdb_backend_tmp:/tmp/duckdb-comparator
       - ./data:/app/data
 
     ports:
@@ -161,3 +173,4 @@ services:
 volumes:
   comparator_postgres_data:
   spark_backend_tmp:
+  duckdb_backend_tmp:

@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timezone
 
 from uuid import uuid4
@@ -27,10 +28,16 @@ from app.execution.models import (
 
 from app.strategy.analyzers import get_dataset_analyzer
 
+
+logger = logging.getLogger(__name__)
+
 class StrategyPlanner:
     """
     Builds the execution plan for a comparison run.
     """
+
+    def __init__(self, connector_manager=None) -> None:
+        self.connector_manager = connector_manager
 
     def analyze_inputs(
         self,
@@ -53,6 +60,19 @@ class StrategyPlanner:
         target_metadata = target_analyzer.analyze(
             configuration.target.connector_type,
             configuration.target.properties,
+        )
+
+        source_metadata = self._resolve_remote_row_count(
+            configuration.source.connector_type,
+            configuration.source.model_dump(mode="python"),
+            configuration.source_filters,
+            source_metadata,
+        )
+        target_metadata = self._resolve_remote_row_count(
+            configuration.target.connector_type,
+            configuration.target.model_dump(mode="python"),
+            configuration.target_filters,
+            target_metadata,
         )
 
         self._validate_filter_fields(
@@ -80,6 +100,39 @@ class StrategyPlanner:
             mappings=configuration.column_mappings,
             dq_rules=configuration.dq_rules,
         )
+
+    def _resolve_remote_row_count(
+        self,
+        connector_type,
+        dataset,
+        filters,
+        metadata,
+    ):
+        """Get an exact filtered count before routing remote data locally."""
+        if str(connector_type).lower() != "databricks":
+            return metadata
+        if self.connector_manager is None:
+            return metadata
+
+        try:
+            statistics = self.connector_manager.get_volume_statistics(
+                "databricks",
+                dataset,
+                business_keys=[],
+                filters=[item.model_dump(mode="python") for item in filters],
+            )
+        except Exception:
+            logger.warning(
+                "Unable to determine Databricks row count; routing to Spark",
+                exc_info=True,
+            )
+            metadata["row_count"] = None
+            metadata["row_count_known"] = False
+            return metadata
+
+        metadata["row_count"] = int(statistics.get("filtered_rows", 0))
+        metadata["row_count_known"] = True
+        return metadata
 
     @staticmethod
     def _validate_filter_fields(filters, columns, side):
@@ -151,11 +204,13 @@ class StrategyPlanner:
             "file_size_bytes", 0
         )
 
-        total_bytes = max(source_size, target_size)
+        total_bytes = source_size + target_size
 
-        # Spark is the sole execution engine. Dataset size affects Spark's
-        # partition tuning, never comparison semantics or engine selection.
-        execution_location = ExecutionLocation.SPARK
+        execution_location = self._choose_execution_location(
+            analysis,
+            total_rows=total_rows,
+            total_bytes=total_bytes,
+        )
 
         strategies = []
 
@@ -212,6 +267,61 @@ class StrategyPlanner:
             )
 
         return StrategyDecision(strategies=strategies)
+
+    @staticmethod
+    def _choose_execution_location(
+        analysis: InputAnalysis,
+        total_rows: int,
+        total_bytes: int,
+    ) -> ExecutionLocation:
+        """Route one complete comparison plan to a single execution engine."""
+        duckdb_enabled = os.getenv(
+            "DUCKDB_EXECUTION_ENABLED",
+            "true",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        if not duckdb_enabled:
+            return ExecutionLocation.SPARK
+
+        source_connector = str(
+            analysis.source_metadata.get("connector_type") or ""
+        ).lower()
+        target_connector = str(
+            analysis.target_metadata.get("connector_type") or ""
+        ).lower()
+        local_connectors = {"csv", "databricks"}
+        if (
+            source_connector not in local_connectors
+            or target_connector not in local_connectors
+        ):
+            return ExecutionLocation.SPARK
+
+        metadata_items = (
+            analysis.source_metadata,
+            analysis.target_metadata,
+        )
+        uses_databricks = "databricks" in {
+            source_connector,
+            target_connector,
+        }
+        if uses_databricks and any(
+            str(item.get("connector_type", "")).lower() == "databricks"
+            and not item.get("row_count_known", False)
+            for item in metadata_items
+        ):
+            return ExecutionLocation.SPARK
+
+        maximum_rows = int(os.getenv("DUCKDB_MAX_ROWS", "1000000"))
+        if uses_databricks:
+            maximum_rows = min(
+                maximum_rows,
+                int(os.getenv("DUCKDB_DATABRICKS_MAX_ROWS", "100000")),
+            )
+        maximum_bytes = int(
+            os.getenv("DUCKDB_MAX_INPUT_BYTES", str(1024 * 1024 * 1024))
+        )
+        if total_rows <= maximum_rows and total_bytes <= maximum_bytes:
+            return ExecutionLocation.DUCKDB
+        return ExecutionLocation.SPARK
 
     def build_execution_tasks(
         self,

@@ -32,7 +32,7 @@ class GroqL7Analyzer:
 
         self.model = os.getenv(
             "GROQ_MODEL",
-            "llama-3.3-70b-versatile",
+            "openai/gpt-oss-120b",
         )
 
     # ==========================================================
@@ -181,9 +181,8 @@ class GroqL7Analyzer:
         normalized[
             "cross_level_analysis"
         ] = self._normalize_correlations(
-            raw.get(
-                "cross_level_analysis"
-            )
+            raw.get("cross_level_analysis"),
+            evidence,
         )
 
         # These speculative sections are intentionally excluded from the
@@ -281,7 +280,7 @@ class GroqL7Analyzer:
     ) -> list[dict[str, Any]]:
 
         if not isinstance(value, list):
-            return []
+            return self._fallback_findings_from_evidence(evidence)
 
         result = []
 
@@ -317,7 +316,7 @@ class GroqL7Analyzer:
                 }
             )
 
-        return result
+        return result or self._fallback_findings_from_evidence(evidence)
 
     # ==========================================================
     # CORRELATIONS
@@ -326,13 +325,14 @@ class GroqL7Analyzer:
     def _normalize_correlations(
         self,
         value: Any,
+        evidence: dict[str, Any],
     ) -> list[dict[str, Any]]:
 
         if not isinstance(
             value,
             list,
         ):
-            return []
+            return self._fallback_correlations_from_evidence(evidence)
 
         result = []
 
@@ -369,6 +369,90 @@ class GroqL7Analyzer:
                         item.get(
                             "conclusion"
                         ),
+                        "Evidence indicates a relationship between validation levels.",
+                    ),
+                }
+            )
+
+        return result or self._fallback_correlations_from_evidence(evidence)
+
+    def _fallback_findings_from_evidence(
+        self,
+        evidence: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        validation_summary = {
+            item["level"]: item
+            for item in self._build_validation_from_evidence(evidence)
+            if item.get("level")
+        }
+        severity = self._severity_from_evidence(evidence)
+        findings = []
+
+        for index, level in enumerate(("L1", "L2", "L3", "L4", "L5", "L6"), start=1):
+            item = evidence.get("levels", {}).get(level)
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("status", "")).upper() != "FAIL":
+                continue
+
+            metrics = item.get("metrics", {})
+            derived_statistics = [
+                f"{key.replace('_', ' ')}: {value}"
+                for key, value in metrics.items()
+                if isinstance(value, (int, float, bool))
+            ][:4]
+            summary = validation_summary.get(level, {})
+
+            findings.append(
+                {
+                    "finding_id": f"AUTO-{index:03d}",
+                    "title": f"{level} {summary.get('name') or self._level_name(level)} validation failed",
+                    "category": "VALIDATION",
+                    "severity": severity,
+                    "observed_evidence": [
+                        summary.get("summary")
+                        or "This validation level reported one or more differences."
+                    ],
+                    "derived_statistics": derived_statistics,
+                    "likely_explanation": (
+                        "The sanitized validation evidence shows a measurable "
+                        "difference between the source and target datasets."
+                    ),
+                    "impact": (
+                        "This failed level should be reviewed before the "
+                        "comparison output is used for reporting or downstream "
+                        "processing."
+                    ),
+                    "recommended_actions": [],
+                    "related_levels": [level],
+                }
+            )
+
+        return findings
+
+    def _fallback_correlations_from_evidence(
+        self,
+        evidence: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        correlations = evidence.get("cross_level_correlations")
+        if not isinstance(correlations, list):
+            return []
+
+        result = []
+        for index, item in enumerate(correlations, start=1):
+            if not isinstance(item, dict):
+                continue
+            result.append(
+                {
+                    "correlation_id": f"EVIDENCE-{index:03d}",
+                    "title": self._string_value(
+                        item.get("title") or item.get("type"),
+                        f"Cross-level correlation {index}",
+                    ),
+                    "levels": self._normalize_levels(item.get("levels")),
+                    "evidence": self._correlation_evidence(item),
+                    "conclusion": self._string_value(
+                        item.get("conclusion") or item.get("interpretation"),
                         "Evidence indicates a relationship between validation levels.",
                     ),
                 }
