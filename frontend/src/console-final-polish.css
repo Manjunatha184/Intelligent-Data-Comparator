@@ -1,11 +1,7 @@
 /* Final console polish: comparison header consistency + targeted table scrolling. */
 
 @media (min-width: 900px) {
-  /* ========================================================
-     DETAILED COMPARISON RESULTS
-     Do not viewport-lock this page. Its accordion/evidence content must
-     retain natural height and remain fully visible.
-  ======================================================== */
+  /* Detailed comparison results must keep their natural content height. */
   .body:has(.resultsConsole) {
     height: auto !important;
     min-height: 100% !important;
@@ -13,34 +9,11 @@
     padding-bottom: 18px !important;
   }
 
-  .resultsConsole {
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-    display: block !important;
-  }
-
+  .resultsConsole,
   .resultsConsole > .resultsPage,
-  .resultsPage {
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-  }
-
-  .resultsPage > .resultLevelsClean {
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-  }
-
-  .resultLevelsClean > .resultLevelClean {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-    display: block !important;
-  }
-
+  .resultsPage,
+  .resultsPage > .resultLevelsClean,
+  .resultLevelsClean > .resultLevelClean,
   .resultLevelClean > .resultLevelContent {
     height: auto !important;
     min-height: 0 !important;
@@ -61,7 +34,6 @@
     overflow-y: visible !important;
   }
 
-  /* Detailed result header uses the same compact frosted shell as other pages. */
   .resultsPage > .wizardFooter {
     position: sticky !important;
     top: 0 !important;
@@ -107,51 +79,42 @@
     margin: 0 !important;
   }
 
-  /* ========================================================
-     RECENT COMPARISONS
-     Header/card/pagination stay fixed; only run rows scroll.
-  ======================================================== */
+  /* Recent comparisons: page/header/pagination stay put; only rows scroll. */
   .body:has(.recentComparisonsPage) {
-    height: 100% !important;
+    height: calc(100vh - 50px) !important;
     min-height: 0 !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
   .recentComparisonsPage {
     height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) !important;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 12px !important;
   }
 
   .recentComparisonsPage > .wizardFooter {
-    margin-bottom: 0 !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
   }
 
-  .recentComparisonsPage > .panel,
   .recentComparisonsPage > .recentComparisonsPanel {
-    min-height: 0 !important;
-    height: 100% !important;
+    flex: 1 1 auto !important;
+    height: auto !important;
+    min-height: 220px !important;
     overflow: hidden !important;
     margin: 0 !important;
+    padding: 0 !important;
     display: flex !important;
     flex-direction: column !important;
   }
 
-  .recentComparisonsPage > .panel > .panelBody,
-  .recentComparisonsPage > .panel > .panelContent,
-  .recentComparisonsPanel > .panelBody,
-  .recentComparisonsPanel > .panelContent {
-    flex: 1 1 0 !important;
-    min-height: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-  }
-
   .recentComparisonsTableShell {
-    height: 100% !important;
+    flex: 1 1 auto !important;
+    height: auto !important;
     min-height: 0 !important;
     overflow: hidden !important;
     display: flex !important;
@@ -159,9 +122,9 @@
   }
 
   .recentComparisonsRowsScroll {
-    flex: 1 1 0 !important;
-    min-height: 0 !important;
-    height: 0 !important;
+    flex: 1 1 auto !important;
+    height: auto !important;
+    min-height: 180px !important;
     overflow-y: auto !important;
     overflow-x: auto !important;
     overscroll-behavior: contain !important;
@@ -187,9 +150,7 @@
     border-top: 1px solid var(--border) !important;
   }
 
-  /* ========================================================
-     CREATE COMPARISON HEADER — same shell as all other pages
-  ======================================================== */
+  /* Create comparison header — same shell as all other pages. */
   .comparisonBuilder > .wizardHeader {
     position: sticky !important;
     top: 0 !important;
