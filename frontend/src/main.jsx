@@ -9,5 +9,6 @@ import App from "./App";
 import "./styles.css";
 import "./enterprise-theme.css";
 import "./comparison-reference.css";
+import "./page-header.css";
 
 createRoot(document.getElementById("root")).render(<App />);
