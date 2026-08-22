@@ -17,5 +17,6 @@ import "./comparison-final-fix.css";
 import "./console-pages.css";
 import "./console-final-polish.css";
 import "./results-horizontal-levels.css";
+import "./header-geometry-fix.css";
 
 createRoot(document.getElementById("root")).render(<App />);
