@@ -92,6 +92,13 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  useEffect(() => {
+    const isAnalysisUrl = /^\/results\/[^/]+\/analysis$/.test(window.location.pathname);
+    if (page !== "analysis" && isAnalysisUrl) {
+      window.history.replaceState(null, "", "/");
+    }
+  }, [page]);
+
   const [toast, setToast] = useState(null);
 
   function notify(message, type = "success") {
