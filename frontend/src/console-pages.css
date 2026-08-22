@@ -1,0 +1,276 @@
+/* Lumera fixed console pages: page chrome stays put, data rows scroll internally. */
+
+@media (min-width: 900px) {
+  /* The app shell already owns the viewport. These feature roots must not grow it. */
+  .body:has(.resultsConsole),
+  .body:has(.connectionManagerPage),
+  .body:has(.rulesRepositoryPage) {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding-bottom: 18px !important;
+    box-sizing: border-box !important;
+  }
+
+  .resultsConsole,
+  .connectionManagerPage,
+  .rulesRepositoryPage {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* ========================================================
+     RESULTS
+  ======================================================== */
+  .resultsConsole {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .resultsConsole > .runMetaStrip {
+    flex: 0 0 auto !important;
+  }
+
+  .resultsConsole > .resultsPage {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-columns: 245px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    grid-template-areas:
+      "head head"
+      "summary summary"
+      "stack evidence" !important;
+    gap: 10px !important;
+    align-items: stretch !important;
+  }
+
+  .resultsPage > .wizardFooter {
+    grid-area: head !important;
+    flex: 0 0 auto !important;
+  }
+
+  .resultsPage > .resultSummaryGrid {
+    grid-area: summary !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+  }
+
+  .resultsPage > .levelSummaryPanel {
+    grid-area: stack !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+  }
+
+  .levelSummaryPanel .levelSummaryHead {
+    flex: 0 0 auto !important;
+  }
+
+  .levelSummaryPanel .levelSummaryGrid {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .resultsPage > .resultLevelsClean {
+    grid-area: evidence !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+  }
+
+  /* Only the active level remains visible in the evidence pane. */
+  .resultsConsole.active-L1 .resultLevelsClean > .resultLevelClean:not(:nth-child(1)),
+  .resultsConsole.active-L2 .resultLevelsClean > .resultLevelClean:not(:nth-child(2)),
+  .resultsConsole.active-L3 .resultLevelsClean > .resultLevelClean:not(:nth-child(3)),
+  .resultsConsole.active-L4 .resultLevelsClean > .resultLevelClean:not(:nth-child(4)),
+  .resultsConsole.active-L5 .resultLevelsClean > .resultLevelClean:not(:nth-child(5)),
+  .resultsConsole.active-L6 .resultLevelsClean > .resultLevelClean:not(:nth-child(6)),
+  .resultsConsole.active-L7 .resultLevelsClean > .resultLevelClean:not(:nth-child(7)) {
+    display: none !important;
+  }
+
+  .resultLevelsClean > .resultLevelClean {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+  }
+
+  .resultLevelClean > .resultLevelHeader {
+    flex: 0 0 auto !important;
+  }
+
+  /* This is the one scrollable Results region. */
+  .resultLevelClean > .resultLevelContent {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  .resultLevelContent .evidenceSection,
+  .resultLevelContent .tableWrapper {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .resultLevelContent table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 4 !important;
+    background: #eef2ef !important;
+  }
+
+  /* ========================================================
+     CONNECTION MANAGER
+  ======================================================== */
+  .connectionManagerPage {
+    display: grid !important;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .connectionManagerPage > .wizardFooter,
+  .connectionManagerPage > .connectorCards {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+  }
+
+  .connectionManagerPage > .connectionListPanel {
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .connectionListPanel > .panelHead,
+  .connectionListPanel > .panelHeader {
+    flex: 0 0 auto !important;
+  }
+
+  .connectionListPanel > .panelBody,
+  .connectionListPanel > .panelContent {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .connectionListPanel .connectionTable {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .connectionListPanel .connectionTable > .thead {
+    flex: 0 0 auto !important;
+    position: relative !important;
+    z-index: 3 !important;
+    background: #eef2ef !important;
+  }
+
+  .connectionRowsScroll {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  /* ========================================================
+     RULE REPOSITORY
+  ======================================================== */
+  .rulesRepositoryPage {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .rulesRepositoryPage > .wizardFooter {
+    margin: 0 !important;
+  }
+
+  .rulesRepositoryPage > .rulesRepositorySections {
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+  }
+
+  .rulesRepositorySections > .ruleRepositorySection {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .ruleRepositorySection > .panelHead,
+  .ruleRepositorySection > .panelHeader {
+    flex: 0 0 auto !important;
+  }
+
+  .ruleRepositorySection > .panelBody,
+  .ruleRepositorySection > .panelContent {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Each rule card owns its own row scrollbar. */
+  .ruleRepositoryTable {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
+    border: 0 !important;
+  }
+
+  .ruleRepositoryTable .dataTable {
+    margin: 0 !important;
+  }
+
+  .ruleRepositoryTable .dataTable thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 4 !important;
+    background: #eef2ef !important;
+  }
+}
+
+@media (max-width: 899px) {
+  /* On small screens normal document scrolling is more usable. */
+  .connectionRowsScroll,
+  .ruleRepositoryTable,
+  .resultLevelContent {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+}
