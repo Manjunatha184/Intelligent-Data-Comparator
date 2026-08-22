@@ -7,6 +7,8 @@ import { COMPARISON_LEVELS, COMPARISON_LEVEL_ICONS, CONNECTORS } from "../../con
 import { defaultMappedPair, findSchemaColumn, getColumnType, getSchemaColumnNames, isNumericColumn, isNumericMapping, rowsEqual } from "../../utils/schema";
 import { normalizeAggregateRulePayload, normalizeDqRulePayload } from "../../utils/rules";
 
+const LOCAL_COMPARISON_DRAFT_KEY = "lumera.comparison.workspace.v1";
+
 /* ============================================================
    COMPARISON BUILDER
 ============================================================ */
@@ -21,6 +23,11 @@ export function ComparisonBuilder({
 }) {
   const [step, setStep] = useState(1);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [comparisonName, setComparisonName] = useState("");
+  const [configurationId, setConfigurationId] = useState(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
+  const [lastLocalSavedAt, setLastLocalSavedAt] = useState(null);
 
   const [sourceId, setSourceId] = useState("");
   const [targetId, setTargetId] = useState("");
@@ -64,6 +71,109 @@ export function ComparisonBuilder({
   const [targetFilters, setTargetFilters] = useState([]);
   const [ignoredSourceColumns, setIgnoredSourceColumns] = useState([]);
   const [ignoredTargetColumns, setIgnoredTargetColumns] = useState([]);
+
+  function workspaceSnapshot() {
+    return {
+      version: 1,
+      comparisonName,
+      configurationId,
+      step,
+      sourceId,
+      targetId,
+      sourceDbCatalog,
+      sourceDbSchema,
+      sourceDbTable,
+      targetDbCatalog,
+      targetDbSchema,
+      targetDbTable,
+      levels,
+      comparisonKeys,
+      groupingAttributes,
+      aggregationColumns,
+      selectedDqRuleIds,
+      selectedAggRuleIds,
+      columnMappings,
+      sourceFilters,
+      targetFilters,
+      ignoredSourceColumns,
+      ignoredTargetColumns,
+    };
+  }
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LOCAL_COMPARISON_DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        setComparisonName(draft.comparisonName || "");
+        setConfigurationId(draft.configurationId || null);
+        setStep(draft.step === 2 ? 2 : 1);
+        setSourceId(draft.sourceId ? String(draft.sourceId) : "");
+        setTargetId(draft.targetId ? String(draft.targetId) : "");
+        setSourceDbCatalog(draft.sourceDbCatalog || "");
+        setSourceDbSchema(draft.sourceDbSchema || "");
+        setSourceDbTable(draft.sourceDbTable || "");
+        setTargetDbCatalog(draft.targetDbCatalog || "");
+        setTargetDbSchema(draft.targetDbSchema || "");
+        setTargetDbTable(draft.targetDbTable || "");
+        setLevels(Array.isArray(draft.levels) ? draft.levels : []);
+        setComparisonKeys(Array.isArray(draft.comparisonKeys) && draft.comparisonKeys.length ? draft.comparisonKeys : [{ source_column: "", target_column: "" }]);
+        setGroupingAttributes(Array.isArray(draft.groupingAttributes) ? draft.groupingAttributes : []);
+        setAggregationColumns(Array.isArray(draft.aggregationColumns) ? draft.aggregationColumns : []);
+        setSelectedDqRuleIds(Array.isArray(draft.selectedDqRuleIds) ? draft.selectedDqRuleIds : []);
+        setSelectedAggRuleIds(Array.isArray(draft.selectedAggRuleIds) ? draft.selectedAggRuleIds : []);
+        setColumnMappings(Array.isArray(draft.columnMappings) ? draft.columnMappings : []);
+        setSourceFilters(Array.isArray(draft.sourceFilters) ? draft.sourceFilters : []);
+        setTargetFilters(Array.isArray(draft.targetFilters) ? draft.targetFilters : []);
+        setIgnoredSourceColumns(Array.isArray(draft.ignoredSourceColumns) ? draft.ignoredSourceColumns : []);
+        setIgnoredTargetColumns(Array.isArray(draft.ignoredTargetColumns) ? draft.ignoredTargetColumns : []);
+      }
+    } catch {
+      window.localStorage.removeItem(LOCAL_COMPARISON_DRAFT_KEY);
+    } finally {
+      setWorkspaceHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceHydrated) return;
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          LOCAL_COMPARISON_DRAFT_KEY,
+          JSON.stringify(workspaceSnapshot())
+        );
+        setLastLocalSavedAt(new Date().toISOString());
+      } catch {
+        // Local autosave is best-effort; explicit PostgreSQL draft save remains available.
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [
+    workspaceHydrated,
+    comparisonName,
+    configurationId,
+    step,
+    sourceId,
+    targetId,
+    sourceDbCatalog,
+    sourceDbSchema,
+    sourceDbTable,
+    targetDbCatalog,
+    targetDbSchema,
+    targetDbTable,
+    levels,
+    comparisonKeys,
+    groupingAttributes,
+    aggregationColumns,
+    selectedDqRuleIds,
+    selectedAggRuleIds,
+    columnMappings,
+    sourceFilters,
+    targetFilters,
+    ignoredSourceColumns,
+    ignoredTargetColumns,
+  ]);
 
   useEffect(() => {
     apiRequest("/rules").then(data => setAvailableRules(data || [])).catch(() => { });
@@ -110,6 +220,8 @@ export function ComparisonBuilder({
   }, [targetConnection, targetDbCatalog, targetDbSchema, targetDbTable, step]);
 
   useEffect(() => {
+    if (!Array.isArray(sourceSchema) || !Array.isArray(targetSchema)) return;
+
     const sourceColumns = getSchemaColumnNames(sourceSchema);
     const targetColumns = getSchemaColumnNames(targetSchema);
 
@@ -205,7 +317,49 @@ export function ComparisonBuilder({
     setLevels([]);
   }
 
+  async function saveDraft() {
+    const name = comparisonName.trim();
+    if (!name) {
+      notify("Enter a comparison name before saving the draft.", "error");
+      return;
+    }
+
+    setSavingDraft(true);
+    try {
+      const body = {
+        name,
+        status: "DRAFT",
+        configuration: {
+          _workspace: workspaceSnapshot(),
+        },
+      };
+
+      const result = configurationId
+        ? await apiRequest(`/configurations/${configurationId}`, {
+          method: "PUT",
+          body: JSON.stringify(body),
+        })
+        : await apiRequest("/configurations", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+
+      setConfigurationId(result.configuration_id);
+      notify(`Draft “${name}” saved.`);
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
   async function runComparison() {
+    const name = comparisonName.trim();
+    if (!name) {
+      notify("Enter a comparison name before running the comparison.", "error");
+      return;
+    }
+
     if (!source || !target) {
       notify("Select both source and target connections.", "error");
       setStep(1);
@@ -377,22 +531,35 @@ export function ComparisonBuilder({
     setRunning(true);
 
     try {
-      const configurationResult = await apiRequest(
-        "/configurations",
-        {
+      const persistedConfiguration = {
+        ...payload,
+        _workspace: workspaceSnapshot(),
+      };
+      const configurationBody = {
+        name,
+        status: "SAVED",
+        configuration: persistedConfiguration,
+      };
+
+      const configurationResult = configurationId
+        ? await apiRequest(`/configurations/${configurationId}`, {
+          method: "PUT",
+          body: JSON.stringify(configurationBody),
+        })
+        : await apiRequest("/configurations", {
           method: "POST",
-          body: JSON.stringify({ configuration: payload }),
-        }
-      );
+          body: JSON.stringify(configurationBody),
+        });
 
-      const configurationId = configurationResult.configuration_id;
+      const savedConfigurationId = configurationResult.configuration_id;
+      setConfigurationId(savedConfigurationId);
 
-      if (!configurationId) {
+      if (!savedConfigurationId) {
         throw new Error("Configuration was saved but no configuration ID was returned.");
       }
 
       const comparisonPayload = {
-        configuration_id: configurationId,
+        configuration_id: savedConfigurationId,
         ...payload,
       };
 
@@ -404,6 +571,7 @@ export function ComparisonBuilder({
         }
       );
 
+      window.localStorage.removeItem(LOCAL_COMPARISON_DRAFT_KEY);
       notify(`Comparison ${String(result.status).toLowerCase()}.`);
       onComplete(result.run_id);
     } catch (error) {
@@ -430,6 +598,11 @@ export function ComparisonBuilder({
         </div>
 
         <div className="actionRow wizardHeaderRight">
+          <button className="secondary" type="button" onClick={saveDraft} disabled={savingDraft || running}>
+            {savingDraft ? <Loader2 size={14} className="spin" /> : null}
+            Save draft
+          </button>
+
           {step > 1 && (
             <button className="secondary" onClick={() => setStep((current) => current - 1)}>
               Back
@@ -451,6 +624,23 @@ export function ComparisonBuilder({
               <ArrowRight size={15} />
             </button>
           )}
+        </div>
+      </div>
+
+      <div className="comparisonIdentityBar">
+        <label className="comparisonNameField">
+          <span>Comparison name <em>*</em></span>
+          <input
+            type="text"
+            value={comparisonName}
+            maxLength={120}
+            placeholder="e.g. Customer migration validation"
+            onChange={(event) => setComparisonName(event.target.value)}
+          />
+        </label>
+        <div className="comparisonDraftState">
+          {configurationId ? <span>Configuration #{configurationId}</span> : <span>New comparison</span>}
+          {lastLocalSavedAt && <small>Changes protected locally</small>}
         </div>
       </div>
 
@@ -548,6 +738,7 @@ export function ComparisonBuilder({
 
       {reviewModalOpen && (
         <ReviewModal
+          comparisonName={comparisonName}
           source={sourceConnection}
           target={targetConnection}
           levels={levels}
@@ -1494,6 +1685,7 @@ function FilterSection({ title, schema, filters, setFilters }) {
 ============================================================ */
 
 function ReviewModal({
+  comparisonName,
   source,
   target,
   levels,
@@ -1524,6 +1716,7 @@ function ReviewModal({
         <div className="modalBody stack">
           <div className="reviewGrid">
             <Panel title="Configuration summary">
+              <ReviewRow label="Name" value={comparisonName || "Untitled comparison"} />
               <ReviewRow label="Source" value={source?.name || "Not selected"} />
               <ReviewRow label="Target" value={target?.name || "Not selected"} />
               <ReviewRow label="Levels" value={levels.join(" · ")} />
