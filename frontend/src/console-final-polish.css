@@ -1,0 +1,167 @@
+/* Final console polish: real evidence scrolling + one shared page-header geometry. */
+
+@media (min-width: 900px) {
+  /* ========================================================
+     RESULTS — create a real constrained scroll viewport
+  ======================================================== */
+  .resultsPage > .resultLevelsClean {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .resultLevelsClean > .resultLevelClean {
+    flex: 1 1 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .resultLevelClean > .resultLevelHeader {
+    flex: 0 0 auto !important;
+    position: relative !important;
+    z-index: 5 !important;
+  }
+
+  .resultLevelClean > .resultLevelContent {
+    flex: 1 1 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .resultLevelContent > .detailsClean {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: min-content !important;
+    overflow: visible !important;
+  }
+
+  /* Let horizontal table overflow live inside the table wrapper while the
+     selected level body owns the vertical scrollbar. */
+  .resultLevelContent .evidenceTableWrap {
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .resultLevelContent .evidenceTableScroll {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+  }
+
+  .resultLevelContent .evidencePagination {
+    position: relative !important;
+    z-index: 2 !important;
+    background: #fbfcfb !important;
+  }
+
+  .resultLevelContent .evidenceTable thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 4 !important;
+    background: #eef2ef !important;
+  }
+
+  /* ========================================================
+     CREATE COMPARISON HEADER — same shell as all other pages
+  ======================================================== */
+  .comparisonBuilder > .wizardHeader {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 40 !important;
+    width: calc(100% + (var(--app-page-gutter) * 2)) !important;
+    min-height: 58px !important;
+    margin: 0 calc(var(--app-page-gutter) * -1) 4px !important;
+    padding: 9px var(--app-page-gutter) !important;
+    box-sizing: border-box !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 20px !important;
+
+    background: var(--page-header-bg) !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--page-header-border) !important;
+    box-shadow: 0 1px 0 rgba(19, 34, 29, 0.04) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(125%) !important;
+    backdrop-filter: blur(16px) saturate(125%) !important;
+  }
+
+  .comparisonBuilder > .wizardHeader .wizardHeaderLeft {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+
+  .comparisonBuilder > .wizardHeader .wizardHeaderRight {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    justify-self: auto !important;
+  }
+
+  /* Center the progress independently of title/action widths. */
+  .comparisonBuilder > .wizardHeader .wizardHeaderCenter {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    justify-self: auto !important;
+    pointer-events: none !important;
+  }
+
+  .comparisonBuilder > .wizardHeader .comparisonProgress {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+  }
+
+  .comparisonBuilder > .wizardHeader h1 {
+    margin: 0 !important;
+    color: var(--page-header-title) !important;
+    font-size: 20px !important;
+    line-height: 1.08 !important;
+    letter-spacing: -0.03em !important;
+  }
+
+  .comparisonBuilder > .wizardHeader .helper {
+    margin: 3px 0 0 !important;
+    color: var(--page-header-muted) !important;
+    font-size: 9px !important;
+    line-height: 1.25 !important;
+  }
+
+  .comparisonBuilder > .wizardHeader .primary,
+  .comparisonBuilder > .wizardHeader .secondary {
+    min-height: 32px !important;
+    height: 32px !important;
+    padding: 0 12px !important;
+    font-size: 9px !important;
+  }
+}
+
+@media (max-width: 1099px) {
+  .comparisonBuilder > .wizardHeader .wizardHeaderCenter {
+    display: none !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .resultLevelsClean > .resultLevelClean,
+  .resultLevelClean > .resultLevelContent {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
