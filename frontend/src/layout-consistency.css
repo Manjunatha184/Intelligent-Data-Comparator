@@ -66,7 +66,8 @@
 .scopeFirstPageExtras,
 .scopeFirstPageExtras .scopeFiltersGrid,
 .scopeFirstPageExtras .filterCard,
-.scopeFirstPageExtras .scopeRecordMatchingCard {
+.scopeFirstPageExtras .scopeRecordMatchingCard,
+.scopeIgnoredColumnsCard {
   max-width: none !important;
 }
 
@@ -80,9 +81,25 @@
 .grid2,
 .comparisonBuilder .scopeSourceSection,
 .comparisonBuilder .scopeLevelsPanel,
-.comparisonBuilder .scopeFirstPageExtras {
+.comparisonBuilder .scopeFirstPageExtras,
+.comparisonBuilder .scopeIgnoredColumnsCard {
   margin-left: 0 !important;
   margin-right: 0 !important;
+}
+
+/* Ignored columns is the full-width finishing row of Define scope. */
+.comparisonBuilder .scopeIgnoredColumnsCard {
+  width: 100% !important;
+}
+
+.comparisonBuilder .scopeIgnoredColumnsCard .formGrid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: var(--app-page-gap) !important;
+}
+
+.comparisonBuilder .scopeIgnoredColumnsCard .mappingPickerBlock {
+  min-width: 0 !important;
 }
 
 /* Do not let comparison-specific styles create extra side indentation. */
@@ -101,5 +118,9 @@
 @media (max-width: 720px) {
   :root {
     --app-page-gutter: 14px;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard .formGrid {
+    grid-template-columns: 1fr !important;
   }
 }
