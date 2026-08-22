@@ -43,7 +43,7 @@ function AnalysisPage({ runId, onBack, notify }) {
   );
 
   return (
-    <div className="resultsPage" style={{ overflowY: "auto", height: "100%" }}>
+    <div className="resultsPage analysisResultsPage">
       <L7AnalysisReportView
         report={data.analysis}
         runId={runId}
@@ -311,28 +311,30 @@ function TopNav({ onOpenRun, notify }) {
         <div className="brandDivider">|</div>
         <div className="brandApp">VALIDATION<br/>CONSOLE</div>
       </div>
-      <div className="topnavSearch">
-        <Search size={14} />
-        <input
-          value={query}
-          onChange={(event) => searchComparisons(event.target.value)}
-          onFocus={() => query.trim() && setOpen(true)}
-          placeholder="Search comparison name or Run ID"
-          aria-label="Search comparisons"
-        />
-        {searching && <span className="topnavSearchBusy">…</span>}
-        {open && (
-          <div className="topnavSearchResults">
-            {results.length ? results.map((result) => (
-              <button key={result.run_id} type="button" onMouseDown={() => chooseResult(result.run_id)}>
-                <span><b>{result.comparisonName}</b><small>{result.run_id}</small></span>
-                <StatusDot value={result.comparison_status || result.status} />
-              </button>
-            )) : (
-              <div className="topnavSearchEmpty">No matching comparison runs</div>
-            )}
-          </div>
-        )}
+      <div className="topnavSearchSlot">
+        <div className="topnavSearch">
+          <Search size={13} />
+          <input
+            value={query}
+            onChange={(event) => searchComparisons(event.target.value)}
+            onFocus={() => query.trim() && setOpen(true)}
+            placeholder="Search comparison name or Run ID"
+            aria-label="Search comparisons"
+          />
+          {searching && <span className="topnavSearchBusy">…</span>}
+          {open && (
+            <div className="topnavSearchResults">
+              {results.length ? results.map((result) => (
+                <button key={result.run_id} type="button" onMouseDown={() => chooseResult(result.run_id)}>
+                  <span><b>{result.comparisonName}</b><small>{result.run_id}</small></span>
+                  <StatusDot value={result.comparison_status || result.status} />
+                </button>
+              )) : (
+                <div className="topnavSearchEmpty">No matching comparison runs</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       <div className="topnavRight">
         <span className="workspaceLabel">workspace / prod-data</span>
@@ -356,7 +358,6 @@ function Sidebar({ page, setPage, onOpenResultsHistory }) {
       <div className="workspace">CONFIGURATION</div>
       <NavigationItem icon={Link2} label="Connection Manager" active={page === "connections"} onClick={() => setPage("connections")} />
       <NavigationItem icon={SlidersHorizontal} label="Rule Repository" active={page === "rules"} onClick={() => setPage("rules")} />
-      <div className="sidebarBottom"><div className="apiState"><i /><div><b>Backend online</b><span>FastAPI · :8000</span></div></div></div>
     </aside>
   );
 }
