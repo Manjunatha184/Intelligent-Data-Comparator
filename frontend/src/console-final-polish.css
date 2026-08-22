@@ -1,247 +1,132 @@
 /* Final console polish: comparison header consistency + targeted table scrolling. */
 
+/* Global comparison search: centered, themed, and contained. */
+.topnav { position: relative !important; }
+.topnavSearch {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, 38vw);
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  background: #14221e;
+  border: 1px solid #33443e;
+  z-index: 80;
+}
+.topnavSearch:focus-within { border-color: #e8aa22; box-shadow: 0 0 0 1px rgba(232,170,34,.16); }
+.topnavSearch > svg { flex: 0 0 auto; color: #81918a; }
+.topnavSearch input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: #eef3f0 !important;
+  font: inherit;
+  font-size: 10px;
+  box-shadow: none !important;
+}
+.topnavSearch input::placeholder { color: #7f8f88; opacity: 1; }
+.topnavSearchBusy { color: #e8aa22; font-weight: 800; }
+.topnavSearchResults {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  right: 0;
+  max-height: 330px;
+  overflow-y: auto;
+  padding: 5px;
+  background: #0e1a16;
+  border: 1px solid #33443e;
+  box-shadow: 0 14px 30px rgba(0,0,0,.3);
+  z-index: 120;
+}
+.topnavSearchResults button {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid #263630;
+  background: transparent;
+  color: #edf3ef;
+  text-align: left;
+  cursor: pointer;
+}
+.topnavSearchResults button:last-child { border-bottom: 0; }
+.topnavSearchResults button:hover { background: #1a2b25; }
+.topnavSearchResults button > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.topnavSearchResults b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.topnavSearchResults small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #82928b; font-size: 8px; }
+.topnavSearchEmpty { padding: 14px 12px; color: #82928b; font-size: 9px; text-align: center; }
+.globalSearchStatus { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #7c8984; }
+.globalSearchStatus.pass, .globalSearchStatus.completed, .globalSearchStatus.success { background: #32b879; }
+.globalSearchStatus.fail, .globalSearchStatus.failed, .globalSearchStatus.error { background: #e35c60; }
+.globalSearchStatus.running, .globalSearchStatus.pending { background: #e8aa22; }
+
+/* Compact filter controls inside Recent Comparisons table headers. */
+.historyHeaderFilter { display: inline-flex; align-items: center; gap: 5px; }
+.historyFilterSelectWrap { position: relative; display: inline-flex; align-items: center; }
+.historyFilterSelectWrap select {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  cursor: pointer;
+}
+.historyFilterSelectWrap > svg { color: #66756f; pointer-events: none; }
+
 @media (min-width: 900px) {
-  /* Detailed comparison results must keep their natural content height. */
-  .body:has(.resultsConsole) {
-    height: auto !important;
-    min-height: 100% !important;
-    overflow: visible !important;
-    padding-bottom: 18px !important;
-  }
+  .body:has(.resultsConsole) { height: auto !important; min-height: 100% !important; overflow: visible !important; padding-bottom: 18px !important; }
+  .resultsConsole, .resultsConsole > .resultsPage, .resultsPage, .resultsPage > .resultLevelsClean, .resultLevelsClean > .resultLevelClean, .resultLevelClean > .resultLevelContent { height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; }
+  .resultLevelContent .evidenceTableWrap { width: 100% !important; min-width: 0 !important; overflow: visible !important; }
+  .resultLevelContent .evidenceTableScroll { width: 100% !important; max-width: 100% !important; overflow-x: auto !important; overflow-y: visible !important; }
+  .resultsPage > .wizardFooter { position: sticky !important; top: 0 !important; z-index: 40 !important; min-height: 58px !important; margin: 0 0 10px !important; padding: 9px 16px !important; box-sizing: border-box !important; display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 18px !important; background: var(--page-header-bg) !important; border: 0 !important; border-bottom: 1px solid var(--page-header-border) !important; box-shadow: 0 1px 0 rgba(19,34,29,.04) !important; backdrop-filter: blur(16px) saturate(125%) !important; }
+  .resultsPage > .wizardFooter .pageTitle { min-width: 0 !important; margin: 0 !important; color: var(--page-header-title) !important; font-size: 20px !important; line-height: 1.08 !important; letter-spacing: -.03em !important; white-space: nowrap !important; }
+  .resultsPage > .wizardFooter .runIdText { display: inline-block !important; max-width: 330px !important; overflow: hidden !important; text-overflow: ellipsis !important; vertical-align: bottom !important; white-space: nowrap !important; }
+  .resultsPage > .wizardFooter .actionRow { flex: 0 0 auto !important; flex-wrap: nowrap !important; margin: 0 !important; }
 
-  .resultsConsole,
-  .resultsConsole > .resultsPage,
-  .resultsPage,
-  .resultsPage > .resultLevelsClean,
-  .resultLevelsClean > .resultLevelClean,
-  .resultLevelClean > .resultLevelContent {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
+  .body:has(.recentComparisonsPage) { height: calc(100vh - 50px) !important; min-height: 0 !important; overflow: hidden !important; box-sizing: border-box !important; }
+  .recentComparisonsPage { height: 100% !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; gap: 12px !important; }
+  .recentComparisonsPage > .wizardFooter { flex: 0 0 auto !important; margin: 0 !important; }
+  .recentComparisonsPage > .recentComparisonsPanel { flex: 1 1 auto !important; height: auto !important; min-height: 220px !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: column !important; }
+  .recentComparisonsTableShell { flex: 1 1 auto !important; height: auto !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+  .recentComparisonsRowsScroll { flex: 1 1 auto !important; height: auto !important; min-height: 180px !important; overflow-y: auto !important; overflow-x: auto !important; overscroll-behavior: contain !important; scrollbar-gutter: stable !important; }
+  .recentComparisonsTable { width: 100% !important; margin: 0 !important; }
+  .recentComparisonsTable thead th { position: sticky !important; top: 0 !important; z-index: 5 !important; background: #eef2ef !important; }
+  .recentComparisonsPagination { flex: 0 0 auto !important; margin: 0 !important; background: #fbfcfb !important; border-top: 1px solid var(--border) !important; }
 
-  .resultLevelContent .evidenceTableWrap {
-    width: 100% !important;
-    min-width: 0 !important;
-    overflow: visible !important;
-  }
-
-  .resultLevelContent .evidenceTableScroll {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: auto !important;
-    overflow-y: visible !important;
-  }
-
-  .resultsPage > .wizardFooter {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 40 !important;
-    min-height: 58px !important;
-    margin: 0 0 10px !important;
-    padding: 9px 16px !important;
-    box-sizing: border-box !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 18px !important;
-    background: var(--page-header-bg) !important;
-    border: 0 !important;
-    border-bottom: 1px solid var(--page-header-border) !important;
-    box-shadow: 0 1px 0 rgba(19, 34, 29, 0.04) !important;
-    -webkit-backdrop-filter: blur(16px) saturate(125%) !important;
-    backdrop-filter: blur(16px) saturate(125%) !important;
-  }
-
-  .resultsPage > .wizardFooter .pageTitle {
-    min-width: 0 !important;
-    margin: 0 !important;
-    color: var(--page-header-title) !important;
-    font-size: 20px !important;
-    line-height: 1.08 !important;
-    letter-spacing: -0.03em !important;
-    white-space: nowrap !important;
-  }
-
-  .resultsPage > .wizardFooter .runIdText {
-    display: inline-block !important;
-    max-width: 330px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    vertical-align: bottom !important;
-    white-space: nowrap !important;
-  }
-
-  .resultsPage > .wizardFooter .actionRow {
-    flex: 0 0 auto !important;
-    flex-wrap: nowrap !important;
-    margin: 0 !important;
-  }
-
-  /* Recent comparisons: page/header/pagination stay put; only rows scroll. */
-  .body:has(.recentComparisonsPage) {
-    height: calc(100vh - 50px) !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-  }
-
-  .recentComparisonsPage {
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 12px !important;
-  }
-
-  .recentComparisonsPage > .wizardFooter {
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-  }
-
-  .recentComparisonsPage > .recentComparisonsPanel {
-    flex: 1 1 auto !important;
-    height: auto !important;
-    min-height: 220px !important;
-    overflow: hidden !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .recentComparisonsTableShell {
-    flex: 1 1 auto !important;
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .recentComparisonsRowsScroll {
-    flex: 1 1 auto !important;
-    height: auto !important;
-    min-height: 180px !important;
-    overflow-y: auto !important;
-    overflow-x: auto !important;
-    overscroll-behavior: contain !important;
-    scrollbar-gutter: stable !important;
-  }
-
-  .recentComparisonsTable {
-    width: 100% !important;
-    margin: 0 !important;
-  }
-
-  .recentComparisonsTable thead th {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 5 !important;
-    background: #eef2ef !important;
-  }
-
-  .recentComparisonsPagination {
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-    background: #fbfcfb !important;
-    border-top: 1px solid var(--border) !important;
-  }
-
-  /* Create comparison header — same shell as all other pages. */
-  .comparisonBuilder > .wizardHeader {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 40 !important;
-    width: calc(100% + (var(--app-page-gutter) * 2)) !important;
-    min-height: 58px !important;
-    margin: 0 calc(var(--app-page-gutter) * -1) 4px !important;
-    padding: 9px var(--app-page-gutter) !important;
-    box-sizing: border-box !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 20px !important;
-    background: var(--page-header-bg) !important;
-    border: 0 !important;
-    border-bottom: 1px solid var(--page-header-border) !important;
-    box-shadow: 0 1px 0 rgba(19, 34, 29, 0.04) !important;
-    -webkit-backdrop-filter: blur(16px) saturate(125%) !important;
-    backdrop-filter: blur(16px) saturate(125%) !important;
-  }
-
-  .comparisonBuilder > .wizardHeader .wizardHeaderLeft {
-    flex: 1 1 0 !important;
-    min-width: 0 !important;
-  }
-
-  .comparisonBuilder > .wizardHeader .wizardHeaderRight {
-    flex: 1 1 0 !important;
-    min-width: 0 !important;
-    display: flex !important;
-    justify-content: flex-end !important;
-    justify-self: auto !important;
-  }
-
-  .comparisonBuilder > .wizardHeader .wizardHeaderCenter {
-    position: absolute !important;
-    left: 50% !important;
-    top: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    justify-self: auto !important;
-    pointer-events: none !important;
-  }
-
-  .comparisonBuilder > .wizardHeader .comparisonProgress {
-    display: flex !important;
-    align-items: center !important;
-    gap: 9px !important;
-  }
-
-  .comparisonBuilder > .wizardHeader h1 {
-    margin: 0 !important;
-    color: var(--page-header-title) !important;
-    font-size: 20px !important;
-    line-height: 1.08 !important;
-    letter-spacing: -0.03em !important;
-  }
-
-  .comparisonBuilder > .wizardHeader .helper {
-    margin: 3px 0 0 !important;
-    color: var(--page-header-muted) !important;
-    font-size: 9px !important;
-    line-height: 1.25 !important;
-  }
-
-  .comparisonBuilder > .wizardHeader .primary,
-  .comparisonBuilder > .wizardHeader .secondary {
-    min-height: 32px !important;
-    height: 32px !important;
-    padding: 0 12px !important;
-    font-size: 9px !important;
-  }
+  .comparisonBuilder > .wizardHeader { position: sticky !important; top: 0 !important; z-index: 40 !important; width: calc(100% + (var(--app-page-gutter) * 2)) !important; min-height: 58px !important; margin: 0 calc(var(--app-page-gutter) * -1) 4px !important; padding: 9px var(--app-page-gutter) !important; box-sizing: border-box !important; display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 20px !important; background: var(--page-header-bg) !important; border: 0 !important; border-bottom: 1px solid var(--page-header-border) !important; box-shadow: 0 1px 0 rgba(19,34,29,.04) !important; backdrop-filter: blur(16px) saturate(125%) !important; }
+  .comparisonBuilder > .wizardHeader .wizardHeaderLeft { flex: 1 1 0 !important; min-width: 0 !important; }
+  .comparisonBuilder > .wizardHeader .wizardHeaderRight { flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; justify-content: flex-end !important; justify-self: auto !important; }
+  .comparisonBuilder > .wizardHeader .wizardHeaderCenter { position: absolute !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; justify-self: auto !important; pointer-events: none !important; }
+  .comparisonBuilder > .wizardHeader .comparisonProgress { display: flex !important; align-items: center !important; gap: 9px !important; }
+  .comparisonBuilder > .wizardHeader h1 { margin: 0 !important; color: var(--page-header-title) !important; font-size: 20px !important; line-height: 1.08 !important; letter-spacing: -.03em !important; }
+  .comparisonBuilder > .wizardHeader .helper { margin: 3px 0 0 !important; color: var(--page-header-muted) !important; font-size: 9px !important; line-height: 1.25 !important; }
+  .comparisonBuilder > .wizardHeader .primary, .comparisonBuilder > .wizardHeader .secondary { min-height: 32px !important; height: 32px !important; padding: 0 12px !important; font-size: 9px !important; }
 }
 
 @media (max-width: 1099px) {
-  .comparisonBuilder > .wizardHeader .wizardHeaderCenter {
-    display: none !important;
-  }
-
-  .resultsPage > .wizardFooter .runIdText {
-    max-width: 190px !important;
-  }
+  .topnavSearch { width: min(360px, 36vw); }
+  .comparisonBuilder > .wizardHeader .wizardHeaderCenter { display: none !important; }
+  .resultsPage > .wizardFooter .runIdText { max-width: 190px !important; }
 }
 
 @media (max-width: 899px) {
-  .recentComparisonsPage,
-  .recentComparisonsRowsScroll,
-  .resultsPage,
-  .resultLevelsClean > .resultLevelClean,
-  .resultLevelClean > .resultLevelContent {
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
+  .topnavSearch { display: none; }
+  .recentComparisonsPage, .recentComparisonsRowsScroll, .resultsPage, .resultLevelsClean > .resultLevelClean, .resultLevelClean > .resultLevelContent { height: auto !important; max-height: none !important; overflow: visible !important; }
 }
