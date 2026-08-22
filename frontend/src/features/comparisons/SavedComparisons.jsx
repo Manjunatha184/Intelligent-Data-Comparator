@@ -5,6 +5,7 @@ import { apiRequest } from "../../api/client";
 import { Empty, Loading, Panel } from "../../components/ui";
 
 const LOCAL_COMPARISON_DRAFT_KEY = "lumera.comparison.workspace.v1";
+const PAGE_SIZE = 12;
 
 function formatTimestamp(value) {
   if (!value) return "—";
@@ -80,12 +81,14 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
   const [loading, setLoading] = useState(false);
   const [rerunningId, setRerunningId] = useState(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   async function loadConfigurations() {
     setLoading(true);
     try {
       const data = await apiRequest("/configurations");
       setItems(Array.isArray(data) ? data : []);
+      setPage(1);
     } catch (error) {
       notify(error.message, "error");
       setItems([]);
@@ -98,6 +101,10 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
     loadConfigurations();
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
   const visibleItems = useMemo(() => {
     const needle = search.trim().toLowerCase();
     if (!needle) return items;
@@ -106,6 +113,10 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
       String(item.configuration_id || "").includes(needle)
     );
   }, [items, search]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleItems.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = visibleItems.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function editConfiguration(item) {
     const configuration = item.configuration || {};
@@ -188,49 +199,42 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
             text={search ? "Try another comparison name or configuration ID." : "Create or save a draft to see it here."}
           />
         ) : (
-          <div className="savedComparisonsTableWrap">
-            <table className="dataTable savedComparisonsTable">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Status</th>
-                  <th>Source</th>
-                  <th>Target</th>
-                  <th>Updated</th>
-                  <th>Config ID</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleItems.map((item) => (
-                  <tr key={item.configuration_id}>
-                    <td><b>{item.name || `Comparison ${item.configuration_id}`}</b></td>
-                    <td><span className={`configurationState ${String(item.status).toLowerCase()}`}>{item.status}</span></td>
-                    <td title={sourceLabel(item.configuration)}>{sourceLabel(item.configuration)}</td>
-                    <td title={targetLabel(item.configuration)}>{targetLabel(item.configuration)}</td>
-                    <td>{formatTimestamp(item.updated_at)}</td>
-                    <td><code>#{item.configuration_id}</code></td>
-                    <td>
-                      <div className="savedComparisonActions">
-                        <button type="button" className="secondary small" onClick={() => editConfiguration(item)}>
-                          <Edit3 size={13} /> Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="primary small"
-                          disabled={item.status !== "SAVED" || rerunningId === item.configuration_id}
-                          onClick={() => rerunConfiguration(item)}
-                          title={item.status === "DRAFT" ? "Complete this draft before running" : "Run this saved configuration again"}
-                        >
-                          {rerunningId === item.configuration_id ? <Loader2 size={13} className="spin" /> : <Play size={13} />}
-                          Rerun
-                        </button>
-                      </div>
-                    </td>
+          <div className="savedComparisonsTableShell">
+            <div className="savedComparisonsTableWrap">
+              <table className="dataTable savedComparisonsTable">
+                <thead>
+                  <tr>
+                    <th>Name</th><th>Status</th><th>Source</th><th>Target</th><th>Updated</th><th>Config ID</th><th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pageItems.map((item) => (
+                    <tr key={item.configuration_id}>
+                      <td><b>{item.name || `Comparison ${item.configuration_id}`}</b></td>
+                      <td><span className={`configurationState ${String(item.status).toLowerCase()}`}>{item.status}</span></td>
+                      <td title={sourceLabel(item.configuration)}>{sourceLabel(item.configuration)}</td>
+                      <td title={targetLabel(item.configuration)}>{targetLabel(item.configuration)}</td>
+                      <td>{formatTimestamp(item.updated_at)}</td>
+                      <td><code>#{item.configuration_id}</code></td>
+                      <td><div className="savedComparisonActions">
+                        <button type="button" className="secondary small" onClick={() => editConfiguration(item)}><Edit3 size={13} /> Edit</button>
+                        <button type="button" className="primary small" disabled={item.status !== "SAVED" || rerunningId === item.configuration_id} onClick={() => rerunConfiguration(item)} title={item.status === "DRAFT" ? "Complete this draft before running" : "Run this saved configuration again"}>
+                          {rerunningId === item.configuration_id ? <Loader2 size={13} className="spin" /> : <Play size={13} />} Rerun
+                        </button>
+                      </div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="tablePagination savedComparisonsPagination">
+              <span>Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, visibleItems.length)} of {visibleItems.length} configurations</span>
+              {totalPages > 1 && <div className="tablePaginationActions">
+                <button type="button" className="pageBtn" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>Previous</button>
+                <span>Page {safePage} of {totalPages}</span>
+                <button type="button" className="pageBtn" disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)}>Next</button>
+              </div>}
+            </div>
           </div>
         )}
       </Panel>
