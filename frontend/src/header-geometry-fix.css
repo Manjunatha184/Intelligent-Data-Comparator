@@ -1,0 +1,193 @@
+/* One final header geometry for all Lumera feature pages. */
+
+:root {
+  --app-page-gutter: 30px;
+  --app-header-height: 58px;
+}
+
+/* Width must include padding; otherwise 100% + body padding overflows right. */
+.main > .body {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Feature roots must not introduce a second horizontal gutter. */
+.historyPage,
+.recentComparisonsPage,
+.connectionManagerPage,
+.rulesRepositoryPage,
+.comparisonBuilder,
+.resultsConsole {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Shared edge-to-edge page header shell. */
+.historyPage > .wizardFooter,
+.recentComparisonsPage > .wizardFooter,
+.connectionManagerPage > .wizardFooter,
+.rulesRepositoryPage > .wizardFooter,
+.body > .stack > .wizardFooter,
+.comparisonBuilder > .wizardHeader {
+  box-sizing: border-box !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 40 !important;
+
+  width: calc(100% + (var(--app-page-gutter) * 2)) !important;
+  max-width: none !important;
+  min-height: var(--app-header-height) !important;
+  height: var(--app-header-height) !important;
+
+  margin-top: 0 !important;
+  margin-left: calc(var(--app-page-gutter) * -1) !important;
+  margin-right: calc(var(--app-page-gutter) * -1) !important;
+  margin-bottom: 4px !important;
+
+  padding: 0 var(--app-page-gutter) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 18px !important;
+
+  background: var(--page-header-bg) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--page-header-border) !important;
+  box-shadow: 0 1px 0 rgba(19, 34, 29, 0.04) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(125%) !important;
+  backdrop-filter: blur(16px) saturate(125%) !important;
+  overflow: visible !important;
+}
+
+/* Keep every title on the exact same left edge and scale. */
+.historyPage > .wizardFooter .pageTitle,
+.recentComparisonsPage > .wizardFooter .pageTitle,
+.connectionManagerPage > .wizardFooter .pageTitle,
+.rulesRepositoryPage > .wizardFooter .pageTitle,
+.body > .stack > .wizardFooter .pageTitle,
+.comparisonBuilder > .wizardHeader h1 {
+  margin: 0 !important;
+  color: var(--page-header-title) !important;
+  font-size: 20px !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* Header actions may shrink internally, but can never escape the viewport. */
+.historyPage > .wizardFooter > button,
+.recentComparisonsPage > .wizardFooter > button,
+.connectionManagerPage > .wizardFooter .actionRow,
+.rulesRepositoryPage > .wizardFooter .actionRow,
+.body > .stack > .wizardFooter .actionRow,
+.comparisonBuilder > .wizardHeader .wizardHeaderRight {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  max-width: 48% !important;
+}
+
+.historyPage > .wizardFooter button,
+.recentComparisonsPage > .wizardFooter button,
+.connectionManagerPage > .wizardFooter button,
+.rulesRepositoryPage > .wizardFooter button,
+.body > .stack > .wizardFooter button,
+.comparisonBuilder > .wizardHeader button {
+  box-sizing: border-box !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+}
+
+/* Comparison uses the same shell; only its progress is overlaid in the center. */
+.comparisonBuilder > .wizardHeader {
+  position: sticky !important;
+  display: flex !important;
+}
+
+.comparisonBuilder > .wizardHeader .wizardHeaderLeft {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+
+.comparisonBuilder > .wizardHeader .wizardHeaderLeft .helper {
+  margin: 3px 0 0 !important;
+  color: var(--page-header-muted) !important;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+}
+
+.comparisonBuilder > .wizardHeader .wizardHeaderCenter {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  display: block !important;
+  width: auto !important;
+  pointer-events: none !important;
+}
+
+.comparisonBuilder > .wizardHeader .comparisonProgress {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  min-width: 0 !important;
+}
+
+.comparisonBuilder > .wizardHeader .wizardHeaderRight {
+  flex: 1 1 0 !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+}
+
+/* Recent comparisons specifically had a nested-width drift. */
+.recentComparisonsPage > .wizardFooter {
+  align-self: stretch !important;
+}
+
+.recentComparisonsPage > .wizardFooter .pageTitle {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.recentComparisonsPage > .wizardFooter > button {
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+}
+
+@media (max-width: 1099px) {
+  :root {
+    --app-page-gutter: 20px;
+  }
+
+  .comparisonBuilder > .wizardHeader .wizardHeaderCenter {
+    display: none !important;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --app-page-gutter: 14px;
+  }
+
+  .historyPage > .wizardFooter,
+  .recentComparisonsPage > .wizardFooter,
+  .connectionManagerPage > .wizardFooter,
+  .rulesRepositoryPage > .wizardFooter,
+  .body > .stack > .wizardFooter,
+  .comparisonBuilder > .wizardHeader {
+    position: relative !important;
+    height: auto !important;
+    min-height: var(--app-header-height) !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+}
