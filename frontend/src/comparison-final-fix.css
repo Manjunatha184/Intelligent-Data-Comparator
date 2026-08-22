@@ -1,0 +1,214 @@
+/* Final comparison layout corrections. Presentation only. */
+
+/* Ignored Columns is near the bottom of Step 1, so its menu opens upward. */
+.comparisonBuilder .scopeIgnoredColumnsCard,
+.comparisonBuilder .scopeIgnoredColumnsCard .mappingPickerBlock,
+.comparisonBuilder .scopeIgnoredColumnsCard .multiSelectField {
+  overflow: visible !important;
+}
+
+.comparisonBuilder .scopeIgnoredColumnsCard .multiSelectField {
+  position: relative !important;
+}
+
+.comparisonBuilder .scopeIgnoredColumnsCard .multiSelectMenu {
+  top: auto !important;
+  bottom: calc(100% + 4px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 220 !important;
+  max-height: 220px !important;
+  overflow-y: auto !important;
+  transform: none !important;
+}
+
+@media (min-width: 1100px) {
+  /* Keep Step 2 on exactly the same horizontal rhythm as Step 1. */
+  .comparisonBuilder .reviewRunStep {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+
+  .comparisonBuilder .reviewRunStep > .reviewRunSummaryGrid {
+    display: contents !important;
+  }
+
+  /* Column Mapping */
+  .comparisonBuilder .reviewRunSummaryGrid > :first-child {
+    grid-column: 1 / -1 !important;
+    order: 1 !important;
+  }
+
+  /* Group reconciliation */
+  .comparisonBuilder .reviewRunStep > .reconciliationCard {
+    grid-column: 1 / -1 !important;
+    order: 2 !important;
+  }
+
+  /* DQ + Aggregate */
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(2),
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(3) {
+    order: 3 !important;
+    height: 100% !important;
+    min-height: 96px !important;
+  }
+
+  /* Every Step-2 panel uses one continuous card shell. */
+  .comparisonBuilder .reviewRunStep .reviewRunCard {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fbfcfb !important;
+    border: 1px solid #c7d0cc !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  .comparisonBuilder .reviewRunStep .reviewRunCard > .panelHead {
+    width: 100% !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #fbfcfb !important;
+    border: 0 !important;
+    border-bottom: 1px solid #d9e0dc !important;
+  }
+
+  .comparisonBuilder .reviewRunStep .reviewRunCard > .panelHead h3 {
+    margin: 0 !important;
+    color: #192823 !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+  }
+
+  /* Remove the rounded floating boxes inside Group Reconciliation. */
+  .comparisonBuilder .reconciliationCard .reconciliationSection {
+    margin: 0 !important;
+    padding: 12px 14px !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e0e6e3 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .comparisonBuilder .reconciliationCard .reconciliationSection:last-of-type {
+    border-bottom: 0 !important;
+  }
+
+  .comparisonBuilder .reconciliationCard .reconciliationSection h4 {
+    margin: 0 0 8px !important;
+    font-size: 10px !important;
+    color: #192823 !important;
+  }
+
+  .comparisonBuilder .reconciliationCard .formGrid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    width: 100% !important;
+  }
+
+  .comparisonBuilder .reconciliationCard .mappingPickerBlock {
+    min-width: 0 !important;
+  }
+
+  .comparisonBuilder .reconciliationCard .multiSelectTrigger {
+    width: 100% !important;
+    min-height: 34px !important;
+    height: 34px !important;
+  }
+
+  .comparisonBuilder .reconciliationNote {
+    margin: 0 !important;
+    padding: 8px 14px 10px !important;
+    border-top: 1px solid #e0e6e3 !important;
+    font-size: 8px !important;
+  }
+
+  /* Column Mapping empty state stays inside the card rather than looking detached. */
+  .comparisonBuilder .reviewRunSummaryGrid > :first-child > .reviewEmptyState {
+    min-height: 54px !important;
+    margin: 0 !important;
+    padding: 17px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: #7b8782 !important;
+    font-size: 9px !important;
+  }
+
+  .comparisonBuilder .columnMappingRow {
+    margin: 10px 14px 0 !important;
+    padding: 9px !important;
+    border: 1px solid #d7dfdb !important;
+    border-radius: 0 !important;
+    background: #f7f9f8 !important;
+  }
+
+  /* Equal visual height and padding for L5/L6. */
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(2),
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(3) {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(2) .reviewEmptyState,
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(3) .reviewEmptyState {
+    flex: 1 1 auto !important;
+    margin: 0 !important;
+    padding: 16px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    background: transparent !important;
+    color: #7b8782 !important;
+    font-size: 9px !important;
+  }
+
+  .comparisonBuilder .reviewRunStep .reviewRunCard > .panelHead button,
+  .comparisonBuilder .reviewRunStep .reviewRunCard > .panelHead .secondary {
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 10px !important;
+    font-size: 8px !important;
+  }
+}
+
+@media (max-width: 1099px) {
+  .comparisonBuilder .reviewRunStep {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .comparisonBuilder .reviewRunStep > .reviewRunSummaryGrid {
+    display: contents !important;
+  }
+
+  .comparisonBuilder .reviewRunSummaryGrid > :first-child {
+    order: 1 !important;
+  }
+
+  .comparisonBuilder .reviewRunStep > .reconciliationCard {
+    order: 2 !important;
+  }
+
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(2),
+  .comparisonBuilder .reviewRunSummaryGrid > :nth-child(3) {
+    order: 3 !important;
+  }
+}
