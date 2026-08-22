@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    event,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -50,6 +51,42 @@ class ConfigurationModel(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+@event.listens_for(
+    ConfigurationModel.configuration,
+    "set",
+    retval=True,
+    active_history=True,
+)
+def preserve_configuration_lifecycle_metadata(
+    target,
+    value: Any,
+    oldvalue: Any,
+    initiator,
+):
+    """Keep UI lifecycle metadata when execution refreshes runtime JSON.
+
+    Comparison execution intentionally persists the validated runtime
+    configuration again before running.  That runtime model does not contain
+    the UI-only ``_meta`` and ``_workspace`` keys.  Without this guard the
+    second save replaces the JSONB document and silently destroys the saved
+    comparison name and editable workspace snapshot.
+
+    Explicit configuration API updates still win: if the incoming value
+    contains either reserved key, that incoming value is kept unchanged.
+    """
+    if not isinstance(value, dict) or not isinstance(oldvalue, dict):
+        return value
+
+    merged = dict(value)
+
+    for reserved_key in ("_meta", "_workspace"):
+        if reserved_key not in merged and reserved_key in oldvalue:
+            merged[reserved_key] = oldvalue[reserved_key]
+
+    return merged
+
 
 class ConnectionModel(Base):
     """
