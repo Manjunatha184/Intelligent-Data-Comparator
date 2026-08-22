@@ -23,7 +23,6 @@ export function ComparisonBuilder({
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   const [sourceId, setSourceId] = useState("");
-
   const [targetId, setTargetId] = useState("");
 
   const [sourceDbCatalog, setSourceDbCatalog] = useState("");
@@ -36,28 +35,21 @@ export function ComparisonBuilder({
 
   const [levels, setLevels] = useState([]);
 
-  const [sourceConnection, setSourceConnection] =
-    useState(null);
+  const [sourceConnection, setSourceConnection] = useState(null);
+  const [targetConnection, setTargetConnection] = useState(null);
 
-  const [targetConnection, setTargetConnection] =
-    useState(null);
-
-  const [comparisonKeys, setComparisonKeys] =
-    useState([
-      {
-        source_column: "",
-        target_column: "",
-      },
-    ]);
+  const [comparisonKeys, setComparisonKeys] = useState([
+    {
+      source_column: "",
+      target_column: "",
+    },
+  ]);
 
   const [groupingAttributes, setGroupingAttributes] = useState([]);
   const [aggregationColumns, setAggregationColumns] = useState([]);
 
   const [selectedDqRuleIds, setSelectedDqRuleIds] = useState([]);
-
-  const [selectedAggRuleIds, setSelectedAggRuleIds] =
-    useState([]);
-
+  const [selectedAggRuleIds, setSelectedAggRuleIds] = useState([]);
   const [availableRules, setAvailableRules] = useState([]);
 
   const [columnMappings, setColumnMappings] = useState([]);
@@ -153,7 +145,6 @@ export function ComparisonBuilder({
       return rowsEqual(current, next) ? current : next;
     });
 
-
     setGroupingAttributes((current) => current.filter(mapping => sourceColumns.includes(mapping.source_column) && targetColumns.includes(mapping.target_column)));
     setAggregationColumns((current) => current.filter(mapping => sourceColumns.includes(mapping.source_column) && targetColumns.includes(mapping.target_column)));
 
@@ -165,22 +156,17 @@ export function ComparisonBuilder({
 
   const [running, setRunning] = useState(false);
 
-  const connectedConnections =
-    connections.filter(
-      (connection) =>
-        String(connection.status || "").trim().toUpperCase() === "CONNECTED"
-    );
+  const connectedConnections = connections.filter(
+    (connection) =>
+      String(connection.status || "").trim().toUpperCase() === "CONNECTED"
+  );
 
   const source = connectedConnections.find(
-    (connection) =>
-      String(connection.connection_id) ===
-      String(sourceId)
+    (connection) => String(connection.connection_id) === String(sourceId)
   );
 
   const target = connectedConnections.find(
-    (connection) =>
-      String(connection.connection_id) ===
-      String(targetId)
+    (connection) => String(connection.connection_id) === String(targetId)
   );
 
   useEffect(() => {
@@ -189,11 +175,7 @@ export function ComparisonBuilder({
       return;
     }
 
-    loadConnection(
-      sourceId,
-      setSourceConnection,
-      notify
-    );
+    loadConnection(sourceId, setSourceConnection, notify);
   }, [sourceId]);
 
   useEffect(() => {
@@ -202,19 +184,13 @@ export function ComparisonBuilder({
       return;
     }
 
-    loadConnection(
-      targetId,
-      setTargetConnection,
-      notify
-    );
+    loadConnection(targetId, setTargetConnection, notify);
   }, [targetId]);
 
   function toggleLevel(levelId) {
     setLevels((current) => {
       if (current.includes(levelId)) {
-        return current.filter(
-          (level) => level !== levelId
-        );
+        return current.filter((level) => level !== levelId);
       }
 
       return [...current, levelId];
@@ -231,37 +207,20 @@ export function ComparisonBuilder({
 
   async function runComparison() {
     if (!source || !target) {
-      notify(
-        "Select both source and target connections.",
-        "error"
-      );
-
+      notify("Select both source and target connections.", "error");
       setStep(1);
-
       return;
     }
 
-    if (
-      !sourceConnection?.properties ||
-      !targetConnection?.properties
-    ) {
-      notify(
-        "Unable to load the selected connection properties.",
-        "error"
-      );
-
+    if (!sourceConnection?.properties || !targetConnection?.properties) {
+      notify("Unable to load the selected connection properties.", "error");
       return;
     }
 
     const validationLevels = levels.filter((level) => level !== "L7");
     if (!validationLevels.length) {
-      notify(
-        "Select at least one validation level before running the comparison.",
-        "error"
-      );
-
+      notify("Select at least one validation level before running the comparison.", "error");
       setStep(2);
-
       return;
     }
 
@@ -275,45 +234,27 @@ export function ComparisonBuilder({
       connection_id: targetConnection.connection_id,
     };
 
-    /*
-     * Databricks connector expects the connection
-     * properties inside the dataset configuration,
-     * and the metadata discovery state at the root.
-     */
-    if (
-      sourceConnection.connector_type ===
-      "databricks"
-    ) {
+    if (sourceConnection.connector_type === "databricks") {
       if (!sourceDbCatalog || !sourceDbSchema || !sourceDbTable) {
         notify("Select Catalog, Schema, and Table for the Databricks source.", "error");
         setStep(1);
         return;
       }
-      sourceProperties.connection_id =
-        sourceConnection.connection_id;
-
-      sourceProperties.connection = {
-        ...sourceConnection.properties,
-      };
+      sourceProperties.connection_id = sourceConnection.connection_id;
+      sourceProperties.connection = { ...sourceConnection.properties };
       sourceProperties.catalog = sourceDbCatalog;
       sourceProperties.schema = sourceDbSchema;
       sourceProperties.table = sourceDbTable;
     }
 
-    if (
-      targetConnection.connector_type ===
-      "databricks"
-    ) {
+    if (targetConnection.connector_type === "databricks") {
       if (!targetDbCatalog || !targetDbSchema || !targetDbTable) {
         notify("Select Catalog, Schema, and Table for the Databricks target.", "error");
         setStep(1);
         return;
       }
-      targetProperties.connection_id =
-        targetConnection.connection_id;
-      targetProperties.connection = {
-        ...targetConnection.properties,
-      };
+      targetProperties.connection_id = targetConnection.connection_id;
+      targetProperties.connection = { ...targetConnection.properties };
       targetProperties.catalog = targetDbCatalog;
       targetProperties.schema = targetDbSchema;
       targetProperties.table = targetDbTable;
@@ -333,13 +274,8 @@ export function ComparisonBuilder({
       }));
 
     if (!comparisonKeyPayload.length) {
-      notify(
-        "Select at least one mapped comparison key.",
-        "error"
-      );
-
+      notify("Select at least one mapped comparison key.", "error");
       setStep(2);
-
       return;
     }
 
@@ -386,14 +322,9 @@ export function ComparisonBuilder({
     const columnMappingPayload = (columnMappings || [])
       .filter((mapping) => mapping.source_column && mapping.target_column)
       .map((mapping) => {
-        const payloadMapping = {
-          ...mapping,
-        };
+        const payloadMapping = { ...mapping };
 
-        if (
-          mapping.tolerance_pct !== undefined &&
-          mapping.tolerance_pct !== ""
-        ) {
+        if (mapping.tolerance_pct !== undefined && mapping.tolerance_pct !== "") {
           payloadMapping.tolerance_pct = Number(mapping.tolerance_pct);
         } else {
           delete payloadMapping.tolerance_pct;
@@ -409,46 +340,32 @@ export function ComparisonBuilder({
       });
 
     const payload = {
-
       source: {
-        connector_type:
-          sourceConnection.connector_type,
+        connector_type: sourceConnection.connector_type,
         properties: sourceProperties,
       },
-
       target: {
-        connector_type:
-          targetConnection.connector_type,
+        connector_type: targetConnection.connector_type,
         properties: targetProperties,
       },
-
       comparison_levels: validationLevels,
       l7_enabled: levels.includes("L7"),
-
       comparison_keys: comparisonKeyPayload,
-
       column_mappings: columnMappingPayload,
-
       ignored_columns: ignoredColumnsPayload,
-
       aggregate_rules: availableRules
         .filter(r => selectedAggRuleIds.some(id => String(id) === String(r.rule_id)))
         .map(r => normalizeAggregateRulePayload(r)),
-
       dq_rules: availableRules
         .filter(r => selectedDqRuleIds.some(id => String(id) === String(r.rule_id)))
         .map(r => normalizeDqRulePayload(r)),
-
       source_filters: sourceFilters.filter(f => f.field).map(normalizeRowFilterPayload),
       target_filters: targetFilters.filter(f => f.field).map(normalizeRowFilterPayload),
-
-
       matching_mode: groupingAttributes.length || aggregationColumns.length
         ? "GROUP_RECONCILIATION"
         : "ROW_LEVEL",
       grouping_attributes: groupingAttributes,
       aggregation_columns: aggregationColumns,
-
       strategy_policy: {
         max_exact_rows: 100000,
         max_exact_bytes: 50000000,
@@ -460,32 +377,19 @@ export function ComparisonBuilder({
     setRunning(true);
 
     try {
-      // --------------------------------------------------
-      // STEP 1: SAVE CONFIGURATION
-      // --------------------------------------------------
-
       const configurationResult = await apiRequest(
         "/configurations",
         {
           method: "POST",
-          body: JSON.stringify({
-            configuration: payload,
-          }),
+          body: JSON.stringify({ configuration: payload }),
         }
       );
 
-      const configurationId =
-        configurationResult.configuration_id;
+      const configurationId = configurationResult.configuration_id;
 
       if (!configurationId) {
-        throw new Error(
-          "Configuration was saved but no configuration ID was returned."
-        );
+        throw new Error("Configuration was saved but no configuration ID was returned.");
       }
-
-      // --------------------------------------------------
-      // STEP 2: RUN COMPARISON USING DATABASE ID
-      // --------------------------------------------------
 
       const comparisonPayload = {
         configuration_id: configurationId,
@@ -496,20 +400,12 @@ export function ComparisonBuilder({
         "/comparisons",
         {
           method: "POST",
-          body: JSON.stringify(
-            comparisonPayload
-          ),
+          body: JSON.stringify(comparisonPayload),
         }
       );
 
-      notify(
-        `Comparison ${String(
-          result.status
-        ).toLowerCase()}.`
-      );
-
+      notify(`Comparison ${String(result.status).toLowerCase()}.`);
       onComplete(result.run_id);
-
     } catch (error) {
       notify(error.message, "error");
     } finally {
@@ -535,12 +431,7 @@ export function ComparisonBuilder({
 
         <div className="actionRow wizardHeaderRight">
           {step > 1 && (
-            <button
-              className="secondary"
-              onClick={() =>
-                setStep((current) => current - 1)
-              }
-            >
+            <button className="secondary" onClick={() => setStep((current) => current - 1)}>
               Back
             </button>
           )}
@@ -555,10 +446,7 @@ export function ComparisonBuilder({
               <ArrowRight size={15} />
             </button>
           ) : (
-            <button
-              className="primary"
-              onClick={() => setReviewModalOpen(true)}
-            >
+            <button className="primary" onClick={() => setReviewModalOpen(true)}>
               Run Comparison
               <ArrowRight size={15} />
             </button>
@@ -593,11 +481,27 @@ export function ComparisonBuilder({
             connectionsError={connectionsError}
             reloadConnections={reloadConnections}
           />
+
           <LevelsStep
             levels={levels}
             toggleLevel={toggleLevel}
             selectAll={selectAllLevels}
             clearAll={clearAllLevels}
+          />
+
+          <ScopeFiltersAndMatching
+            sourceSchema={sourceSchema}
+            targetSchema={targetSchema}
+            sourceSchemaLoading={sourceSchemaLoading}
+            targetSchemaLoading={targetSchemaLoading}
+            sourceSchemaError={sourceSchemaError}
+            targetSchemaError={targetSchemaError}
+            sourceFilters={sourceFilters}
+            setSourceFilters={setSourceFilters}
+            targetFilters={targetFilters}
+            setTargetFilters={setTargetFilters}
+            comparisonKeys={comparisonKeys}
+            setComparisonKeys={setComparisonKeys}
           />
         </div>
       )}
@@ -654,7 +558,6 @@ export function ComparisonBuilder({
           running={running}
         />
       )}
-
     </div>
   );
 }
@@ -663,16 +566,9 @@ export function ComparisonBuilder({
    CONNECTION DETAIL LOADING
 ============================================================ */
 
-async function loadConnection(
-  connectionId,
-  setter,
-  notify
-) {
+async function loadConnection(connectionId, setter, notify) {
   try {
-    const connection = await apiRequest(
-      `/connections/${connectionId}`
-    );
-
+    const connection = await apiRequest(`/connections/${connectionId}`);
     setter(connection);
   } catch (error) {
     setter(null);
@@ -718,53 +614,53 @@ function SourceStep({
       </div>
 
       <div className="grid2 scopeSourceGrid">
-      <Panel title="Source dataset" className="scopeDatasetCard">
-        <ConnectionSelector
-          label="Source connection"
-          value={sourceId}
-          setValue={setSourceId}
-          connections={connections}
-          loading={connectionsLoading}
-          error={connectionsError}
-          onRetry={reloadConnections}
-        />
-        {source?.connector_type === "databricks" && (
-          <DatabricksSelector
-            connection={source}
-            catalog={sourceDbCatalog}
-            setCatalog={setSourceDbCatalog}
-            schema={sourceDbSchema}
-            setSchema={setSourceDbSchema}
-            table={sourceDbTable}
-            setTable={setSourceDbTable}
-            notify={notify}
+        <Panel title="Source dataset" className="scopeDatasetCard">
+          <ConnectionSelector
+            label="Source connection"
+            value={sourceId}
+            setValue={setSourceId}
+            connections={connections}
+            loading={connectionsLoading}
+            error={connectionsError}
+            onRetry={reloadConnections}
           />
-        )}
-      </Panel>
+          {source?.connector_type === "databricks" && (
+            <DatabricksSelector
+              connection={source}
+              catalog={sourceDbCatalog}
+              setCatalog={setSourceDbCatalog}
+              schema={sourceDbSchema}
+              setSchema={setSourceDbSchema}
+              table={sourceDbTable}
+              setTable={setSourceDbTable}
+              notify={notify}
+            />
+          )}
+        </Panel>
 
-      <Panel title="Target dataset" className="scopeDatasetCard">
-        <ConnectionSelector
-          label="Target connection"
-          value={targetId}
-          setValue={setTargetId}
-          connections={connections}
-          loading={connectionsLoading}
-          error={connectionsError}
-          onRetry={reloadConnections}
-        />
-        {target?.connector_type === "databricks" && (
-          <DatabricksSelector
-            connection={target}
-            catalog={targetDbCatalog}
-            setCatalog={setTargetDbCatalog}
-            schema={targetDbSchema}
-            setSchema={setTargetDbSchema}
-            table={targetDbTable}
-            setTable={setTargetDbTable}
-            notify={notify}
+        <Panel title="Target dataset" className="scopeDatasetCard">
+          <ConnectionSelector
+            label="Target connection"
+            value={targetId}
+            setValue={setTargetId}
+            connections={connections}
+            loading={connectionsLoading}
+            error={connectionsError}
+            onRetry={reloadConnections}
           />
-        )}
-      </Panel>
+          {target?.connector_type === "databricks" && (
+            <DatabricksSelector
+              connection={target}
+              catalog={targetDbCatalog}
+              setCatalog={setTargetDbCatalog}
+              schema={targetDbSchema}
+              setSchema={setTargetDbSchema}
+              table={targetDbTable}
+              setTable={setTargetDbTable}
+              notify={notify}
+            />
+          )}
+        </Panel>
       </div>
     </section>
   );
@@ -891,17 +787,10 @@ function ConnectionSelector({
 }) {
   const displayConnection = (connection) => {
     const properties = connection.properties || {};
-    const filename =
-      properties.filename ||
-      properties.path?.split("/").pop();
-    const dataset =
-      connection.connector_type === "csv"
-        ? filename
-        : properties.table;
+    const filename = properties.filename || properties.path?.split("/").pop();
+    const dataset = connection.connector_type === "csv" ? filename : properties.table;
 
-    return dataset
-      ? `${connection.name} (${dataset})`
-      : connection.name;
+    return dataset ? `${connection.name} (${dataset})` : connection.name;
   };
 
   return (
@@ -922,22 +811,13 @@ function ConnectionSelector({
         <div className="connectionSelectorState">No connections available</div>
       )}
       {!loading && !error && connections.length > 0 && (
-        <select
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          aria-label={label}
-        >
+        <select value={value} onChange={(event) => setValue(event.target.value)} aria-label={label}>
           <option value="">Select an authenticated connection...</option>
-          {connections.map((connection) => {
-            return (
-              <option
-                key={connection.connection_id}
-                value={String(connection.connection_id)}
-              >
-                {displayConnection(connection)} · {CONNECTORS[connection.connector_type]?.label || connection.connector_type}
-              </option>
-            );
-          })}
+          {connections.map((connection) => (
+            <option key={connection.connection_id} value={String(connection.connection_id)}>
+              {displayConnection(connection)} · {CONNECTORS[connection.connector_type]?.label || connection.connector_type}
+            </option>
+          ))}
         </select>
       )}
     </div>
@@ -948,12 +828,7 @@ function ConnectionSelector({
    LEVELS
 ============================================================ */
 
-function LevelsStep({
-  levels,
-  toggleLevel,
-  selectAll,
-  clearAll
-}) {
+function LevelsStep({ levels, toggleLevel, selectAll, clearAll }) {
   return (
     <Panel title="Comparison depth" className="scopeLevelsPanel">
       <div className="scopeLevelIntro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
@@ -966,11 +841,8 @@ function LevelsStep({
 
       <div className="levelGrid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "10px" }}>
         {COMPARISON_LEVELS.map((level) => {
-          const selected = levels.includes(
-            level.id
-          );
+          const selected = levels.includes(level.id);
 
-          // We don't use the LevelIcon here to match reference exactly
           return (
             <button
               type="button"
@@ -993,6 +865,88 @@ function LevelsStep({
         })}
       </div>
     </Panel>
+  );
+}
+
+/* ============================================================
+   STEP 1 FILTERS + RECORD MATCHING
+============================================================ */
+
+function ScopeFiltersAndMatching({
+  sourceSchema,
+  targetSchema,
+  sourceSchemaLoading,
+  targetSchemaLoading,
+  sourceSchemaError,
+  targetSchemaError,
+  sourceFilters,
+  setSourceFilters,
+  targetFilters,
+  setTargetFilters,
+  comparisonKeys,
+  setComparisonKeys,
+}) {
+  const sourceColumnOptions = getSchemaColumnNames(sourceSchema);
+  const targetColumnOptions = getSchemaColumnNames(targetSchema);
+  const selectedKey = comparisonKeys?.[0] || {
+    source_column: "",
+    target_column: "",
+  };
+
+  const updateSelectedKey = (field, value) => {
+    setComparisonKeys([
+      {
+        ...selectedKey,
+        [field]: value,
+      },
+    ]);
+  };
+
+  const schemaStatus =
+    sourceSchemaError ||
+    targetSchemaError ||
+    (sourceSchemaLoading || targetSchemaLoading ? "Loading fields..." : "");
+
+  return (
+    <div className="scopeFirstPageExtras stack">
+      {schemaStatus && (
+        <div className="helper scopeSchemaStatus" role="status">
+          {schemaStatus}
+        </div>
+      )}
+
+      <div className="filtersGrid scopeFiltersGrid">
+        <FilterSection
+          title="Source Filters"
+          schema={sourceSchema}
+          filters={sourceFilters}
+          setFilters={setSourceFilters}
+        />
+        <FilterSection
+          title="Target Filters"
+          schema={targetSchema}
+          filters={targetFilters}
+          setFilters={setTargetFilters}
+        />
+      </div>
+
+      <Panel title="Record matching" className="reviewRunCard recordMatchingCard scopeRecordMatchingCard">
+        <div className="formGrid">
+          <SelectField
+            label="Source key"
+            value={selectedKey.source_column || ""}
+            setValue={(value) => updateSelectedKey("source_column", value)}
+            options={["", ...sourceColumnOptions]}
+          />
+          <SelectField
+            label="Target key"
+            value={selectedKey.target_column || ""}
+            setValue={(value) => updateSelectedKey("target_column", value)}
+            options={["", ...targetColumnOptions]}
+          />
+        </div>
+      </Panel>
+    </div>
   );
 }
 
@@ -1047,12 +1001,8 @@ function RuleSelectionModal({
                     type="checkbox"
                     checked={selectedIds.includes(rule.rule_id)}
                     onChange={(e) => {
-                      if (e.target.checked)
-                        onSelectionChange([...selectedIds, rule.rule_id]);
-                      else
-                        onSelectionChange(
-                          selectedIds.filter((id) => id !== rule.rule_id)
-                        );
+                      if (e.target.checked) onSelectionChange([...selectedIds, rule.rule_id]);
+                      else onSelectionChange(selectedIds.filter((id) => id !== rule.rule_id));
                     }}
                   />
                   <div>
@@ -1060,9 +1010,7 @@ function RuleSelectionModal({
                     <span>
                       {rule.rule_type === "DQ"
                         ? describeDqRule(rule.payload)
-                        : `${String(rule.payload.function).toLowerCase()} on ${String(
-                          rule.payload.source_column
-                        ).toLowerCase()}`}
+                        : `${String(rule.payload.function).toLowerCase()} on ${String(rule.payload.source_column).toLowerCase()}`}
                     </span>
                   </div>
                 </label>
@@ -1103,15 +1051,8 @@ export function schemaRuleOptions(schema, currentValue, schemaAware) {
     return ["", ...schemaColumns];
   }
 
-  return Array.from(
-    new Set([
-      "",
-      ...schemaColumns,
-      currentValue || "",
-    ])
-  );
+  return Array.from(new Set(["", ...schemaColumns, currentValue || ""]));
 }
-
 
 function MultiSelectField({ options, selected, onChange, placeholder }) {
   const [open, setOpen] = React.useState(false);
@@ -1178,21 +1119,6 @@ function RulesStep({
   const sourceColumnOptions = getSchemaColumnNames(sourceSchema);
   const targetColumnOptions = getSchemaColumnNames(targetSchema);
 
-  const selectedKey = comparisonKeys?.[0] || {
-    source_column: "",
-    target_column: "",
-  };
-
-  const updateSelectedKey = (field, value) => {
-    setComparisonKeys([
-      {
-        ...selectedKey,
-        [field]: value,
-      },
-    ]);
-  };
-
-
   const sourceGroupingFields = groupingAttributes.map((item) => item.source_column).filter(Boolean);
   const targetGroupingFields = groupingAttributes.map((item) => item.target_column).filter(Boolean);
   const sourceAggregationFields = aggregationColumns.map((item) => item.source_column).filter(Boolean);
@@ -1208,23 +1134,15 @@ function RulesStep({
         : mapping.target_column === value && mapping.source_column
     );
     if (explicitMapping) {
-      return side === "source"
-        ? explicitMapping.target_column
-        : explicitMapping.source_column;
+      return side === "source" ? explicitMapping.target_column : explicitMapping.source_column;
     }
 
-    const counterpartOptions = side === "source"
-      ? targetColumnOptions
-      : sourceColumnOptions;
-    const exactName = counterpartOptions.find(
-      (option) => option.toLowerCase() === String(value).toLowerCase()
-    );
+    const counterpartOptions = side === "source" ? targetColumnOptions : sourceColumnOptions;
+    const exactName = counterpartOptions.find((option) => option.toLowerCase() === String(value).toLowerCase());
     if (exactName) return exactName;
 
     const logicalName = logicalColumnName(value);
-    const logicalMatches = counterpartOptions.filter(
-      (option) => logicalColumnName(option) === logicalName
-    );
+    const logicalMatches = counterpartOptions.filter((option) => logicalColumnName(option) === logicalName);
     return logicalMatches.length === 1 ? logicalMatches[0] : "";
   };
   const updatePairedSelection = (kind, side, values) => {
@@ -1234,9 +1152,6 @@ function RulesStep({
     const otherField = side === "source" ? "target_column" : "source_column";
     const existing = new Set(current.map((item) => item[field]).filter(Boolean));
 
-    // Keep completed mappings intact by identity, not by the array position
-    // of either multi-select. Only a newly selected field can fill an
-    // intentionally incomplete mapping created on the opposite side.
     const next = current
       .map((item) => {
         if (!item[field] || selected.has(item[field])) return { ...item };
@@ -1247,12 +1162,9 @@ function RulesStep({
       .filter((item) => item.source_column || item.target_column);
 
     values.filter((value) => !existing.has(value)).forEach((value) => {
-      // Resolve logical counterparts instead of pairing by selection order.
       const counterpart = mappedCounterpart(value, side);
       const pending = counterpart
-        ? next.find(
-          (item) => !item[field] && item[otherField] === counterpart
-        )
+        ? next.find((item) => !item[field] && item[otherField] === counterpart)
         : null;
       const mapping = pending || { source_column: "", target_column: "" };
       mapping[field] = value;
@@ -1284,7 +1196,6 @@ function RulesStep({
         }}>×</button></span>;
     })}
   </div>;
-  const sourceTypeFor = (name) => getColumnType(findSchemaColumn(sourceSchema, name));
   const automaticOperation = (name, side) => {
     const schema = side === "source" ? sourceSchema : targetSchema;
     return isNumericColumn(findSchemaColumn(schema, name)) ? "AVG" : "MODE";
@@ -1294,16 +1205,6 @@ function RulesStep({
       {values.map((value, index) => <span className="chip" key={`${value}-${index}`}>{value}<button type="button" aria-label={`Remove ${value}`} onClick={() => onRemove(index)}>×</button></span>)}
     </div>
   );
-  const MultiFieldPicker = ({ label, options, selected, onAdd }) => (
-    <div className="field">
-      <label>{label}</label>
-      <select value="" onChange={(event) => onAdd(event.target.value)}>
-        <option value="">Select fields...</option>
-        {options.filter((option) => !selected.includes(option)).map(option => <option key={option} value={option}>{option}</option>)}
-      </select>
-    </div>
-  );
-
 
   return (
     <div className="stack reviewRunStep">
@@ -1312,10 +1213,7 @@ function RulesStep({
           {sourceSchemaError || targetSchemaError || (sourceSchemaLoading || targetSchemaLoading ? "Loading fields..." : "")}
         </div>
       )}
-      <div className="filtersGrid">
-        <FilterSection title="Source Filters" schema={sourceSchema} filters={sourceFilters} setFilters={setSourceFilters} />
-        <FilterSection title="Target Filters" schema={targetSchema} filters={targetFilters} setFilters={setTargetFilters} />
-      </div>
+
       <Panel title="Ignored columns" className="reviewRunCard ignoredColumnsCard">
         <p className="helper">Selected columns are excluded from every applicable comparison level.</p>
         <div className="formGrid">
@@ -1330,25 +1228,6 @@ function RulesStep({
             <FieldChips values={ignoredTargetColumns} onRemove={(index) => setIgnoredTargetColumns(ignoredTargetColumns.filter((_, itemIndex) => itemIndex !== index))} />
           </div>
         </div>
-      </Panel>
-      <Panel title="Record matching" className="reviewRunCard recordMatchingCard">
-        <div className="formGrid">
-          <SelectField
-            label="Source key"
-            value={selectedKey.source_column || ""}
-            setValue={(value) => updateSelectedKey("source_column", value)}
-            options={["", ...sourceColumnOptions]}
-          />
-
-          <SelectField
-            label="Target key"
-            value={selectedKey.target_column || ""}
-            setValue={(value) => updateSelectedKey("target_column", value)}
-            options={["", ...targetColumnOptions]}
-          />
-        </div>
-
-
       </Panel>
 
       <Panel title="Group-Based Reconciliation" className="reviewRunCard reconciliationCard">
@@ -1387,126 +1266,119 @@ function RulesStep({
       </Panel>
 
       <div className={`reviewRunSummaryGrid ${columnMappings?.length ? "hasMappings" : ""}`}>
-      {!columnMappings || columnMappings.length === 0 ? (
-        <Panel
-          title="Column Mapping"
-          className="reviewRunCard compactReviewCard"
-          action={<button type="button" className="secondary small" onClick={() => setColumnMappings([{ source_column: "", target_column: "", tolerance_pct: undefined }])}>
-            <Plus size={14} /> Add column mapping
-          </button>}
-        >
-          <p className="reviewEmptyState">No mappings configured.</p>
-        </Panel>
-      ) : (
-        <Panel title="Column Mapping" className="reviewRunCard">
-          <div className="stack" style={{ gap: "10px" }}>
-            {columnMappings.map((mapping, idx) => {
-              const isNumericPair = isNumericMapping(mapping, sourceSchema, targetSchema);
-              const updateMapping = (key, val) => {
-                const copy = [...columnMappings];
-                const updated = {
-                  ...copy[idx],
-                  [key]: val,
-                };
-
-                if (
-                  key === "source_column" ||
-                  key === "target_column"
-                ) {
-                  const nextMapping = {
-                    ...updated,
+        {!columnMappings || columnMappings.length === 0 ? (
+          <Panel
+            title="Column Mapping"
+            className="reviewRunCard compactReviewCard"
+            action={<button type="button" className="secondary small" onClick={() => setColumnMappings([{ source_column: "", target_column: "", tolerance_pct: undefined }])}>
+              <Plus size={14} /> Add column mapping
+            </button>}
+          >
+            <p className="reviewEmptyState">No mappings configured.</p>
+          </Panel>
+        ) : (
+          <Panel title="Column Mapping" className="reviewRunCard">
+            <div className="stack" style={{ gap: "10px" }}>
+              {columnMappings.map((mapping, idx) => {
+                const isNumericPair = isNumericMapping(mapping, sourceSchema, targetSchema);
+                const updateMapping = (key, val) => {
+                  const copy = [...columnMappings];
+                  const updated = {
+                    ...copy[idx],
+                    [key]: val,
                   };
 
-                  if (!isNumericMapping(nextMapping, sourceSchema, targetSchema)) {
-                    delete nextMapping.tolerance_pct;
+                  if (key === "source_column" || key === "target_column") {
+                    const nextMapping = { ...updated };
+                    if (!isNumericMapping(nextMapping, sourceSchema, targetSchema)) {
+                      delete nextMapping.tolerance_pct;
+                    }
+                    copy[idx] = nextMapping;
+                  } else {
+                    copy[idx] = updated;
                   }
 
-                  copy[idx] = nextMapping;
-                } else {
-                  copy[idx] = updated;
-                }
+                  setColumnMappings(copy);
+                };
 
-                setColumnMappings(copy);
-              };
-
-              return (
-                <div key={idx} className="columnMappingRow" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(130px, 0.7fr) auto auto", gap: "10px", alignItems: "end", padding: "10px", border: "1px solid var(--line)", borderRadius: "8px", background: "#f8fafc" }}>
-                  <div>
-                    <SelectField
-                      label="Source column"
-                      value={mapping.source_column || ""}
-                      options={["", ...sourceColumnOptions]}
-                      setValue={v => updateMapping("source_column", v)}
-                    />
-                  </div>
-                  <div>
-                    <SelectField
-                      label="Target column"
-                      value={mapping.target_column || ""}
-                      options={["", ...targetColumnOptions]}
-                      setValue={v => updateMapping("target_column", v)}
-                    />
-                  </div>
-                  <div>
-                    <Field label="Tolerance (%)">
-                      {isNumericPair ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="any"
-                          value={mapping.tolerance_pct === undefined ? "" : mapping.tolerance_pct}
-                          onChange={e => updateMapping("tolerance_pct", e.target.value ? Number(e.target.value) : undefined)}
-                        />
-                      ) : (
-                        <div style={{ padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "6px", color: "var(--muted)", fontSize: "13px" }}>
-                          N/A
-                        </div>
-                      )}
-                    </Field>
-                  </div>
-                  <button type="button" className="secondary small" onClick={() => setNormalizationOpen(current => ({ ...current, [idx]: !current[idx] }))} style={{ marginBottom: "2px" }}>
-                    {normalizationOpen[idx] ? "Hide" : "Configure"}
-                  </button>
-                  <button type="button" className="iconButton dangerIcon" title="Delete mapping" onClick={() => setColumnMappings(columnMappings.filter((_, i) => i !== idx))} style={{ marginBottom: "2px" }}><Trash2 size={15} /></button>
-                  {normalizationOpen[idx] && (
-                    <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "18px", flexWrap: "wrap", padding: "10px 4px 2px", borderTop: "1px solid var(--line)" }}>
-                      <strong style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Normalization options</strong>
-                      {[["trim", "Trim whitespace"], ["case_insensitive", "Ignore case"], ["empty_as_null", "Empty string as null"]].map(([key, label]) => (
-                        <label key={key} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          <input type="checkbox" checked={Boolean(mapping.normalization?.[key])} onChange={e => updateMapping("normalization", { ...(mapping.normalization || {}), [key]: e.target.checked })} />
-                          {label}
-                        </label>
-                      ))}
-                      {isNumericPair && <label style={{ display: "inline-flex", alignItems: "center", gap: "7px", fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Round decimals<input style={{ width: "70px" }} type="number" min="0" step="1" value={mapping.normalization?.round ?? ""} onChange={e => {
-                        const value = e.target.value;
-                        updateMapping("normalization", { ...(mapping.normalization || {}), ...(value === "" ? { round: undefined } : { round: Number(value) }) });
-                      }} /></label>}
+                return (
+                  <div key={idx} className="columnMappingRow" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(130px, 0.7fr) auto auto", gap: "10px", alignItems: "end", padding: "10px", border: "1px solid var(--line)", borderRadius: "8px", background: "#f8fafc" }}>
+                    <div>
+                      <SelectField
+                        label="Source column"
+                        value={mapping.source_column || ""}
+                        options={["", ...sourceColumnOptions]}
+                        setValue={v => updateMapping("source_column", v)}
+                      />
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: "15px" }}>
-            <button type="button" className="secondary small" onClick={() => setColumnMappings([...(columnMappings || []), { source_column: "", target_column: "", tolerance_pct: undefined }])}>
-              <Plus size={14} /> Add column mapping
-            </button>
-          </div>
+                    <div>
+                      <SelectField
+                        label="Target column"
+                        value={mapping.target_column || ""}
+                        options={["", ...targetColumnOptions]}
+                        setValue={v => updateMapping("target_column", v)}
+                      />
+                    </div>
+                    <div>
+                      <Field label="Tolerance (%)">
+                        {isNumericPair ? (
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="any"
+                            value={mapping.tolerance_pct === undefined ? "" : mapping.tolerance_pct}
+                            onChange={e => updateMapping("tolerance_pct", e.target.value ? Number(e.target.value) : undefined)}
+                          />
+                        ) : (
+                          <div style={{ padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "6px", color: "var(--muted)", fontSize: "13px" }}>
+                            N/A
+                          </div>
+                        )}
+                      </Field>
+                    </div>
+                    <button type="button" className="secondary small" onClick={() => setNormalizationOpen(current => ({ ...current, [idx]: !current[idx] }))} style={{ marginBottom: "2px" }}>
+                      {normalizationOpen[idx] ? "Hide" : "Configure"}
+                    </button>
+                    <button type="button" className="iconButton dangerIcon" title="Delete mapping" onClick={() => setColumnMappings(columnMappings.filter((_, i) => i !== idx))} style={{ marginBottom: "2px" }}><Trash2 size={15} /></button>
+                    {normalizationOpen[idx] && (
+                      <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "18px", flexWrap: "wrap", padding: "10px 4px 2px", borderTop: "1px solid var(--line)" }}>
+                        <strong style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Normalization options</strong>
+                        {[["trim", "Trim whitespace"], ["case_insensitive", "Ignore case"], ["empty_as_null", "Empty string as null"]].map(([key, label]) => (
+                          <label key={key} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            <input type="checkbox" checked={Boolean(mapping.normalization?.[key])} onChange={e => updateMapping("normalization", { ...(mapping.normalization || {}), [key]: e.target.checked })} />
+                            {label}
+                          </label>
+                        ))}
+                        {isNumericPair && <label style={{ display: "inline-flex", alignItems: "center", gap: "7px", fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Round decimals<input style={{ width: "70px" }} type="number" min="0" step="1" value={mapping.normalization?.round ?? ""} onChange={e => {
+                          const value = e.target.value;
+                          updateMapping("normalization", { ...(mapping.normalization || {}), ...(value === "" ? { round: undefined } : { round: Number(value) }) });
+                        }} /></label>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: "15px" }}>
+              <button type="button" className="secondary small" onClick={() => setColumnMappings([...(columnMappings || []), { source_column: "", target_column: "", tolerance_pct: undefined }])}>
+                <Plus size={14} /> Add column mapping
+              </button>
+            </div>
+          </Panel>
+        )}
+
+        <Panel title="Data quality rules (L6)" className="reviewRunCard compactReviewCard" action={<button type="button" className="secondary small" onClick={() => setDqModalOpen(true)}>Select rules</button>}>
+          <p className="reviewEmptyState">
+            {selectedDqRuleIds.length === 0 ? "No data-quality rules selected." : `${selectedDqRuleIds.length} data-quality rule${selectedDqRuleIds.length === 1 ? "" : "s"} selected.`}
+          </p>
         </Panel>
-      )}
 
-      <Panel title="Data quality rules (L6)" className="reviewRunCard compactReviewCard" action={<button type="button" className="secondary small" onClick={() => setDqModalOpen(true)}>Select rules</button>}>
-        <p className="reviewEmptyState">
-          {selectedDqRuleIds.length === 0 ? "No data-quality rules selected." : `${selectedDqRuleIds.length} data-quality rule${selectedDqRuleIds.length === 1 ? "" : "s"} selected.`}
-        </p>
-      </Panel>
-
-      <Panel title="Aggregate rules (L5)" className="reviewRunCard compactReviewCard" action={<button type="button" className="secondary small" onClick={() => setAggModalOpen(true)}>Select rules</button>}>
-        <p className="reviewEmptyState">
-          {selectedAggRuleIds.length === 0 ? "No aggregate rules selected." : `${selectedAggRuleIds.length} aggregate rule${selectedAggRuleIds.length === 1 ? "" : "s"} selected.`}
-        </p>
-      </Panel>
+        <Panel title="Aggregate rules (L5)" className="reviewRunCard compactReviewCard" action={<button type="button" className="secondary small" onClick={() => setAggModalOpen(true)}>Select rules</button>}>
+          <p className="reviewEmptyState">
+            {selectedAggRuleIds.length === 0 ? "No aggregate rules selected." : `${selectedAggRuleIds.length} aggregate rule${selectedAggRuleIds.length === 1 ? "" : "s"} selected.`}
+          </p>
+        </Panel>
       </div>
 
       {dqModalOpen && (
@@ -1615,27 +1487,9 @@ function ReviewModal({
         <div className="modalBody stack">
           <div className="reviewGrid">
             <Panel title="Configuration summary">
-              <ReviewRow
-                label="Source"
-                value={
-                  source?.name ||
-                  "Not selected"
-                }
-              />
-
-              <ReviewRow
-                label="Target"
-                value={
-                  target?.name ||
-                  "Not selected"
-                }
-              />
-
-              <ReviewRow
-                label="Levels"
-                value={levels.join(" · ")}
-              />
-
+              <ReviewRow label="Source" value={source?.name || "Not selected"} />
+              <ReviewRow label="Target" value={target?.name || "Not selected"} />
+              <ReviewRow label="Levels" value={levels.join(" · ")} />
               <ReviewRow
                 label="Record keys"
                 value={(comparisonKeys || [])
@@ -1643,22 +1497,12 @@ function ReviewModal({
                   .map((key) => `${key.source_column} → ${key.target_column}`)
                   .join(", ") || "Not selected"}
               />
-
-
               <ReviewRow label="Source filters" value={String(sourceFiltersCount)} />
               <ReviewRow label="Target filters" value={String(targetFiltersCount)} />
               <ReviewRow label="Ignored columns" value={String(ignoredColumnsCount)} />
               <ReviewRow label="Column mappings" value={String(mappingsCount)} />
-
-              <ReviewRow
-                label="DQ rules"
-                value={String(dqRulesCount)}
-              />
-
-              <ReviewRow
-                label="Aggregate rules"
-                value={String(aggregateRulesCount)}
-              />
+              <ReviewRow label="DQ rules" value={String(dqRulesCount)} />
+              <ReviewRow label="Aggregate rules" value={String(aggregateRulesCount)} />
             </Panel>
           </div>
         </div>
