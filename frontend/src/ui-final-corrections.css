@@ -2,19 +2,19 @@
 
 /* --------------------------------------------------------------------------
    TOP HEADER SEARCH
-   Center it in the CONTENT/WHITE workspace, not the entire browser header.
-   Desktop sidebar is ~222px, therefore content center is offset by half of it.
+   Center in the main content workspace, not across sidebar + content.
 ---------------------------------------------------------------------------- */
 @media (min-width: 900px) {
   .topnavSearch {
-    left: calc(50% + 111px) !important;
-    width: min(390px, 32vw) !important;
-    height: 30px !important;
+    left: calc(50% + 110px) !important;
+    width: min(360px, 29vw) !important;
+    height: 28px !important;
     transform: translate(-50%, -50%) !important;
-    padding: 0 10px !important;
+    padding: 0 9px !important;
+    border-color: #31433d !important;
   }
   .topnavSearch input {
-    height: 28px !important;
+    height: 26px !important;
     font-size: 9px !important;
   }
 }
@@ -22,42 +22,33 @@
 @media (min-width: 900px) and (max-width: 1199px) {
   .topnavSearch {
     left: calc(50% + 96px) !important;
-    width: min(340px, 30vw) !important;
+    width: min(320px, 28vw) !important;
   }
 }
 
 /* --------------------------------------------------------------------------
    COMPARISON RESULTS LEVEL SELECTOR
-   Never turn a selected/hovered validation level black. Keep the enterprise
-   light surface and use only border/accent changes for state.
+   Selected, hovered and focused items stay light. State is shown only with
+   small accents/status chips instead of a black card.
 ---------------------------------------------------------------------------- */
 .resultsPage .levelSummaryItem,
 .resultsPage .levelSummaryItem:hover,
 .resultsPage .levelSummaryItem:focus,
 .resultsPage .levelSummaryItem:focus-visible,
-.resultsPage .levelSummaryItem:active {
+.resultsPage .levelSummaryItem:active,
+.resultsPage .levelSummaryItem.pass,
+.resultsPage .levelSummaryItem.fail,
+.resultsPage .levelSummaryItem.review,
+.resultsPage .levelSummaryItem.not_applicable {
   background: #fbfcfb !important;
   color: #13211d !important;
   box-shadow: none !important;
   outline: none !important;
 }
 
-.resultsPage .levelSummaryItem:hover {
-  background: #f4f7f5 !important;
-}
-
-.resultsPage .levelSummaryItem.pass,
-.resultsPage .levelSummaryItem.fail,
-.resultsPage .levelSummaryItem.review,
-.resultsPage .levelSummaryItem.not_applicable {
-  background: #fbfcfb !important;
-}
-
-.resultsPage .levelSummaryItem.pass:hover,
-.resultsPage .levelSummaryItem.fail:hover,
-.resultsPage .levelSummaryItem.review:hover,
-.resultsPage .levelSummaryItem.not_applicable:hover {
-  background: #f4f7f5 !important;
+.resultsPage .levelSummaryItem:hover,
+.resultsPage .levelSummaryItem:focus-visible {
+  background: #f2f6f3 !important;
 }
 
 .resultsPage .levelSummaryName { color: #13211d !important; }
@@ -69,60 +60,55 @@
 
 /* --------------------------------------------------------------------------
    L7 ANALYSIS REPORT
-   Restore the report to the same full-width Lumera page geometry/theme.
 ---------------------------------------------------------------------------- */
 .body:has(.analysisResultsPage) {
-  height: calc(100vh - 50px) !important;
+  height: 100% !important;
   min-height: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow: hidden !important;
   box-sizing: border-box !important;
-  padding-bottom: 28px !important;
+  padding: 0 !important;
 }
 
 .analysisResultsPage {
+  height: 100% !important;
+  min-height: 0 !important;
   width: 100% !important;
   max-width: none !important;
-  height: auto !important;
-  min-height: 100% !important;
-  overflow: visible !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   margin: 0 !important;
-  padding: 0 !important;
-  display: block !important;
+  padding: 0 0 28px !important;
+  box-sizing: border-box !important;
 }
 
 .analysisResultsPage > .stack {
   width: 100% !important;
   max-width: none !important;
   margin: 0 !important;
-  padding: 0 !important;
-  display: grid !important;
-  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
-  gap: 12px !important;
-  align-items: start !important;
+  padding: 0 16px 24px !important;
+  box-sizing: border-box !important;
+  display: block !important;
 }
 
-.analysisResultsPage > .stack > .pageTitle {
-  grid-column: 1 / -1 !important;
-  min-height: 58px !important;
-  margin: 0 !important;
+.analysisResultsPage .pageTitle {
+  width: 100% !important;
+  margin: 0 -16px 12px !important;
   padding: 14px 16px !important;
-  box-sizing: border-box !important;
+  min-height: 54px !important;
+  box-sizing: content-box !important;
   display: flex !important;
   align-items: center !important;
-  color: var(--page-header-title, #13211d) !important;
-  background: var(--page-header-bg, #f7faf8) !important;
-  border-bottom: 1px solid var(--page-header-border, #ccd5d0) !important;
+  background: #f7faf8 !important;
+  border-bottom: 1px solid #ccd5d0 !important;
+  color: #13211d !important;
   font-size: 22px !important;
   line-height: 1.1 !important;
   letter-spacing: -.03em !important;
 }
 
-.analysisResultsPage > .stack > .pageActions {
-  grid-column: 1 / -1 !important;
+.analysisResultsPage .pageActions {
   width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
+  margin: 0 0 12px !important;
   padding: 14px 16px !important;
   box-sizing: border-box !important;
   display: flex !important;
@@ -130,79 +116,215 @@
   justify-content: space-between !important;
   gap: 20px !important;
   background: #fbfcfb !important;
-  border: 1px solid var(--border, #d5ddd9) !important;
+  border: 1px solid #d5ddd9 !important;
 }
 
 .analysisResultsPage .pageActions > div:first-child {
   min-width: 0 !important;
 }
+
 .analysisResultsPage .pageActions h2 {
   margin: 3px 0 4px !important;
   font-size: 18px !important;
   line-height: 1.15 !important;
 }
+
 .analysisResultsPage .pageActions .runIdText {
   margin: 0 !important;
-  max-width: 600px !important;
+  max-width: 720px !important;
+  white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  color: var(--muted, #74837d) !important;
+  color: #74837d !important;
   font-size: 10px !important;
 }
+
 .analysisResultsPage .pageActions .actionRow {
-  flex: 0 0 auto !important;
   display: flex !important;
   align-items: center !important;
-  flex-wrap: nowrap !important;
   gap: 8px !important;
+  flex: 0 0 auto !important;
+  flex-wrap: nowrap !important;
 }
+
 .analysisResultsPage .pageActions button {
-  min-height: 34px !important;
   width: auto !important;
+  min-height: 34px !important;
+  padding: 0 14px !important;
   white-space: nowrap !important;
 }
 
-/* All direct report sections/cards span the usable report width. */
-.analysisResultsPage > .stack > :not(.pageTitle):not(.pageActions) {
-  grid-column: 1 / -1 !important;
-  min-width: 0 !important;
-  max-width: none !important;
-}
-
-/* Metric/status cards are allowed to form a compact row instead of becoming
-   narrow cards stacked at the far left. */
-.analysisResultsPage .stats,
-.analysisResultsPage .reportStats,
-.analysisResultsPage .analysisStats,
-.analysisResultsPage .summaryStats {
+.analysisResultsPage .analysisReportStatus {
   width: 100% !important;
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 10px !important;
-}
-
-.analysisResultsPage .panel,
-.analysisResultsPage .card,
-.analysisResultsPage .analysisSection,
-.analysisResultsPage .reportSection,
-.analysisResultsPage .evidenceSection {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
+  gap: 0 !important;
+  margin: 0 0 12px !important;
+  padding: 0 !important;
+  background: #fbfcfb !important;
+  border: 1px solid #d5ddd9 !important;
   box-sizing: border-box !important;
 }
 
-.analysisResultsPage table {
-  width: 100% !important;
-  table-layout: auto !important;
+.analysisResultsPage .analysisReportStatus > div {
+  min-width: 0 !important;
+  min-height: 74px !important;
+  padding: 14px 16px !important;
+  box-sizing: border-box !important;
+  border-right: 1px solid #d5ddd9 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 5px !important;
 }
 
-.analysisResultsPage p,
-.analysisResultsPage li,
-.analysisResultsPage td,
-.analysisResultsPage th {
+.analysisResultsPage .analysisReportStatus > div:last-child {
+  border-right: 0 !important;
+}
+
+.analysisResultsPage .analysisReportStatus span {
+  font-size: 9px !important;
+  text-transform: uppercase !important;
+  letter-spacing: .08em !important;
+  color: #7a8883 !important;
+}
+
+.analysisResultsPage .analysisReportStatus strong {
+  font-size: 15px !important;
+  color: #14231f !important;
   overflow-wrap: anywhere !important;
+}
+
+.analysisResultsPage .analysisReportSection {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 0 12px !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  background: #fbfcfb !important;
+  border: 1px solid #d5ddd9 !important;
+}
+
+.analysisResultsPage .analysisSectionHeading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding-bottom: 10px !important;
+  margin-bottom: 12px !important;
+  border-bottom: 1px solid #e0e6e3 !important;
+}
+
+.analysisResultsPage .analysisSectionHeading h3 {
+  margin: 0 !important;
+  font-size: 14px !important;
+  color: #14231f !important;
+}
+
+.analysisResultsPage .analysisValidation {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.analysisResultsPage .analysisValidationRow {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: 54px 180px 110px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 10px 0 !important;
+  border-bottom: 1px solid #e4e9e6 !important;
+}
+
+.analysisResultsPage .analysisValidationRow:last-child {
+  border-bottom: 0 !important;
+}
+
+.analysisResultsPage .analysisLevelCode {
+  width: 38px !important;
+  height: 30px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #edf4ff !important;
+  color: #315d89 !important;
+  border-radius: 3px !important;
+}
+
+.analysisResultsPage .analysisValidationSummary {
+  min-width: 0 !important;
+  color: #677771 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.analysisResultsPage .analysisFindingList,
+.analysisResultsPage .analysisCorrelationList {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.analysisResultsPage .analysisFindingCard,
+.analysisResultsPage .analysisCorrelationCard {
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 14px !important;
+  background: #f8faf9 !important;
+  border: 1px solid #dbe2de !important;
+}
+
+.analysisResultsPage .analysisFindingTop {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+}
+
+.analysisResultsPage .analysisFindingTop h4 {
+  margin: 0 !important;
+  color: #14231f !important;
+  font-size: 13px !important;
+}
+
+.analysisResultsPage .analysisBulletList {
+  padding-left: 18px !important;
+  margin-bottom: 0 !important;
+}
+
+.analysisResultsPage .analysisBulletList li,
+.analysisResultsPage .analysisReportSection p {
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+  color: #43534d !important;
+}
+
+.analysisResultsPage .analysisTechnicalEvidence {
+  width: 100% !important;
+  max-width: 100% !important;
+  max-height: 360px !important;
+  overflow: auto !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  background: #0d1714 !important;
+  color: #dce7e2 !important;
+  font-size: 10px !important;
+  line-height: 1.5 !important;
+}
+
+@media (max-width: 1050px) {
+  .analysisResultsPage .analysisFindingList,
+  .analysisResultsPage .analysisCorrelationList {
+    grid-template-columns: 1fr !important;
+  }
+  .analysisResultsPage .analysisValidationRow {
+    grid-template-columns: 46px 150px 90px minmax(0, 1fr) !important;
+  }
 }
 
 @media (max-width: 899px) {
@@ -210,21 +332,29 @@
     height: auto !important;
     overflow: visible !important;
   }
-  .analysisResultsPage > .stack {
-    display: flex !important;
-    flex-direction: column !important;
+  .analysisResultsPage {
+    height: auto !important;
+    overflow: visible !important;
   }
-  .analysisResultsPage > .stack > .pageActions {
+  .analysisResultsPage .pageActions {
     align-items: flex-start !important;
     flex-direction: column !important;
   }
   .analysisResultsPage .pageActions .actionRow {
     flex-wrap: wrap !important;
   }
-  .analysisResultsPage .stats,
-  .analysisResultsPage .reportStats,
-  .analysisResultsPage .analysisStats,
-  .analysisResultsPage .summaryStats {
+  .analysisResultsPage .analysisReportStatus {
     grid-template-columns: 1fr !important;
+  }
+  .analysisResultsPage .analysisReportStatus > div {
+    border-right: 0 !important;
+    border-bottom: 1px solid #d5ddd9 !important;
+  }
+  .analysisResultsPage .analysisValidationRow {
+    grid-template-columns: 46px minmax(0, 1fr) !important;
+  }
+  .analysisResultsPage .analysisValidationRow > :nth-child(3),
+  .analysisResultsPage .analysisValidationRow > :nth-child(4) {
+    grid-column: 2 !important;
   }
 }
