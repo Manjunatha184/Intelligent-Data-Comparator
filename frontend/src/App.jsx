@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Activity, ArrowRight, ChevronRight, Database, GitCompare, LayoutDashboard, Link2, Plus, SlidersHorizontal, Zap, Copy, Settings } from "lucide-react";
+import { Activity, ArrowRight, ChevronRight, Database, GitCompare, LayoutDashboard, Link2, Plus, Search, SlidersHorizontal, Zap } from "lucide-react";
 
 import { API_BASE, apiRequest } from "./api/client";
 import { ConnectionLine, Empty, Loading, Metric, Panel, Toast } from "./components/ui";
@@ -156,7 +156,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <TopNav />
+      <TopNav onOpenRun={handleComparisonComplete} notify={notify} />
       <div className="appBody">
         <Sidebar page={page} setPage={setPage} onOpenResultsHistory={openResultsHistory} />
 
@@ -253,7 +253,56 @@ function Footer() {
   );
 }
 
-function TopNav() {
+function TopNav({ onOpenRun, notify }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  async function searchComparisons(value) {
+    const needle = value.trim().toLowerCase();
+    setQuery(value);
+    if (!needle) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const [runs, configurations] = await Promise.all([
+        apiRequest("/comparisons", { method: "GET" }),
+        apiRequest("/configurations", { method: "GET" }).catch(() => []),
+      ]);
+      const names = new Map((Array.isArray(configurations) ? configurations : []).map((item) => [
+        String(item.configuration_id),
+        item.name || `Comparison ${item.configuration_id}`,
+      ]));
+
+      const matches = (Array.isArray(runs) ? runs : []).filter((run) => {
+        const name = names.get(String(run.configuration_id)) || `Comparison ${run.configuration_id}`;
+        return String(run.run_id || "").toLowerCase().includes(needle)
+          || name.toLowerCase().includes(needle);
+      }).slice(0, 8).map((run) => ({
+        ...run,
+        comparisonName: names.get(String(run.configuration_id)) || `Comparison ${run.configuration_id}`,
+      }));
+
+      setResults(matches);
+      setOpen(true);
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function chooseResult(runId) {
+    setOpen(false);
+    setQuery("");
+    onOpenRun(runId);
+  }
+
   return (
     <header className="topnav">
       <div className="topnavBrand">
@@ -262,15 +311,39 @@ function TopNav() {
         <div className="brandDivider">|</div>
         <div className="brandApp">VALIDATION<br/>CONSOLE</div>
       </div>
-      <div className="topnavLinks">
-        <button className="active">RUNS</button><button>COMPARE</button><button>CONNECTORS</button><button>POLICIES</button>
+      <div className="topnavSearch">
+        <Search size={14} />
+        <input
+          value={query}
+          onChange={(event) => searchComparisons(event.target.value)}
+          onFocus={() => query.trim() && setOpen(true)}
+          placeholder="Search comparison name or Run ID"
+          aria-label="Search comparisons"
+        />
+        {searching && <span className="topnavSearchBusy">…</span>}
+        {open && (
+          <div className="topnavSearchResults">
+            {results.length ? results.map((result) => (
+              <button key={result.run_id} type="button" onMouseDown={() => chooseResult(result.run_id)}>
+                <span><b>{result.comparisonName}</b><small>{result.run_id}</small></span>
+                <StatusDot value={result.comparison_status || result.status} />
+              </button>
+            )) : (
+              <div className="topnavSearchEmpty">No matching comparison runs</div>
+            )}
+          </div>
+        )}
       </div>
       <div className="topnavRight">
         <span className="workspaceLabel">workspace / prod-data</span>
-        <button className="iconBtn"><Copy size={14} /></button><button className="iconBtn"><Settings size={14} /></button>
       </div>
     </header>
   );
+}
+
+function StatusDot({ value }) {
+  const normalized = String(value || "UNKNOWN").toLowerCase();
+  return <i className={`globalSearchStatus ${normalized}`} title={value || "Unknown"} />;
 }
 
 function Sidebar({ page, setPage, onOpenResultsHistory }) {
