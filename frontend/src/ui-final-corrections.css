@@ -1,0 +1,230 @@
+/* Final targeted UI corrections: global search geometry, results tabs, analysis report. */
+
+/* --------------------------------------------------------------------------
+   TOP HEADER SEARCH
+   Center it in the CONTENT/WHITE workspace, not the entire browser header.
+   Desktop sidebar is ~222px, therefore content center is offset by half of it.
+---------------------------------------------------------------------------- */
+@media (min-width: 900px) {
+  .topnavSearch {
+    left: calc(50% + 111px) !important;
+    width: min(390px, 32vw) !important;
+    height: 30px !important;
+    transform: translate(-50%, -50%) !important;
+    padding: 0 10px !important;
+  }
+  .topnavSearch input {
+    height: 28px !important;
+    font-size: 9px !important;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .topnavSearch {
+    left: calc(50% + 96px) !important;
+    width: min(340px, 30vw) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   COMPARISON RESULTS LEVEL SELECTOR
+   Never turn a selected/hovered validation level black. Keep the enterprise
+   light surface and use only border/accent changes for state.
+---------------------------------------------------------------------------- */
+.resultsPage .levelSummaryItem,
+.resultsPage .levelSummaryItem:hover,
+.resultsPage .levelSummaryItem:focus,
+.resultsPage .levelSummaryItem:focus-visible,
+.resultsPage .levelSummaryItem:active {
+  background: #fbfcfb !important;
+  color: #13211d !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.resultsPage .levelSummaryItem:hover {
+  background: #f4f7f5 !important;
+}
+
+.resultsPage .levelSummaryItem.pass,
+.resultsPage .levelSummaryItem.fail,
+.resultsPage .levelSummaryItem.review,
+.resultsPage .levelSummaryItem.not_applicable {
+  background: #fbfcfb !important;
+}
+
+.resultsPage .levelSummaryItem.pass:hover,
+.resultsPage .levelSummaryItem.fail:hover,
+.resultsPage .levelSummaryItem.review:hover,
+.resultsPage .levelSummaryItem.not_applicable:hover {
+  background: #f4f7f5 !important;
+}
+
+.resultsPage .levelSummaryName { color: #13211d !important; }
+.resultsPage .levelSummaryFinding { color: #788781 !important; }
+.resultsPage .levelSummaryCode {
+  background: #edf4ff !important;
+  color: #315d89 !important;
+}
+
+/* --------------------------------------------------------------------------
+   L7 ANALYSIS REPORT
+   Restore the report to the same full-width Lumera page geometry/theme.
+---------------------------------------------------------------------------- */
+.body:has(.analysisResultsPage) {
+  height: calc(100vh - 50px) !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  padding-bottom: 28px !important;
+}
+
+.analysisResultsPage {
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 100% !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+}
+
+.analysisResultsPage > .stack {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+.analysisResultsPage > .stack > .pageTitle {
+  grid-column: 1 / -1 !important;
+  min-height: 58px !important;
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  color: var(--page-header-title, #13211d) !important;
+  background: var(--page-header-bg, #f7faf8) !important;
+  border-bottom: 1px solid var(--page-header-border, #ccd5d0) !important;
+  font-size: 22px !important;
+  line-height: 1.1 !important;
+  letter-spacing: -.03em !important;
+}
+
+.analysisResultsPage > .stack > .pageActions {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 20px !important;
+  background: #fbfcfb !important;
+  border: 1px solid var(--border, #d5ddd9) !important;
+}
+
+.analysisResultsPage .pageActions > div:first-child {
+  min-width: 0 !important;
+}
+.analysisResultsPage .pageActions h2 {
+  margin: 3px 0 4px !important;
+  font-size: 18px !important;
+  line-height: 1.15 !important;
+}
+.analysisResultsPage .pageActions .runIdText {
+  margin: 0 !important;
+  max-width: 600px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: var(--muted, #74837d) !important;
+  font-size: 10px !important;
+}
+.analysisResultsPage .pageActions .actionRow {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+}
+.analysisResultsPage .pageActions button {
+  min-height: 34px !important;
+  width: auto !important;
+  white-space: nowrap !important;
+}
+
+/* All direct report sections/cards span the usable report width. */
+.analysisResultsPage > .stack > :not(.pageTitle):not(.pageActions) {
+  grid-column: 1 / -1 !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+/* Metric/status cards are allowed to form a compact row instead of becoming
+   narrow cards stacked at the far left. */
+.analysisResultsPage .stats,
+.analysisResultsPage .reportStats,
+.analysisResultsPage .analysisStats,
+.analysisResultsPage .summaryStats {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.analysisResultsPage .panel,
+.analysisResultsPage .card,
+.analysisResultsPage .analysisSection,
+.analysisResultsPage .reportSection,
+.analysisResultsPage .evidenceSection {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.analysisResultsPage table {
+  width: 100% !important;
+  table-layout: auto !important;
+}
+
+.analysisResultsPage p,
+.analysisResultsPage li,
+.analysisResultsPage td,
+.analysisResultsPage th {
+  overflow-wrap: anywhere !important;
+}
+
+@media (max-width: 899px) {
+  .body:has(.analysisResultsPage) {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .analysisResultsPage > .stack {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .analysisResultsPage > .stack > .pageActions {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+  .analysisResultsPage .pageActions .actionRow {
+    flex-wrap: wrap !important;
+  }
+  .analysisResultsPage .stats,
+  .analysisResultsPage .reportStats,
+  .analysisResultsPage .analysisStats,
+  .analysisResultsPage .summaryStats {
+    grid-template-columns: 1fr !important;
+  }
+}
