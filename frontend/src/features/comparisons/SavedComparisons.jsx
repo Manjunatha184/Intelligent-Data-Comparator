@@ -32,6 +32,49 @@ function executablePayload(configuration) {
   return payload;
 }
 
+function connectionId(dataset) {
+  return dataset?.connection_id ?? dataset?.properties?.connection_id ?? "";
+}
+
+function reconstructWorkspace(item) {
+  const configuration = item.configuration || {};
+  const source = configuration.source || {};
+  const target = configuration.target || {};
+  const sourceProperties = source.properties || {};
+  const targetProperties = target.properties || {};
+
+  return {
+    version: 1,
+    comparisonName: item.name || configuration?._meta?.name || `Comparison ${item.configuration_id}`,
+    configurationId: item.configuration_id,
+    step: 1,
+    sourceId: connectionId(source) ? String(connectionId(source)) : "",
+    targetId: connectionId(target) ? String(connectionId(target)) : "",
+    sourceDbCatalog: sourceProperties.catalog || "",
+    sourceDbSchema: sourceProperties.schema || "",
+    sourceDbTable: sourceProperties.table || "",
+    targetDbCatalog: targetProperties.catalog || "",
+    targetDbSchema: targetProperties.schema || "",
+    targetDbTable: targetProperties.table || "",
+    levels: [
+      ...(Array.isArray(configuration.comparison_levels) ? configuration.comparison_levels : []),
+      ...(configuration.l7_enabled ? ["L7"] : []),
+    ],
+    comparisonKeys: Array.isArray(configuration.comparison_keys) && configuration.comparison_keys.length
+      ? configuration.comparison_keys
+      : [{ source_column: "", target_column: "" }],
+    groupingAttributes: Array.isArray(configuration.grouping_attributes) ? configuration.grouping_attributes : [],
+    aggregationColumns: Array.isArray(configuration.aggregation_columns) ? configuration.aggregation_columns : [],
+    selectedDqRuleIds: [],
+    selectedAggRuleIds: [],
+    columnMappings: Array.isArray(configuration.column_mappings) ? configuration.column_mappings : [],
+    sourceFilters: Array.isArray(configuration.source_filters) ? configuration.source_filters : [],
+    targetFilters: Array.isArray(configuration.target_filters) ? configuration.target_filters : [],
+    ignoredSourceColumns: Array.isArray(configuration.ignored_columns) ? configuration.ignored_columns : [],
+    ignoredTargetColumns: Array.isArray(configuration.ignored_columns) ? configuration.ignored_columns : [],
+  };
+}
+
 export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -66,21 +109,20 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
 
   function editConfiguration(item) {
     const configuration = item.configuration || {};
-    const workspace = configuration._workspace;
-    if (!workspace) {
-      notify("This older configuration does not contain an editable workspace snapshot.", "error");
-      return;
-    }
-
+    const workspace = configuration._workspace || reconstructWorkspace(item);
     const restored = {
       ...workspace,
-      comparisonName: item.name || workspace.comparisonName || "",
+      comparisonName: item.name || configuration?._meta?.name || workspace.comparisonName || `Comparison ${item.configuration_id}`,
       configurationId: item.configuration_id,
       step: 1,
     };
 
     window.localStorage.setItem(LOCAL_COMPARISON_DRAFT_KEY, JSON.stringify(restored));
     onEdit(item.configuration_id);
+
+    if (!configuration._workspace) {
+      notify("Editable configuration restored from the saved runtime settings. Review reusable rule selections before saving.");
+    }
   }
 
   async function rerunConfiguration(item) {
@@ -99,7 +141,7 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
           ...payload,
         }),
       });
-      notify(`Comparison ${String(result.status).toLowerCase()}.`);
+      notify(`Rerun started from configuration #${item.configuration_id}. ${String(result.status).toLowerCase()}.`);
       onRunComplete(result.run_id);
     } catch (error) {
       notify(error.message, "error");
