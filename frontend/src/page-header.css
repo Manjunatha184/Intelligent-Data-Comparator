@@ -1,0 +1,145 @@
+/*
+ * Shared page-header rhythm.
+ * Loaded last so Overview, Connections, Rules, Results and Comparison
+ * use the same compact visual header without changing page functionality.
+ */
+
+:root {
+  --page-header-bg: #f8faf8;
+  --page-header-border: #d4dcd8;
+  --page-header-title: #172521;
+  --page-header-muted: #7b8882;
+}
+
+/* Generic page headers: Connection Manager, Rule Repository, Results history. */
+.body > .stack > .wizardFooter,
+.historyPage > .wizardFooter {
+  min-height: 72px !important;
+  margin: -26px -30px 14px !important;
+  padding: 14px 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 22px !important;
+  background: var(--page-header-bg) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--page-header-border) !important;
+  box-shadow: none !important;
+}
+
+.body > .stack > .wizardFooter .pageTitle,
+.historyPage > .wizardFooter .pageTitle {
+  margin: 0 !important;
+  color: var(--page-header-title) !important;
+  font-size: 22px !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.body > .stack > .wizardFooter .actionRow,
+.historyPage > .wizardFooter .actionRow {
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+/* Overview previously had a much larger hero treatment. Make it a page header. */
+.dashboardIntro {
+  min-height: 72px !important;
+  margin: -26px -30px 14px !important;
+  padding: 12px 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 24px !important;
+  background: var(--page-header-bg) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--page-header-border) !important;
+}
+
+.dashboardIntro > div {
+  min-width: 0 !important;
+}
+
+.dashboardIntro .sectionEyebrow {
+  display: none !important;
+}
+
+.dashboardIntro h1 {
+  margin: 0 !important;
+  color: var(--page-header-title) !important;
+  font-size: 22px !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.dashboardIntro p {
+  margin: 5px 0 0 !important;
+  color: var(--page-header-muted) !important;
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+}
+
+.dashboardIntro .primary {
+  flex: 0 0 auto !important;
+}
+
+/* Comparison has the wizard progress, but should share the same header shell. */
+.comparisonBuilder > .wizardFooter {
+  min-height: 72px !important;
+  margin: -26px -30px 8px !important;
+  padding: 12px 30px !important;
+  background: var(--page-header-bg) !important;
+  border-bottom: 1px solid var(--page-header-border) !important;
+}
+
+.comparisonBuilder > .wizardFooter .pageTitle {
+  color: var(--page-header-title) !important;
+  font-size: 22px !important;
+}
+
+/* Remove the large dead band visible between the wizard header and panels. */
+.comparisonBuilder > .stack:not(.reviewRunStep) {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.scopeSourceSection,
+.scopeLevelsPanel {
+  margin-top: 0 !important;
+}
+
+/* Keep header action buttons visually consistent across pages. */
+.wizardFooter .primary,
+.wizardFooter .secondary,
+.dashboardIntro .primary,
+.dashboardIntro .secondary {
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 13px !important;
+  font-size: 9px !important;
+}
+
+/* Tablet/narrow desktop: preserve the same rhythm without negative overflow. */
+@media (max-width: 1099px) {
+  .body > .stack > .wizardFooter,
+  .historyPage > .wizardFooter,
+  .dashboardIntro,
+  .comparisonBuilder > .wizardFooter {
+    margin-left: -20px !important;
+    margin-right: -20px !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .body > .stack > .wizardFooter,
+  .historyPage > .wizardFooter,
+  .dashboardIntro,
+  .comparisonBuilder > .wizardFooter {
+    min-height: auto !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+}
