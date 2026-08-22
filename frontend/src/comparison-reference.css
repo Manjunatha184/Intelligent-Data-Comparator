@@ -4,17 +4,36 @@
  */
 
 @media (min-width: 1100px) {
-  .comparisonBuilder { gap: 14px !important; }
-  .comparisonProgress { min-width: 320px !important; display: flex !important; align-items: center !important; gap: 12px !important; }
+  .comparisonBuilder { gap: 12px !important; }
+
+  .comparisonProgress {
+    min-width: 320px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
   .comparisonProgress i { width: 32px !important; height: 1px !important; background: #ccd5d0 !important; }
   .comparisonProgress span { white-space: nowrap !important; }
 
+  /*
+   * Main Step-1 composition:
+   * left  = ledger -> filters -> record key
+   * right = comparison depth spanning the full workspace height
+   */
   .comparisonBuilder > .stack:not(.reviewRunStep) {
     display: grid !important;
     grid-template-columns: minmax(620px, 1.72fr) minmax(410px, 1fr) !important;
-    gap: 14px !important;
+    grid-template-areas:
+      "ledger depth"
+      "extras depth" !important;
+    grid-template-rows: auto auto !important;
+    gap: 12px 14px !important;
     align-items: start !important;
   }
+
+  .scopeSourceSection { grid-area: ledger !important; }
+  .scopeLevelsPanel { grid-area: depth !important; }
+  .scopeFirstPageExtras { grid-area: extras !important; }
 
   .scopeSourceSection,
   .scopeLevelsPanel {
@@ -27,56 +46,203 @@
     overflow: visible !important;
   }
 
-  .scopeSectionIntro { height: 38px !important; min-height: 38px !important; margin: 0 !important; padding: 0 14px !important; display: flex !important; align-items: center !important; background: #fbfcfb !important; border-bottom: 1px solid #d9e0dc !important; }
+  /* ---------------- Ledger selection ---------------- */
+  .scopeSectionIntro {
+    height: 38px !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    background: #fbfcfb !important;
+    border-bottom: 1px solid #d9e0dc !important;
+  }
   .scopeSectionIntro h2 { margin: 0 !important; font-size: 0 !important; }
   .scopeSectionIntro h2::before { content: "Ledger selection"; color: #1d2c27; font-size: 10px; font-weight: 700; }
-  .scopeSectionIntro h2::after { content: "PAIRED"; margin-left: 10px; color: #8b9792; font: 600 7px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .09em; }
+  .scopeSectionIntro h2::after {
+    content: "PAIRED";
+    margin-left: 10px;
+    color: #8b9792;
+    font: 600 7px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: .09em;
+  }
 
-  .scopeSourceGrid { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; gap: 0 !important; height: auto !important; min-height: 0 !important; background: #fbfcfb !important; }
-  .scopeSourceGrid > .scopeDatasetCard { min-width: 0 !important; min-height: 150px !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; }
+  .scopeSourceGrid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fbfcfb !important;
+  }
+
+  .scopeSourceGrid > .scopeDatasetCard {
+    min-width: 0 !important;
+    min-height: 142px !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
   .scopeSourceGrid > .scopeDatasetCard:first-child { border-right: 1px solid #d9e0dc !important; }
-  .scopeDatasetCard .panelHead { height: 34px !important; min-height: 34px !important; padding: 0 14px !important; display: flex !important; align-items: center !important; border-bottom: 1px solid #e0e6e3 !important; }
-  .scopeDatasetCard .panelHead h3 { margin: 0 !important; color: #315f7d !important; font-size: 8px !important; font-weight: 700 !important; letter-spacing: .08em !important; text-transform: uppercase !important; }
+
+  .scopeDatasetCard .panelHead {
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    border-bottom: 1px solid #e0e6e3 !important;
+  }
+  .scopeDatasetCard .panelHead h3 {
+    margin: 0 !important;
+    color: #315f7d !important;
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    letter-spacing: .08em !important;
+    text-transform: uppercase !important;
+  }
   .scopeSourceGrid > .scopeDatasetCard:last-child .panelHead h3 { color: #75558a !important; }
-  .scopeDatasetCard > .connectionSelector { margin: 14px 14px 12px !important; }
+
+  .scopeDatasetCard > .connectionSelector { margin: 13px 14px 11px !important; }
   .scopeDatasetCard .connectionSelector select { width: 100% !important; height: 36px !important; min-height: 36px !important; }
-  .scopeDatasetCard > .connectionSelector + div { margin: 0 14px 14px !important; display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; align-items: end !important; }
+
+  /* Databricks stays compact within either source/target half. */
+  .scopeDatasetCard > .connectionSelector + div {
+    margin: 0 14px 13px !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    align-items: end !important;
+  }
   .scopeDatasetCard > .connectionSelector + div > .field { min-width: 0 !important; margin: 0 !important; }
   .scopeDatasetCard > .connectionSelector + div > .field span { display: block !important; margin-bottom: 5px !important; white-space: nowrap !important; }
-  .scopeDatasetCard > .connectionSelector + div > .field select { width: 100% !important; min-width: 0 !important; height: 34px !important; min-height: 34px !important; padding-left: 8px !important; padding-right: 24px !important; text-overflow: ellipsis !important; }
+  .scopeDatasetCard > .connectionSelector + div > .field select {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding-left: 8px !important;
+    padding-right: 24px !important;
+    text-overflow: ellipsis !important;
+  }
 
-  .scopeLevelsPanel { padding: 0 !important; }
-  .scopeLevelsPanel > .panelHead { height: 38px !important; min-height: 38px !important; padding: 0 14px !important; display: flex !important; align-items: center !important; border-bottom: 1px solid #d9e0dc !important; }
+  /* ---------------- Comparison depth ---------------- */
+  .scopeLevelsPanel { padding: 0 !important; align-self: stretch !important; }
+  .scopeLevelsPanel > .panelHead {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    border-bottom: 1px solid #d9e0dc !important;
+  }
   .scopeLevelsPanel > .panelHead h3 { margin: 0 !important; font-size: 10px !important; }
-  .scopeLevelIntro { min-height: 44px !important; margin: 0 !important; padding: 0 14px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; border-bottom: 1px solid #e0e6e3 !important; }
-  .scopeSelectionCount { padding: 5px 8px !important; border-radius: 14px !important; background: #eef2f0 !important; color: #718079 !important; font-size: 7px !important; line-height: 1 !important; }
+
+  .scopeLevelIntro {
+    min-height: 44px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid #e0e6e3 !important;
+  }
+  .scopeSelectionCount {
+    padding: 5px 8px !important;
+    border-radius: 14px !important;
+    background: #eef2f0 !important;
+    color: #718079 !important;
+    font-size: 7px !important;
+    line-height: 1 !important;
+  }
   .scopeLevelIntro button { font-size: 9px !important; }
-  .scopeLevelsPanel .levelGrid { display: block !important; grid-template-columns: none !important; gap: 0 !important; padding: 0 14px !important; }
-  .scopeLevelsPanel .levelRow { width: 100% !important; min-height: 56px !important; height: 56px !important; margin: 0 !important; padding: 0 10px !important; display: flex !important; align-items: center !important; border: 0 !important; border-bottom: 1px solid #e1e6e3 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; text-align: left !important; }
+
+  .scopeLevelsPanel .levelGrid {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+    padding: 0 14px !important;
+  }
+  .scopeLevelsPanel .levelRow {
+    width: 100% !important;
+    min-height: 55px !important;
+    height: 55px !important;
+    margin: 0 !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e1e6e3 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-align: left !important;
+  }
   .scopeLevelsPanel .levelRow:last-child { border-bottom: 0 !important; }
   .scopeLevelsPanel .levelRow:hover { background: #f4f7f5 !important; }
   .scopeLevelsPanel .levelRow.selected { background: transparent !important; box-shadow: none !important; }
   .scopeLevelsPanel .levelRow.selected:hover { background: #f4f7f5 !important; }
-  .scopeLevelsPanel .levelRowLeft { width: 100% !important; min-width: 0 !important; display: grid !important; grid-template-columns: 18px 34px minmax(0, 1fr) !important; align-items: center !important; gap: 9px !important; }
-  .scopeLevelsPanel .customCheckbox { width: 16px !important; height: 16px !important; display: grid !important; place-items: center !important; border: 1px solid #bcc7c2 !important; border-radius: 2px !important; color: #172521 !important; background: #fff !important; }
-  .scopeLevelsPanel .customCheckbox.checked { background: #f2b43b !important; border-color: #e5a72d !important; }
-  .scopeLevelsPanel .levelChip { width: 29px !important; height: 24px !important; display: grid !important; place-items: center !important; border-radius: 2px !important; background: #eef2f0 !important; color: #52615b !important; font: 700 8px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important; }
-  .scopeLevelsPanel .levelRowText { min-width: 0 !important; }
-  .scopeLevelsPanel .levelRowText b { display: block !important; color: #192823 !important; font-size: 10px !important; line-height: 1.2 !important; }
-  .scopeLevelsPanel .levelRowText small { display: block !important; margin-top: 3px !important; overflow: hidden !important; color: #7b8782 !important; font-size: 8px !important; line-height: 1.25 !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 
-  /* Filters and record matching now belong to Step 1 and use the full page width. */
-  .scopeFirstPageExtras {
-    grid-column: 1 / -1 !important;
+  .scopeLevelsPanel .levelRowLeft {
     width: 100% !important;
     min-width: 0 !important;
-    gap: 14px !important;
+    display: grid !important;
+    grid-template-columns: 18px 34px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 9px !important;
   }
+  .scopeLevelsPanel .customCheckbox {
+    width: 16px !important;
+    height: 16px !important;
+    display: grid !important;
+    place-items: center !important;
+    border: 1px solid #bcc7c2 !important;
+    border-radius: 2px !important;
+    color: #172521 !important;
+    background: #fff !important;
+  }
+  .scopeLevelsPanel .customCheckbox.checked { background: #f2b43b !important; border-color: #e5a72d !important; }
+  .scopeLevelsPanel .levelChip {
+    width: 29px !important;
+    height: 24px !important;
+    display: grid !important;
+    place-items: center !important;
+    border-radius: 2px !important;
+    background: #eef2f0 !important;
+    color: #52615b !important;
+    font: 700 8px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  }
+  .scopeLevelsPanel .levelRowText { min-width: 0 !important; }
+  .scopeLevelsPanel .levelRowText b { display: block !important; color: #192823 !important; font-size: 10px !important; line-height: 1.2 !important; }
+  .scopeLevelsPanel .levelRowText small {
+    display: block !important;
+    margin-top: 3px !important;
+    overflow: hidden !important;
+    color: #7b8782 !important;
+    font-size: 8px !important;
+    line-height: 1.25 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* ---------------- Filters + record matching ---------------- */
+  .scopeFirstPageExtras {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-self: start !important;
+  }
+
+  .scopeFirstPageExtras .scopeSchemaStatus { margin: 0 !important; }
 
   .scopeFirstPageExtras .scopeFiltersGrid {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-    gap: 14px !important;
+    gap: 12px !important;
     align-items: start !important;
   }
 
@@ -84,34 +250,92 @@
   .scopeFirstPageExtras .scopeRecordMatchingCard {
     margin: 0 !important;
     min-width: 0 !important;
+    background: #fbfcfb !important;
+    border: 1px solid #c7d0cc !important;
+    box-shadow: none !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .panelHead,
+  .scopeFirstPageExtras .scopeRecordMatchingCard .panelHead {
+    min-height: 38px !important;
+    height: 38px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    border-bottom: 1px solid #d9e0dc !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .panelHead h3,
+  .scopeFirstPageExtras .scopeRecordMatchingCard .panelHead h3 {
+    margin: 0 !important;
+    font-size: 10px !important;
+  }
+
+  .scopeFirstPageExtras .filterCard > .stack {
+    gap: 8px !important;
+    padding: 11px 14px 13px !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .secondary {
+    width: 100% !important;
+    min-height: 34px !important;
+    justify-content: center !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .formGrid {
+    grid-template-columns: minmax(120px, 1fr) 92px minmax(120px, 1fr) auto !important;
+    gap: 7px !important;
+    align-items: end !important;
   }
 
   .scopeFirstPageExtras .scopeRecordMatchingCard .formGrid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 12px !important;
+    padding: 11px 14px 14px !important;
   }
 
-  .scopeSchemaStatus { grid-column: 1 / -1 !important; }
+  .scopeFirstPageExtras .scopeRecordMatchingCard .field {
+    margin: 0 !important;
+  }
+
   .comparisonBuilder::after { display: none !important; }
 }
 
 @media (min-width: 1100px) and (max-width: 1360px) {
-  .comparisonBuilder > .stack:not(.reviewRunStep) { grid-template-columns: minmax(560px, 1.5fr) minmax(370px, .95fr) !important; }
+  .comparisonBuilder > .stack:not(.reviewRunStep) {
+    grid-template-columns: minmax(560px, 1.5fr) minmax(370px, .95fr) !important;
+  }
   .scopeDatasetCard > .connectionSelector + div { grid-template-columns: 1fr 1fr !important; }
   .scopeDatasetCard > .connectionSelector + div > .field:last-child { grid-column: 1 / -1 !important; }
+  .scopeFirstPageExtras .filterCard .formGrid { grid-template-columns: 1fr 86px 1fr !important; }
+  .scopeFirstPageExtras .filterCard .formGrid > button { grid-column: 1 / -1 !important; }
 }
 
 @media (max-width: 1099px) {
   .comparisonBuilder > .stack:not(.reviewRunStep) { display: block !important; }
   .scopeSourceSection { margin-bottom: 12px !important; }
+  .scopeLevelsPanel { margin-bottom: 12px !important; }
   .scopeSourceGrid { display: grid !important; grid-template-columns: 1fr 1fr !important; }
-  .scopeDatasetCard > .connectionSelector + div { margin: 0 14px 14px !important; display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
-  .scopeFirstPageExtras { margin-top: 12px !important; }
-  .scopeFirstPageExtras .scopeFiltersGrid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+  .scopeDatasetCard > .connectionSelector + div {
+    margin: 0 14px 14px !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  .scopeFirstPageExtras { margin-top: 0 !important; }
+  .scopeFirstPageExtras .scopeFiltersGrid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
 }
 
 @media (max-width: 720px) {
   .scopeSourceGrid { grid-template-columns: 1fr !important; }
-  .scopeSourceGrid > .scopeDatasetCard:first-child { border-right: 0 !important; border-bottom: 1px solid #d9e0dc !important; }
+  .scopeSourceGrid > .scopeDatasetCard:first-child {
+    border-right: 0 !important;
+    border-bottom: 1px solid #d9e0dc !important;
+  }
   .scopeFirstPageExtras .scopeFiltersGrid { grid-template-columns: 1fr !important; }
   .scopeFirstPageExtras .scopeRecordMatchingCard .formGrid { grid-template-columns: 1fr !important; }
 }
