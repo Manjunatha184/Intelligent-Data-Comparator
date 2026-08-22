@@ -4,10 +4,13 @@ import { Activity, ArrowRight, ChevronRight, Database, GitCompare, LayoutDashboa
 import { API_BASE, apiRequest } from "./api/client";
 import { ConnectionLine, Empty, Loading, Metric, Panel, Toast } from "./components/ui";
 import { ComparisonBuilder } from "./features/comparisons/ComparisonBuilder";
+import { SavedComparisons } from "./features/comparisons/SavedComparisons";
 import { ConnectionManager, ConnectionModal } from "./features/connections/Connections";
 import { L7AnalysisReportView } from "./features/results/Results";
 import { ResultsConsole } from "./features/results/ResultsConsole";
 import { RulesPage } from "./features/rules/RulesPage";
+
+const LOCAL_COMPARISON_DRAFT_KEY = "lumera.comparison.workspace.v1";
 
 function AnalysisPage({ runId, onBack, notify }) {
   const [data, setData] = useState(null);
@@ -57,25 +60,18 @@ function AnalysisPage({ runId, onBack, notify }) {
   );
 }
 
-/* ============================================================
-   APPLICATION
-============================================================ */
-
 export default function App() {
   const [page, setPage] = useState(() => {
     const p = window.location.pathname;
     if (p.match(/^\/results\/([^/]+)\/analysis$/)) return "analysis";
     return "dashboard";
   });
-
+  const [comparisonBuilderKey, setComparisonBuilderKey] = useState(0);
   const [connections, setConnections] = useState([]);
-
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [connectionsError, setConnectionsError] = useState(null);
   const connectionsRequestId = React.useRef(0);
-
   const [connectionModalOpen, setConnectionModalOpen] = useState(false);
-
   const [activeRunId, setActiveRunId] = useState(() => {
     const match = window.location.pathname.match(/^\/results\/([^/]+)\/analysis$/);
     return match ? match[1] : null;
@@ -99,26 +95,17 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   function notify(message, type = "success") {
-    setToast({
-      message,
-      type,
-    });
-
+    setToast({ message, type });
     window.clearTimeout(window.__v1ToastTimer);
-
-    window.__v1ToastTimer = window.setTimeout(() => {
-      setToast(null);
-    }, 3500);
+    window.__v1ToastTimer = window.setTimeout(() => setToast(null), 3500);
   }
 
   async function loadConnections() {
     const requestId = ++connectionsRequestId.current;
     setLoadingConnections(true);
     setConnectionsError(null);
-
     try {
       const data = await apiRequest("/connections");
-
       if (requestId !== connectionsRequestId.current) return;
       if (!Array.isArray(data)) throw new Error("Invalid connection list response.");
       setConnections(data);
@@ -131,13 +118,8 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    loadConnections();
-  }, []);
-
-  useEffect(() => {
-    if (page === "comparison") loadConnections();
-  }, [page]);
+  useEffect(() => { loadConnections(); }, []);
+  useEffect(() => { if (page === "comparison-builder") loadConnections(); }, [page]);
 
   function handleComparisonComplete(runId) {
     setActiveRunId(runId);
@@ -161,23 +143,29 @@ export default function App() {
     window.history.pushState(null, "", `/results/${runId}/analysis`);
   }
 
+  function startNewComparison() {
+    window.localStorage.removeItem(LOCAL_COMPARISON_DRAFT_KEY);
+    setComparisonBuilderKey((current) => current + 1);
+    setPage("comparison-builder");
+  }
+
+  function editComparison() {
+    setComparisonBuilderKey((current) => current + 1);
+    setPage("comparison-builder");
+  }
+
   return (
     <div className="app">
       <TopNav />
       <div className="appBody">
-        <Sidebar
-          page={page}
-          setPage={setPage}
-          hasResults={Boolean(activeRunId)}
-          onOpenResultsHistory={openResultsHistory}
-        />
+        <Sidebar page={page} setPage={setPage} onOpenResultsHistory={openResultsHistory} />
 
         <main className="main">
           <div className="body">
             {page === "dashboard" && (
               <Dashboard
                 connections={connections}
-                onNewComparison={() => setPage("comparison")}
+                onNewComparison={startNewComparison}
                 onConnections={() => setPage("connections")}
               />
             )}
@@ -192,8 +180,18 @@ export default function App() {
               />
             )}
 
-            {page === "comparison" && (
+            {page === "comparisons" && (
+              <SavedComparisons
+                onNew={startNewComparison}
+                onEdit={editComparison}
+                onRunComplete={handleComparisonComplete}
+                notify={notify}
+              />
+            )}
+
+            {page === "comparison-builder" && (
               <ComparisonBuilder
+                key={comparisonBuilderKey}
                 connections={connections}
                 notify={notify}
                 connectionsLoading={loadingConnections}
@@ -240,39 +238,20 @@ export default function App() {
         />
       )}
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <Footer />
     </div>
   );
 }
 
-/* ============================================================
-   FOOTER
-============================================================ */
-
 function Footer() {
   return (
     <footer className="globalFooter">
       <div className="footerLeft">Lumera Corporation © 2026</div>
-      <div className="footerRight">
-        <span>Terms of Service</span>
-        <span>Privacy Policy</span>
-        <span>v1.0.0</span>
-      </div>
+      <div className="footerRight"><span>Terms of Service</span><span>Privacy Policy</span><span>v1.0.0</span></div>
     </footer>
   );
 }
-
-/* ============================================================
-   TOPNAV
-============================================================ */
 
 function TopNav() {
   return (
@@ -284,233 +263,63 @@ function TopNav() {
         <div className="brandApp">VALIDATION<br/>CONSOLE</div>
       </div>
       <div className="topnavLinks">
-        <button className="active">RUNS</button>
-        <button>COMPARE</button>
-        <button>CONNECTORS</button>
-        <button>POLICIES</button>
+        <button className="active">RUNS</button><button>COMPARE</button><button>CONNECTORS</button><button>POLICIES</button>
       </div>
       <div className="topnavRight">
         <span className="workspaceLabel">workspace / prod-data</span>
-        <button className="iconBtn"><Copy size={14} /></button>
-        <button className="iconBtn"><Settings size={14} /></button>
+        <button className="iconBtn"><Copy size={14} /></button><button className="iconBtn"><Settings size={14} /></button>
       </div>
     </header>
   );
 }
 
-/* ============================================================
-   SIDEBAR
-============================================================ */
-
-function Sidebar({ page, setPage, hasResults, onOpenResultsHistory }) {
+function Sidebar({ page, setPage, onOpenResultsHistory }) {
   return (
     <aside className="sidebar">
       <div className="workspace">WORKSPACE</div>
-
-      <NavigationItem
-        icon={LayoutDashboard}
-        label="Overview"
-        active={page === "dashboard"}
-        onClick={() => setPage("dashboard")}
-      />
-
-      <NavigationItem
-        icon={GitCompare}
-        label="Comparisons"
-        active={page === "comparison"}
-        onClick={() => setPage("comparison")}
-      />
-
-      <NavigationItem
-        icon={Activity}
-        label="Results"
-        active={page === "results"}
-        onClick={onOpenResultsHistory}
-      />
-
+      <NavigationItem icon={LayoutDashboard} label="Overview" active={page === "dashboard"} onClick={() => setPage("dashboard")} />
+      <NavigationItem icon={GitCompare} label="Comparisons" active={page === "comparisons" || page === "comparison-builder"} onClick={() => setPage("comparisons")} />
+      <NavigationItem icon={Activity} label="Results" active={page === "results"} onClick={onOpenResultsHistory} />
       <div className="workspace">CONFIGURATION</div>
-
-      <NavigationItem
-        icon={Link2}
-        label="Connection Manager"
-        active={page === "connections"}
-        onClick={() => setPage("connections")}
-      />
-
-      <NavigationItem
-        icon={SlidersHorizontal}
-        label="Rule Repository"
-        active={page === "rules"}
-        onClick={() => setPage("rules")}
-      />
-
-      <div className="sidebarBottom">
-        <div className="apiState">
-          <i />
-
-          <div>
-            <b>Backend online</b>
-            <span>FastAPI · :8000</span>
-          </div>
-        </div>
-      </div>
+      <NavigationItem icon={Link2} label="Connection Manager" active={page === "connections"} onClick={() => setPage("connections")} />
+      <NavigationItem icon={SlidersHorizontal} label="Rule Repository" active={page === "rules"} onClick={() => setPage("rules")} />
+      <div className="sidebarBottom"><div className="apiState"><i /><div><b>Backend online</b><span>FastAPI · :8000</span></div></div></div>
     </aside>
   );
 }
 
-function NavigationItem({
-  icon: Icon,
-  label,
-  active,
-  disabled,
-  onClick,
-}) {
+function NavigationItem({ icon: Icon, label, active, disabled, onClick }) {
   return (
-    <button
-      className={`nav ${active ? "active" : ""}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <Icon size={17} />
-
-      <span>{label}</span>
-
-      {active && <ChevronRight size={14} />}
+    <button className={`nav ${active ? "active" : ""}`} disabled={disabled} onClick={onClick}>
+      <Icon size={17} /><span>{label}</span>{active && <ChevronRight size={14} />}
     </button>
   );
 }
 
-/* ============================================================
-   HEADER
-============================================================ */
-
-function Header() {
-  return (
-    <header className="header">
-    </header>
-  );
-}
-
-/* ============================================================
-   DASHBOARD
-============================================================ */
-
-function Dashboard({
-  connections,
-  onNewComparison,
-  onConnections,
-}) {
-  const connectedCount = connections.filter(
-    (connection) => connection.status === "CONNECTED"
-  ).length;
-
+function Dashboard({ connections, onNewComparison, onConnections }) {
+  const connectedCount = connections.filter((connection) => connection.status === "CONNECTED").length;
   return (
     <div className="stack">
       <div className="dashboardIntro">
-        <div>
-          <span className="sectionEyebrow">DATA QUALITY WORKSPACE</span>
-          <h1>Comparison control center</h1>
-          <p>Monitor connections, configure validation, and review evidence.</p>
-        </div>
-        <button className="primary" onClick={onNewComparison}>
-          <Plus size={15} /> New comparison
-        </button>
+        <div><span className="sectionEyebrow">DATA QUALITY WORKSPACE</span><h1>Comparison control center</h1><p>Monitor connections, configure validation, and review evidence.</p></div>
+        <button className="primary" onClick={onNewComparison}><Plus size={15} /> New comparison</button>
       </div>
-
       <div className="stats">
-        <Metric
-          label="Authenticated connections"
-          value={connections.length}
-          sub={`${connectedCount} currently connected`}
-          icon={Link2}
-        />
-
-        <Metric
-          label="Comparison levels"
-          value="6"
-          sub="L1 Schema → L6 DQ"
-          icon={GitCompare}
-        />
-
-        <Metric
-          label="Connector types"
-          value="2"
-          sub="CSV · Databricks"
-          icon={Database}
-        />
-
-        <Metric
-          label="Execution engine"
-          value="Ready"
-          sub="Planner + task execution"
-          icon={Zap}
-        />
+        <Metric label="Authenticated connections" value={connections.length} sub={`${connectedCount} currently connected`} icon={Link2} />
+        <Metric label="Comparison levels" value="6" sub="L1 Schema → L6 DQ" icon={GitCompare} />
+        <Metric label="Connector types" value="2" sub="CSV · Databricks" icon={Database} />
+        <Metric label="Execution engine" value="Ready" sub="Planner + task execution" icon={Zap} />
       </div>
-
       <div className="grid2">
         <Panel title="How the platform works">
           <div className="steps">
-            {[
-              [
-                "01",
-                "Connect",
-                "Save and test reusable source connections.",
-              ],
-              [
-                "02",
-                "Configure",
-                "Choose sources, keys, levels and rules.",
-              ],
-              [
-                "03",
-                "Execute",
-                "Planner creates only the tasks you selected.",
-              ],
-              [
-                "04",
-                "Review",
-                "Inspect metrics and comparison evidence.",
-              ],
-            ].map(([number, title, description]) => (
-              <div className="step" key={number}>
-                <b>{number}</b>
-
-                <div>
-                  <strong>{title}</strong>
-                  <span>{description}</span>
-                </div>
-
-                <ArrowRight size={15} />
-              </div>
+            {[["01", "Connect", "Save and test reusable source connections."], ["02", "Configure", "Choose sources, keys, levels and rules."], ["03", "Execute", "Planner creates only the tasks you selected."], ["04", "Review", "Inspect metrics and comparison evidence."]].map(([number, title, description]) => (
+              <div className="step" key={number}><b>{number}</b><div><strong>{title}</strong><span>{description}</span></div><ArrowRight size={15} /></div>
             ))}
           </div>
         </Panel>
-
-        <Panel
-          title="Connection health"
-          action={
-            <button
-              className="textBtn"
-              onClick={onConnections}
-            >
-              Open manager
-            </button>
-          }
-        >
-          {connections.length === 0 ? (
-            <Empty
-              icon={Link2}
-              title="No connections yet"
-              text="Add a source to start building comparisons."
-            />
-          ) : (
-            connections.slice(0, 5).map((connection) => (
-              <ConnectionLine
-                key={connection.connection_id}
-                connection={connection}
-              />
-            ))
-          )}
+        <Panel title="Connection health" action={<button className="textBtn" onClick={onConnections}>Open manager</button>}>
+          {connections.length === 0 ? <Empty icon={Link2} title="No connections yet" text="Add a source to start building comparisons." /> : connections.slice(0, 5).map((connection) => <ConnectionLine key={connection.connection_id} connection={connection} />)}
         </Panel>
       </div>
     </div>
