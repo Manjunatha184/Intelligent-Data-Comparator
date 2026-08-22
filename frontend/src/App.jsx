@@ -5,7 +5,8 @@ import { API_BASE, apiRequest } from "./api/client";
 import { ConnectionLine, Empty, Loading, Metric, Panel, Toast } from "./components/ui";
 import { ComparisonBuilder } from "./features/comparisons/ComparisonBuilder";
 import { ConnectionManager, ConnectionModal } from "./features/connections/Connections";
-import { L7AnalysisReportView, Results } from "./features/results/Results";
+import { L7AnalysisReportView } from "./features/results/Results";
+import { ResultsConsole } from "./features/results/ResultsConsole";
 import { RulesPage } from "./features/rules/RulesPage";
 
 function AnalysisPage({ runId, onBack, notify }) {
@@ -201,7 +202,7 @@ export default function App() {
           )}
 
           {page === "results" && (
-            <Results
+            <ResultsConsole
               runId={activeRunId}
               onOpenRun={handleComparisonComplete}
               onBack={backToResultsHistory}
