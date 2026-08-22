@@ -15,6 +15,87 @@
   .topnavSearch { left: calc(50% + 96px) !important; width: min(320px, 28vw) !important; }
 }
 
+/* Recent Comparisons: final viewport owner. Keep header/pagination fixed and rows visible + scrollable. */
+@media (min-width: 900px) {
+  .body:has(.recentComparisonsPage) {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding-bottom: 18px !important;
+    box-sizing: border-box !important;
+  }
+  .recentComparisonsPage {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .recentComparisonsPage > .wizardFooter {
+    flex: 0 0 auto !important;
+    min-height: 58px !important;
+    margin: 0 !important;
+  }
+  .recentComparisonsPage > .recentComparisonsPanel {
+    flex: 1 1 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .recentComparisonsPanel > .panelBody,
+  .recentComparisonsPanel > .panelContent {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .recentComparisonsTableShell {
+    flex: 1 1 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .recentComparisonsRowsScroll {
+    flex: 1 1 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
+  }
+  .recentComparisonsTable {
+    width: 100% !important;
+    min-width: 980px !important;
+    margin: 0 !important;
+  }
+  .recentComparisonsTable thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5 !important;
+    background: #eef2ef !important;
+  }
+  .recentComparisonsPagination {
+    flex: 0 0 auto !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    position: relative !important;
+    z-index: 6 !important;
+    background: #fbfcfb !important;
+    border-top: 1px solid var(--border) !important;
+  }
+}
+
 .resultsPage .levelSummaryItem,
 .resultsPage .levelSummaryItem:hover,
 .resultsPage .levelSummaryItem:focus,
@@ -35,7 +116,6 @@
 .resultsPage .levelSummaryFinding { color: #788781 !important; }
 .resultsPage .levelSummaryCode { background: #edf4ff !important; color: #315d89 !important; }
 
-/* L7 report: scroll internally, with a consistent safe inset on BOTH edges. */
 .body:has(.analysisResultsPage) {
   height: 100% !important;
   min-height: 0 !important;
@@ -63,8 +143,6 @@
   box-sizing: border-box !important;
   display: block !important;
 }
-
-/* Header uses the same inset as every report card; no negative margin. */
 .analysisResultsPage .pageTitle {
   width: 100% !important;
   margin: 0 0 12px !important;
@@ -94,88 +172,41 @@
 }
 .analysisResultsPage .pageActions > div:first-child { min-width: 0 !important; }
 .analysisResultsPage .pageActions h2 { margin: 3px 0 4px !important; font-size: 18px !important; line-height: 1.15 !important; }
-.analysisResultsPage .pageActions .runIdText {
-  margin: 0 !important; max-width: 720px !important; white-space: nowrap !important;
-  overflow: hidden !important; text-overflow: ellipsis !important; color: #74837d !important; font-size: 10px !important;
-}
-.analysisResultsPage .pageActions .actionRow {
-  display: flex !important; align-items: center !important; gap: 8px !important; flex: 0 0 auto !important; flex-wrap: nowrap !important;
-}
+.analysisResultsPage .pageActions .runIdText { margin: 0 !important; max-width: 720px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #74837d !important; font-size: 10px !important; }
+.analysisResultsPage .pageActions .actionRow { display: flex !important; align-items: center !important; gap: 8px !important; flex: 0 0 auto !important; flex-wrap: nowrap !important; }
 .analysisResultsPage .pageActions button { width: auto !important; min-height: 34px !important; padding: 0 14px !important; white-space: nowrap !important; }
-
-.analysisResultsPage .analysisReportStatus {
-  width: 100% !important;
-  display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 0 !important;
-  margin: 0 0 12px !important;
-  padding: 0 !important;
-  background: #fbfcfb !important;
-  border: 1px solid #d5ddd9 !important;
-  box-sizing: border-box !important;
-  overflow: hidden !important;
-}
-.analysisResultsPage .analysisReportStatus > div {
-  min-width: 0 !important; min-height: 74px !important; padding: 14px 16px !important; box-sizing: border-box !important;
-  border-right: 1px solid #d5ddd9 !important; display: flex !important; flex-direction: column !important; justify-content: center !important; gap: 5px !important;
-}
+.analysisResultsPage .analysisReportStatus { width: 100% !important; display: grid !important; grid-template-columns: repeat(3,minmax(0,1fr)) !important; gap: 0 !important; margin: 0 0 12px !important; padding: 0 !important; background: #fbfcfb !important; border: 1px solid #d5ddd9 !important; box-sizing: border-box !important; overflow: hidden !important; }
+.analysisResultsPage .analysisReportStatus > div { min-width: 0 !important; min-height: 74px !important; padding: 14px 16px !important; box-sizing: border-box !important; border-right: 1px solid #d5ddd9 !important; display: flex !important; flex-direction: column !important; justify-content: center !important; gap: 5px !important; }
 .analysisResultsPage .analysisReportStatus > div:last-child { border-right: 0 !important; }
 .analysisResultsPage .analysisReportStatus span { font-size: 9px !important; text-transform: uppercase !important; letter-spacing: .08em !important; color: #7a8883 !important; }
 .analysisResultsPage .analysisReportStatus strong { font-size: 15px !important; color: #14231f !important; overflow-wrap: anywhere !important; }
-
-.analysisResultsPage .analysisReportSection {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  margin: 0 0 12px !important;
-  padding: 16px !important;
-  box-sizing: border-box !important;
-  background: #fbfcfb !important;
-  border: 1px solid #d5ddd9 !important;
-  overflow: hidden !important;
-}
-.analysisResultsPage .analysisSectionHeading {
-  display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important;
-  padding-bottom: 10px !important; margin-bottom: 12px !important; border-bottom: 1px solid #e0e6e3 !important;
-}
+.analysisResultsPage .analysisReportSection { width: 100% !important; max-width: none !important; min-width: 0 !important; margin: 0 0 12px !important; padding: 16px !important; box-sizing: border-box !important; background: #fbfcfb !important; border: 1px solid #d5ddd9 !important; overflow: hidden !important; }
+.analysisResultsPage .analysisSectionHeading { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; padding-bottom: 10px !important; margin-bottom: 12px !important; border-bottom: 1px solid #e0e6e3 !important; }
 .analysisResultsPage .analysisSectionHeading h3 { margin: 0 !important; font-size: 14px !important; color: #14231f !important; }
 .analysisResultsPage .analysisValidation { width: 100% !important; display: flex !important; flex-direction: column !important; }
-.analysisResultsPage .analysisValidationRow {
-  width: 100% !important; min-width: 0 !important; display: grid !important;
-  grid-template-columns: 54px 180px 110px minmax(0, 1fr) !important; align-items: center !important; gap: 12px !important;
-  padding: 10px 0 !important; border-bottom: 1px solid #e4e9e6 !important; box-sizing: border-box !important;
-}
+.analysisResultsPage .analysisValidationRow { width: 100% !important; min-width: 0 !important; display: grid !important; grid-template-columns: 54px 180px 110px minmax(0,1fr) !important; align-items: center !important; gap: 12px !important; padding: 10px 0 !important; border-bottom: 1px solid #e4e9e6 !important; box-sizing: border-box !important; }
 .analysisResultsPage .analysisValidationRow:last-child { border-bottom: 0 !important; }
-.analysisResultsPage .analysisLevelCode {
-  width: 38px !important; height: 30px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
-  background: #edf4ff !important; color: #315d89 !important; border-radius: 3px !important;
-}
+.analysisResultsPage .analysisLevelCode { width: 38px !important; height: 30px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; background: #edf4ff !important; color: #315d89 !important; border-radius: 3px !important; }
 .analysisResultsPage .analysisValidationSummary { min-width: 0 !important; color: #677771 !important; overflow-wrap: anywhere !important; }
 .analysisResultsPage .analysisFindingList,
-.analysisResultsPage .analysisCorrelationList {
-  display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; width: 100% !important;
-}
+.analysisResultsPage .analysisCorrelationList { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 12px !important; width: 100% !important; }
 .analysisResultsPage .analysisFindingCard,
-.analysisResultsPage .analysisCorrelationCard {
-  min-width: 0 !important; width: 100% !important; box-sizing: border-box !important; padding: 14px !important;
-  background: #f8faf9 !important; border: 1px solid #dbe2de !important;
-}
+.analysisResultsPage .analysisCorrelationCard { min-width: 0 !important; width: 100% !important; box-sizing: border-box !important; padding: 14px !important; background: #f8faf9 !important; border: 1px solid #dbe2de !important; }
 .analysisResultsPage .analysisFindingTop { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; gap: 12px !important; }
 .analysisResultsPage .analysisFindingTop h4 { margin: 0 !important; color: #14231f !important; font-size: 13px !important; }
 .analysisResultsPage .analysisBulletList { padding-left: 18px !important; margin-bottom: 0 !important; }
 .analysisResultsPage .analysisBulletList li,
 .analysisResultsPage .analysisReportSection p { font-size: 12px !important; line-height: 1.6 !important; color: #43534d !important; }
-.analysisResultsPage .analysisTechnicalEvidence {
-  width: 100% !important; max-width: 100% !important; max-height: 360px !important; overflow: auto !important; box-sizing: border-box !important;
-  margin: 0 !important; padding: 12px !important; background: #0d1714 !important; color: #dce7e2 !important; font-size: 10px !important; line-height: 1.5 !important;
-}
+.analysisResultsPage .analysisTechnicalEvidence { width: 100% !important; max-width: 100% !important; max-height: 360px !important; overflow: auto !important; box-sizing: border-box !important; margin: 0 !important; padding: 12px !important; background: #0d1714 !important; color: #dce7e2 !important; font-size: 10px !important; line-height: 1.5 !important; }
 
 @media (max-width: 1050px) {
   .analysisResultsPage .analysisFindingList,
   .analysisResultsPage .analysisCorrelationList { grid-template-columns: 1fr !important; }
-  .analysisResultsPage .analysisValidationRow { grid-template-columns: 46px 150px 90px minmax(0, 1fr) !important; }
+  .analysisResultsPage .analysisValidationRow { grid-template-columns: 46px 150px 90px minmax(0,1fr) !important; }
 }
 @media (max-width: 899px) {
+  .topnavSearch { display: none !important; }
+  .body:has(.recentComparisonsPage), .recentComparisonsPage, .recentComparisonsPage > .recentComparisonsPanel, .recentComparisonsTableShell, .recentComparisonsRowsScroll { height: auto !important; max-height: none !important; overflow: visible !important; }
   .body:has(.analysisResultsPage) { height: auto !important; overflow: visible !important; }
   .analysisResultsPage { height: auto !important; overflow: visible !important; }
   .analysisResultsPage > .stack { padding-left: 14px !important; padding-right: 14px !important; }
@@ -183,7 +214,6 @@
   .analysisResultsPage .pageActions .actionRow { flex-wrap: wrap !important; }
   .analysisResultsPage .analysisReportStatus { grid-template-columns: 1fr !important; }
   .analysisResultsPage .analysisReportStatus > div { border-right: 0 !important; border-bottom: 1px solid #d5ddd9 !important; }
-  .analysisResultsPage .analysisValidationRow { grid-template-columns: 46px minmax(0, 1fr) !important; }
-  .analysisResultsPage .analysisValidationRow > :nth-child(3),
-  .analysisResultsPage .analysisValidationRow > :nth-child(4) { grid-column: 2 !important; }
+  .analysisResultsPage .analysisValidationRow { grid-template-columns: 46px minmax(0,1fr) !important; }
+  .analysisResultsPage .analysisValidationRow > :nth-child(3), .analysisResultsPage .analysisValidationRow > :nth-child(4) { grid-column: 2 !important; }
 }
