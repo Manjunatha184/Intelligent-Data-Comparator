@@ -1,0 +1,178 @@
+/* Step 1 layout correction: mirrors the approved Create Comparison reference without changing comparison logic. */
+@media (min-width: 1100px) {
+  .comparisonBuilder { gap: 0 !important; }
+
+  .comparisonBuilder > .wizardFooter {
+    position: relative !important;
+    top: auto !important;
+    margin: -26px -30px 14px !important;
+    min-height: 64px !important;
+    padding: 13px 30px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #fbfcfb !important;
+    border-bottom: 1px solid #d7ddda !important;
+    backdrop-filter: none !important;
+  }
+
+  .builderHeading { gap: 42px !important; }
+  .builderHeading .pageTitle {
+    font-size: 21px !important;
+    line-height: 1.1 !important;
+    letter-spacing: -0.035em !important;
+    white-space: nowrap;
+  }
+
+  .comparisonProgress {
+    min-width: 300px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+  .comparisonProgress i {
+    width: 34px !important;
+    height: 1px !important;
+    background: #d7ddda !important;
+  }
+  .comparisonProgress span { white-space: nowrap; }
+
+  .comparisonBuilder > .stack:not(.reviewRunStep) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.58fr) minmax(390px, .98fr) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+  }
+
+  .scopeSourceSection {
+    min-height: 0 !important;
+    height: auto !important;
+    align-self: start !important;
+    background: #fbfcfb !important;
+    border: 1px solid #cbd3cf !important;
+  }
+
+  .scopeSectionIntro {
+    min-height: 36px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    background: #fbfcfb !important;
+    border-bottom: 1px solid #dce2df !important;
+  }
+  .scopeSectionIntro h2 {
+    font-size: 10px !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+  }
+  .scopeSectionIntro h2::before { content: "Ledger selection"; font-size: 10px; }
+  .scopeSectionIntro h2 { font-size: 0 !important; }
+  .scopeSectionIntro h2::after {
+    content: "PAIRED";
+    margin-left: 10px;
+    color: #8d9893;
+    font: 600 7px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .08em;
+  }
+
+  .scopeSourceGrid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  .scopeSourceGrid > .panel {
+    min-height: 176px !important;
+    height: auto !important;
+    padding: 0 !important;
+    background: #fbfcfb !important;
+  }
+  .scopeSourceGrid > .panel:first-child { border-right: 1px solid #d8dfdb !important; }
+  .scopeDatasetCard .panelHead,
+  .scopeDatasetCard .panelHeader {
+    min-height: 32px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    border-bottom: 1px solid #e0e5e2 !important;
+    font-size: 8px !important;
+  }
+  .scopeDatasetCard .panelBody,
+  .scopeDatasetCard > div:last-child {
+    padding: 14px !important;
+  }
+  .scopeDatasetCard .field { margin: 0 !important; }
+  .scopeDatasetCard .field select { min-height: 34px !important; height: 34px !important; }
+
+  .scopeLevelsPanel {
+    min-height: 0 !important;
+    height: auto !important;
+    align-self: start !important;
+    padding: 0 !important;
+    background: #fbfcfb !important;
+    border: 1px solid #cbd3cf !important;
+  }
+  .scopeLevelsPanel .panelHead,
+  .scopeLevelsPanel .panelHeader {
+    min-height: 36px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    border-bottom: 1px solid #dce2df !important;
+    font-size: 10px !important;
+  }
+  .scopeLevelsPanel .panelBody,
+  .scopeLevelsPanel > div:last-child { padding: 0 14px !important; }
+
+  .scopeLevelIntro {
+    min-height: 42px !important;
+    padding: 7px 0 !important;
+    gap: 12px !important;
+    border-bottom: 1px solid #dce2df !important;
+  }
+  .scopeLevelIntro .helper {
+    margin: 0 !important;
+    max-width: 260px !important;
+    font-size: 8px !important;
+    line-height: 1.35 !important;
+  }
+  .scopeSelectionCount {
+    flex: 0 0 auto !important;
+    padding: 5px 8px !important;
+    background: #eef2f0 !important;
+    border-radius: 12px !important;
+    font-size: 7px !important;
+  }
+
+  .levelGrid { border-top: 0 !important; }
+  .level {
+    min-height: 54px !important;
+    height: 54px !important;
+    grid-template-columns: 48px minmax(0, 1fr) 20px !important;
+    padding: 6px 8px !important;
+    border-bottom: 1px solid #dfe5e2 !important;
+    box-shadow: none !important;
+  }
+  .level:last-child { border-bottom: 0 !important; }
+  .level.selected {
+    background: #fffaf0 !important;
+    box-shadow: inset 2px 0 0 #f2b43b !important;
+  }
+  .levelCode {
+    width: 25px !important;
+    height: 23px !important;
+    font-size: 8px !important;
+  }
+  .level b { font-size: 9px !important; }
+  .level small { font-size: 7px !important; line-height: 1.3 !important; }
+  .checkCircle { justify-self: end !important; }
+
+  .comparisonBuilder::after { display: none !important; }
+}
+
+@media (min-width: 1450px) {
+  .body { padding-left: 30px !important; padding-right: 30px !important; }
+  .comparisonBuilder > .stack:not(.reviewRunStep) {
+    grid-template-columns: minmax(0, 1.7fr) minmax(430px, .95fr) !important;
+  }
+}
