@@ -1,0 +1,95 @@
+/* Recent Comparisons viewport behavior.
+   Mirrors Connection Manager: page chrome stays fixed, only rows scroll. */
+
+@media (min-width: 900px) {
+  /* The app shell already defines the usable viewport. Do not recalculate it. */
+  .body:has(.recentComparisonsPage) {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    padding-bottom: 18px !important;
+  }
+
+  .recentComparisonsPage {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .recentComparisonsPage > .wizardFooter {
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+  }
+
+  /* This card owns all remaining vertical space. */
+  .recentComparisonsPage > .recentComparisonsPanel {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .recentComparisonsTableShell {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* ONLY the table rows region scrolls. It may shrink in short windows. */
+  .recentComparisonsRowsScroll {
+    flex: 1 1 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  .recentComparisonsTable {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .recentComparisonsTable thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5 !important;
+    background: #eef2ef !important;
+  }
+
+  /* Pagination always remains visible at the bottom of the card. */
+  .recentComparisonsPagination {
+    flex: 0 0 auto !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    background: #fbfcfb !important;
+    border-top: 1px solid var(--border) !important;
+    position: relative !important;
+    z-index: 6 !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .body:has(.recentComparisonsPage),
+  .recentComparisonsPage,
+  .recentComparisonsPage > .recentComparisonsPanel,
+  .recentComparisonsTableShell,
+  .recentComparisonsRowsScroll {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
