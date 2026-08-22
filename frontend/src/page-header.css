@@ -10,7 +10,7 @@
   --page-header-muted: #74817b;
 }
 
-/* Remove the body's top padding so the sticky header starts immediately below the dark app bar. */
+/* Remove body top padding so headers begin immediately below the dark app bar. */
 .main > .body {
   padding-top: 0 !important;
 }
@@ -19,7 +19,7 @@
 .body > .stack > .wizardFooter,
 .historyPage > .wizardFooter,
 .dashboardIntro,
-.comparisonBuilder > .wizardFooter {
+.comparisonBuilder > .wizardHeader {
   position: sticky !important;
   top: 0 !important;
   z-index: 40 !important;
@@ -38,7 +38,7 @@
   backdrop-filter: blur(16px) saturate(125%) !important;
 }
 
-/* Keep the translucent surface continuous edge-to-edge while content scrolls behind it. */
+/* Keep the translucent surface continuous while content scrolls behind it. */
 .body > .stack,
 .historyPage,
 .comparisonBuilder {
@@ -48,7 +48,7 @@
 .body > .stack > .wizardFooter::before,
 .historyPage > .wizardFooter::before,
 .dashboardIntro::before,
-.comparisonBuilder > .wizardFooter::before {
+.comparisonBuilder > .wizardHeader::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -64,8 +64,8 @@
 /* Shared title sizing. */
 .body > .stack > .wizardFooter .pageTitle,
 .historyPage > .wizardFooter .pageTitle,
-.comparisonBuilder > .wizardFooter .pageTitle,
-.dashboardIntro h1 {
+.dashboardIntro h1,
+.comparisonBuilder > .wizardHeader h1 {
   margin: 0 !important;
   color: var(--page-header-title) !important;
   font-size: 20px !important;
@@ -74,7 +74,8 @@
 }
 
 .body > .stack > .wizardFooter .actionRow,
-.historyPage > .wizardFooter .actionRow {
+.historyPage > .wizardFooter .actionRow,
+.comparisonBuilder > .wizardHeader .actionRow {
   margin: 0 !important;
   flex: 0 0 auto !important;
 }
@@ -88,7 +89,8 @@
   display: none !important;
 }
 
-.dashboardIntro p {
+.dashboardIntro p,
+.comparisonBuilder > .wizardHeader .helper {
   margin: 3px 0 0 !important;
   color: var(--page-header-muted) !important;
   font-size: 9px !important;
@@ -99,18 +101,33 @@
   flex: 0 0 auto !important;
 }
 
-/* Comparison wizard stays horizontally compact and uses the identical frosted header. */
-.comparisonBuilder > .wizardFooter {
-  background: var(--page-header-bg) !important;
-  margin-bottom: 4px !important;
+/* Comparison wizard uses the identical frosted header shell. */
+.comparisonBuilder > .wizardHeader {
+  display: grid !important;
+  grid-template-columns: minmax(240px, 1fr) auto minmax(190px, 1fr) !important;
+  align-items: center !important;
 }
 
-.comparisonBuilder .builderHeading {
-  gap: 40px !important;
+.comparisonBuilder > .wizardHeader .wizardHeaderLeft {
+  min-width: 0 !important;
+}
+
+.comparisonBuilder > .wizardHeader .wizardHeaderCenter {
+  justify-self: center !important;
+}
+
+.comparisonBuilder > .wizardHeader .wizardHeaderRight {
+  justify-self: end !important;
 }
 
 .comparisonBuilder .comparisonProgress {
+  display: flex !important;
+  align-items: center !important;
   gap: 9px !important;
+}
+
+.comparisonBuilder .comparisonProgress span {
+  white-space: nowrap !important;
 }
 
 .comparisonBuilder .comparisonProgress span b {
@@ -119,8 +136,8 @@
   margin-right: 6px !important;
 }
 
-.comparisonBuilder .comparisonProgress i {
-  width: 26px !important;
+.comparisonBuilder .progressArrow {
+  color: #9ba7a1 !important;
 }
 
 /* Pull the first content row close to the header. */
@@ -139,7 +156,9 @@
 .wizardFooter .primary,
 .wizardFooter .secondary,
 .dashboardIntro .primary,
-.dashboardIntro .secondary {
+.dashboardIntro .secondary,
+.comparisonBuilder > .wizardHeader .primary,
+.comparisonBuilder > .wizardHeader .secondary {
   min-height: 32px !important;
   height: 32px !important;
   padding: 0 12px !important;
@@ -150,11 +169,19 @@
   .body > .stack > .wizardFooter,
   .historyPage > .wizardFooter,
   .dashboardIntro,
-  .comparisonBuilder > .wizardFooter {
+  .comparisonBuilder > .wizardHeader {
     margin-left: -20px !important;
     margin-right: -20px !important;
     padding-left: 20px !important;
     padding-right: 20px !important;
+  }
+
+  .comparisonBuilder > .wizardHeader {
+    grid-template-columns: 1fr auto !important;
+  }
+
+  .comparisonBuilder > .wizardHeader .wizardHeaderCenter {
+    display: none !important;
   }
 }
 
@@ -162,11 +189,15 @@
   .body > .stack > .wizardFooter,
   .historyPage > .wizardFooter,
   .dashboardIntro,
-  .comparisonBuilder > .wizardFooter {
+  .comparisonBuilder > .wizardHeader {
     position: relative !important;
     min-height: auto !important;
     align-items: flex-start !important;
     flex-direction: column !important;
     gap: 8px !important;
+  }
+
+  .comparisonBuilder > .wizardHeader {
+    display: flex !important;
   }
 }
