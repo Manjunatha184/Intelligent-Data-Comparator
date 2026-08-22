@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Edit3, Loader2, Play, Plus, RefreshCw } from "lucide-react";
+import { Edit3, GitCompare, Loader2, Play, Plus, RefreshCw } from "lucide-react";
 
 import { apiRequest } from "../../api/client";
 import { Empty, Loading, Panel } from "../../components/ui";
@@ -45,6 +45,7 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
       setItems(Array.isArray(data) ? data : []);
     } catch (error) {
       notify(error.message, "error");
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -140,6 +141,7 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
           <Loading text="Loading comparisons…" />
         ) : !visibleItems.length ? (
           <Empty
+            icon={GitCompare}
             title={search ? "No matching comparisons" : "No saved comparisons yet"}
             text={search ? "Try another comparison name or configuration ID." : "Create or save a draft to see it here."}
           />
