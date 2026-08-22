@@ -1,5 +1,58 @@
 /* Final comparison layout corrections. Presentation only. */
 
+.comparisonBuilder .comparisonIdentityBar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #d9e0dc;
+  background: #fbfcfb;
+}
+
+.comparisonBuilder .comparisonNameField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 520px;
+  max-width: 680px;
+}
+
+.comparisonBuilder .comparisonNameField > span {
+  color: #34453f;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.comparisonBuilder .comparisonNameField em {
+  color: #b74b4b;
+  font-style: normal;
+  margin-left: 2px;
+}
+
+.comparisonBuilder .comparisonNameField input {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+
+.comparisonBuilder .comparisonDraftState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  color: #5d6d67;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.comparisonBuilder .comparisonDraftState small {
+  color: #83908b;
+  font-size: 9px;
+}
+
 /* Ignored Columns is near the bottom of Step 1, so its menu opens upward. */
 .comparisonBuilder .scopeIgnoredColumnsCard,
 .comparisonBuilder .scopeIgnoredColumnsCard .mappingPickerBlock,
@@ -189,6 +242,15 @@
 }
 
 @media (max-width: 1099px) {
+  .comparisonBuilder .comparisonIdentityBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .comparisonBuilder .comparisonDraftState {
+    align-items: flex-start;
+  }
+
   .comparisonBuilder .reviewRunStep {
     display: grid !important;
     grid-template-columns: 1fr !important;
