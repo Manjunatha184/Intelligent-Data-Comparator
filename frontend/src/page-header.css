@@ -4,10 +4,15 @@
  */
 
 :root {
-  --page-header-bg: rgba(233, 238, 235, 0.72);
+  --page-header-bg: rgba(233, 238, 235, 0.78);
   --page-header-border: rgba(181, 193, 187, 0.72);
   --page-header-title: #172521;
   --page-header-muted: #74817b;
+}
+
+/* Remove the body's top padding so the sticky header starts immediately below the dark app bar. */
+.main > .body {
+  padding-top: 0 !important;
 }
 
 /* All major page headers share one compact sticky treatment. */
@@ -17,9 +22,9 @@
 .comparisonBuilder > .wizardFooter {
   position: sticky !important;
   top: 0 !important;
-  z-index: 28 !important;
+  z-index: 40 !important;
   min-height: 58px !important;
-  margin: -26px -30px 6px !important;
+  margin: 0 -30px 4px !important;
   padding: 9px 30px !important;
   display: flex !important;
   align-items: center !important;
@@ -28,12 +33,12 @@
   background: var(--page-header-bg) !important;
   border: 0 !important;
   border-bottom: 1px solid var(--page-header-border) !important;
-  box-shadow: 0 1px 0 rgba(19, 34, 29, 0.03) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(120%) !important;
-  backdrop-filter: blur(14px) saturate(120%) !important;
+  box-shadow: 0 1px 0 rgba(19, 34, 29, 0.04) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(125%) !important;
+  backdrop-filter: blur(16px) saturate(125%) !important;
 }
 
-/* Content scrolls behind the header rather than being visually blocked by a solid strip. */
+/* Keep the translucent surface continuous edge-to-edge while content scrolls behind it. */
 .body > .stack,
 .historyPage,
 .comparisonBuilder {
@@ -50,8 +55,8 @@
   z-index: -1;
   background: linear-gradient(
     180deg,
-    rgba(241, 245, 242, 0.48) 0%,
-    rgba(233, 238, 235, 0.24) 100%
+    rgba(242, 246, 243, 0.54) 0%,
+    rgba(233, 238, 235, 0.30) 100%
   );
   pointer-events: none;
 }
@@ -74,7 +79,7 @@
   flex: 0 0 auto !important;
 }
 
-/* Overview becomes the same compact header instead of a hero block. */
+/* Overview uses the same compact header instead of a hero block. */
 .dashboardIntro > div {
   min-width: 0 !important;
 }
@@ -94,8 +99,9 @@
   flex: 0 0 auto !important;
 }
 
-/* Comparison wizard stays horizontally compact. */
+/* Comparison wizard stays horizontally compact and uses the identical frosted header. */
 .comparisonBuilder > .wizardFooter {
+  background: var(--page-header-bg) !important;
   margin-bottom: 4px !important;
 }
 
@@ -117,7 +123,7 @@
   width: 26px !important;
 }
 
-/* Pull the first content row closer to the header. */
+/* Pull the first content row close to the header. */
 .comparisonBuilder > .stack:not(.reviewRunStep) {
   margin-top: 0 !important;
   padding-top: 0 !important;
@@ -138,11 +144,6 @@
   height: 32px !important;
   padding: 0 12px !important;
   font-size: 9px !important;
-}
-
-/* Keep the sticky header below the real dark top navigation. */
-.appBody .main .body {
-  position: relative;
 }
 
 @media (max-width: 1099px) {
