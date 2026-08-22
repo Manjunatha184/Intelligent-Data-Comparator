@@ -4,10 +4,6 @@ import { Activity, ChevronDown, Loader2, RefreshCw, Trash2 } from "lucide-react"
 import { apiRequest } from "../../api/client";
 import { Empty, Loading, Panel, Status } from "../../components/ui";
 
-/* ============================================================
-   HISTORY
-============================================================ */
-
 function formatDuration(startedAt, finishedAt) {
   if (!startedAt || !finishedAt) return "—";
   const started = new Date(startedAt).getTime();
@@ -100,8 +96,8 @@ export function History({ onOpenRun, notify }) {
     setPage(1);
   }, [statusFilter, resultFilter]);
 
-  async function deleteRun(runId, e) {
-    e.stopPropagation();
+  async function deleteRun(runId, event) {
+    event.stopPropagation();
     if (!runId) return;
     if (!window.confirm("Are you sure you want to delete this comparison run?")) return;
 
@@ -141,13 +137,13 @@ export function History({ onOpenRun, notify }) {
   const pageRuns = filteredRuns.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
-    <div className="stack historyPage recentComparisonsPage">
-      <div className="wizardFooter">
-        <h1 className="pageTitle" style={{ margin: 0 }}>Recent comparisons</h1>
+    <div className="recentComparisonsPage">
+      <header className="recentComparisonsHeader">
+        <h1>Recent comparisons</h1>
         <button type="button" className="secondary small" onClick={loadRuns}>
           <RefreshCw size={14} className={loading ? "spin" : ""} /> Refresh
         </button>
-      </div>
+      </header>
 
       <Panel className="recentComparisonsPanel">
         {!runs.length ? (
@@ -172,42 +168,32 @@ export function History({ onOpenRun, notify }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRuns.map((r) => {
-                    const runId = r?.run_id;
-                    const startedValue = r?.started_at || r?.created_at;
+                  {pageRuns.map((run) => {
+                    const runId = run?.run_id;
+                    const startedValue = run?.started_at || run?.created_at;
                     const startedAt = startedValue ? new Date(startedValue) : null;
                     const startedLabel = startedAt && !Number.isNaN(startedAt.getTime())
                       ? startedAt.toLocaleString()
                       : "Not available";
-                    const name = configurationName(r?.configuration_id, configurationMap);
+                    const name = configurationName(run?.configuration_id, configurationMap);
 
                     return (
-                      <tr
-                        key={runId}
-                        onClick={() => onOpenRun(runId)}
-                        className="clickable"
-                      >
+                      <tr key={runId} onClick={() => onOpenRun(runId)} className="clickable">
                         <td className="comparisonNameCell" title={name}><b>{name}</b></td>
-                        <td className="codeCell" title={runId}>
-                          {runId || "Unknown run"}
-                        </td>
-                        <td><Status status={r.status} /></td>
-                        <td><Status status={r.comparison_status} /></td>
-                        <td className="durationCell">{formatDuration(r?.started_at, r?.finished_at)}</td>
+                        <td className="codeCell" title={runId}>{runId || "Unknown run"}</td>
+                        <td><Status status={run.status} /></td>
+                        <td><Status status={run.comparison_status} /></td>
+                        <td className="durationCell">{formatDuration(run?.started_at, run?.finished_at)}</td>
                         <td>{startedLabel}</td>
                         <td>
                           <button
                             type="button"
                             className="iconButton dangerIcon"
-                            onClick={(e) => deleteRun(runId, e)}
+                            onClick={(event) => deleteRun(runId, event)}
                             title="Delete Run"
                             disabled={!runId || deletingRunId === runId}
                           >
-                            {deletingRunId === runId ? (
-                              <Loader2 size={15} className="spin" />
-                            ) : (
-                              <Trash2 size={15} />
-                            )}
+                            {deletingRunId === runId ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
                           </button>
                         </td>
                       </tr>
@@ -217,7 +203,7 @@ export function History({ onOpenRun, notify }) {
               </table>
             </div>
 
-            <div className="tablePagination recentComparisonsPagination">
+            <footer className="tablePagination recentComparisonsPagination">
               <span>
                 {filteredRuns.length
                   ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filteredRuns.length)} of ${filteredRuns.length} runs`
@@ -230,7 +216,7 @@ export function History({ onOpenRun, notify }) {
                   <button type="button" className="pageBtn" disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)}>Next</button>
                 </div>
               )}
-            </div>
+            </footer>
           </div>
         )}
       </Panel>
