@@ -1,0 +1,105 @@
+/*
+ * Global page geometry.
+ * This file is intentionally loaded last so every feature page shares the
+ * same outer width, content gutter and header edges.
+ */
+
+:root {
+  --app-page-gutter: 30px;
+  --app-page-gap: 12px;
+}
+
+/* One geometry model for every page. */
+.main > .body {
+  width: 100% !important;
+  max-width: none !important;
+  padding-left: var(--app-page-gutter) !important;
+  padding-right: var(--app-page-gutter) !important;
+}
+
+/* Remove the legacy 1420px centered-page rule from styles.css. */
+.main > .body > * {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* All feature roots occupy the exact same available width. */
+.dashboardPage,
+.dashboardIntro,
+.historyPage,
+.resultsConsole,
+.resultsPage,
+.comparisonBuilder,
+.connectionManager,
+.rulesPage,
+.body > .stack {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Shared page headers always span the same main-content width. */
+.body > .stack > .wizardFooter,
+.historyPage > .wizardFooter,
+.dashboardIntro,
+.comparisonBuilder > .wizardHeader {
+  width: calc(100% + (var(--app-page-gutter) * 2)) !important;
+  max-width: none !important;
+  margin-left: calc(var(--app-page-gutter) * -1) !important;
+  margin-right: calc(var(--app-page-gutter) * -1) !important;
+  padding-left: var(--app-page-gutter) !important;
+  padding-right: var(--app-page-gutter) !important;
+}
+
+/* Comparison content now uses the exact same left/right card edges as other pages. */
+.comparisonBuilder > .stack:not(.reviewRunStep),
+.comparisonBuilder > .reviewRunStep {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.scopeSourceSection,
+.scopeLevelsPanel,
+.scopeFirstPageExtras,
+.scopeFirstPageExtras .scopeFiltersGrid,
+.scopeFirstPageExtras .filterCard,
+.scopeFirstPageExtras .scopeRecordMatchingCard {
+  max-width: none !important;
+}
+
+/* Keep common card sections on the same horizontal rhythm. */
+.connectorCards,
+.connectionManager .panel,
+.rulesPage .panel,
+.historyPage .panel,
+.historyPage .tableWrapper,
+.stats,
+.grid2,
+.comparisonBuilder .scopeSourceSection,
+.comparisonBuilder .scopeLevelsPanel,
+.comparisonBuilder .scopeFirstPageExtras {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Do not let comparison-specific styles create extra side indentation. */
+.comparisonBuilder .scopeSourceGrid,
+.comparisonBuilder .levelGrid {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+@media (max-width: 1099px) {
+  :root {
+    --app-page-gutter: 20px;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --app-page-gutter: 14px;
+  }
+}
