@@ -503,6 +503,15 @@ export function ComparisonBuilder({
             comparisonKeys={comparisonKeys}
             setComparisonKeys={setComparisonKeys}
           />
+
+          <IgnoredColumnsScope
+            sourceSchema={sourceSchema}
+            targetSchema={targetSchema}
+            ignoredSourceColumns={ignoredSourceColumns}
+            setIgnoredSourceColumns={setIgnoredSourceColumns}
+            ignoredTargetColumns={ignoredTargetColumns}
+            setIgnoredTargetColumns={setIgnoredTargetColumns}
+          />
         </div>
       )}
 
@@ -534,10 +543,6 @@ export function ComparisonBuilder({
           setSourceFilters={setSourceFilters}
           targetFilters={targetFilters}
           setTargetFilters={setTargetFilters}
-          ignoredSourceColumns={ignoredSourceColumns}
-          setIgnoredSourceColumns={setIgnoredSourceColumns}
-          ignoredTargetColumns={ignoredTargetColumns}
-          setIgnoredTargetColumns={setIgnoredTargetColumns}
         />
       )}
 
@@ -950,6 +955,63 @@ function ScopeFiltersAndMatching({
   );
 }
 
+function IgnoredColumnsScope({
+  sourceSchema,
+  targetSchema,
+  ignoredSourceColumns,
+  setIgnoredSourceColumns,
+  ignoredTargetColumns,
+  setIgnoredTargetColumns,
+}) {
+  const sourceColumnOptions = getSchemaColumnNames(sourceSchema);
+  const targetColumnOptions = getSchemaColumnNames(targetSchema);
+
+  const selectedChips = (values, onChange) => (
+    <div className="chipRow">
+      {values.map((value) => (
+        <span className="chip" key={value}>
+          {value}
+          <button
+            type="button"
+            aria-label={`Remove ${value}`}
+            onClick={() => onChange(values.filter((item) => item !== value))}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <Panel title="Ignored columns" className="reviewRunCard ignoredColumnsCard scopeIgnoredColumnsCard">
+      <p className="helper">Selected columns are excluded from every applicable comparison level.</p>
+      <div className="formGrid">
+        <div className="mappingPickerBlock">
+          <label>Source columns to ignore</label>
+          <MultiSelectField
+            options={sourceColumnOptions}
+            selected={ignoredSourceColumns}
+            onChange={setIgnoredSourceColumns}
+            placeholder="Select source columns"
+          />
+          {selectedChips(ignoredSourceColumns, setIgnoredSourceColumns)}
+        </div>
+        <div className="mappingPickerBlock">
+          <label>Target columns to ignore</label>
+          <MultiSelectField
+            options={targetColumnOptions}
+            selected={ignoredTargetColumns}
+            onChange={setIgnoredTargetColumns}
+            placeholder="Select target columns"
+          />
+          {selectedChips(ignoredTargetColumns, setIgnoredTargetColumns)}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 /* ============================================================
    RULES
 ============================================================ */
@@ -1103,10 +1165,6 @@ function RulesStep({
   setSourceFilters,
   targetFilters,
   setTargetFilters,
-  ignoredSourceColumns,
-  setIgnoredSourceColumns,
-  ignoredTargetColumns,
-  setIgnoredTargetColumns,
 }) {
   const [dqModalOpen, setDqModalOpen] = React.useState(false);
   const [aggModalOpen, setAggModalOpen] = React.useState(false);
@@ -1200,11 +1258,6 @@ function RulesStep({
     const schema = side === "source" ? sourceSchema : targetSchema;
     return isNumericColumn(findSchemaColumn(schema, name)) ? "AVG" : "MODE";
   };
-  const FieldChips = ({ values, onRemove }) => (
-    <div className="chipRow">
-      {values.map((value, index) => <span className="chip" key={`${value}-${index}`}>{value}<button type="button" aria-label={`Remove ${value}`} onClick={() => onRemove(index)}>×</button></span>)}
-    </div>
-  );
 
   return (
     <div className="stack reviewRunStep">
@@ -1213,22 +1266,6 @@ function RulesStep({
           {sourceSchemaError || targetSchemaError || (sourceSchemaLoading || targetSchemaLoading ? "Loading fields..." : "")}
         </div>
       )}
-
-      <Panel title="Ignored columns" className="reviewRunCard ignoredColumnsCard">
-        <p className="helper">Selected columns are excluded from every applicable comparison level.</p>
-        <div className="formGrid">
-          <div className="mappingPickerBlock">
-            <label>Source columns to ignore</label>
-            <MultiSelectField options={sourceColumnOptions} selected={ignoredSourceColumns} onChange={setIgnoredSourceColumns} placeholder="Select source columns" />
-            <FieldChips values={ignoredSourceColumns} onRemove={(index) => setIgnoredSourceColumns(ignoredSourceColumns.filter((_, itemIndex) => itemIndex !== index))} />
-          </div>
-          <div className="mappingPickerBlock">
-            <label>Target columns to ignore</label>
-            <MultiSelectField options={targetColumnOptions} selected={ignoredTargetColumns} onChange={setIgnoredTargetColumns} placeholder="Select target columns" />
-            <FieldChips values={ignoredTargetColumns} onRemove={(index) => setIgnoredTargetColumns(ignoredTargetColumns.filter((_, itemIndex) => itemIndex !== index))} />
-          </div>
-        </div>
-      </Panel>
 
       <Panel title="Group-Based Reconciliation" className="reviewRunCard reconciliationCard">
         <section className="reconciliationSection">
