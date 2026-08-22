@@ -1,1 +1,655 @@
-/* ==========================================================================\n   Lumera enterprise validation-console theme\n\n   Presentation-only override. Existing component behavior, API contracts,\n   comparison payloads, evidence rendering, and pagination remain unchanged.\n   ========================================================================== */\n\n:root {\n  --lumera-shell: #0d1513;\n  --lumera-shell-soft: #121d1a;\n  --lumera-shell-line: #25312e;\n  --lumera-accent: #f2b43b;\n  --lumera-accent-strong: #eaa526;\n  --lumera-accent-soft: #fff4d9;\n  --lumera-canvas: #e9eeeb;\n  --lumera-surface: #f8faf8;\n  --lumera-surface-2: #f2f5f3;\n  --lumera-line: #cbd3cf;\n  --lumera-line-soft: #dce2df;\n  --lumera-text: #172521;\n  --lumera-muted: #73807b;\n  --lumera-muted-2: #929d98;\n  --lumera-pass: #24965a;\n  --lumera-pass-soft: #e4f4ea;\n  --lumera-fail: #d8493f;\n  --lumera-fail-soft: #fae8e5;\n  --lumera-review: #d99212;\n  --lumera-review-soft: #fff2d6;\n  --lumera-radius: 2px;\n  --lumera-shadow: 0 1px 1px rgba(13, 21, 19, 0.04);\n}\n\nhtml,\nbody,\n#root {\n  height: 100%;\n}\n\nbody {\n  margin: 0;\n  background: var(--lumera-canvas);\n  color: var(--lumera-text);\n  font-family: Montserrat, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;\n}\n\nbutton,\ninput,\nselect,\ntextarea {\n  font: inherit;\n}\n\n/* ---------- App shell ---------- */\n\n.app {\n  min-height: 100vh;\n  background: var(--lumera-canvas);\n}\n\n.sidebar {\n  width: 218px;\n  background: linear-gradient(180deg, #0b1412 0%, #101b18 100%);\n  border-right: 1px solid #1e2b27;\n  color: #d9e0dc;\n  padding: 0;\n}\n\n.brand {\n  min-height: 68px;\n  display: flex;\n  align-items: center;\n  padding: 0 20px;\n  border-bottom: 1px solid #22302c;\n  position: relative;\n}\n\n.brand::before {\n  content: \"L\";\n  width: 28px;\n  height: 28px;\n  margin-right: 11px;\n  display: grid;\n  place-items: center;\n  transform: rotate(45deg);\n  background: var(--lumera-accent);\n  color: #13201c;\n  font-size: 12px;\n  font-weight: 800;\n}\n\n.brandWordmark {\n  color: #f5f7f6;\n  font-size: 14px;\n  font-weight: 700;\n  letter-spacing: 0.02em;\n}\n\n.brandWordmark::after {\n  content: \"  ·  VALIDATION CONSOLE\";\n  margin-left: 8px;\n  color: #77837f;\n  font-size: 8px;\n  font-weight: 500;\n  letter-spacing: 0.16em;\n}\n\n.workspace {\n  padding: 19px 20px 8px;\n  color: #6f7d78;\n  font-size: 9px;\n  font-weight: 700;\n  letter-spacing: 0.18em;\n}\n\n.nav {\n  width: calc(100% - 16px);\n  min-height: 40px;\n  margin: 2px 8px;\n  padding: 0 12px;\n  border: 0;\n  border-left: 2px solid transparent;\n  border-radius: var(--lumera-radius);\n  background: transparent;\n  color: #bdc7c3;\n  display: flex;\n  align-items: center;\n  gap: 11px;\n  text-align: left;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.nav:hover {\n  background: #17231f;\n  color: #fff;\n}\n\n.nav.active {\n  background: #202b28;\n  border-left-color: var(--lumera-accent);\n  color: var(--lumera-accent);\n}\n\n.nav.active svg:last-child {\n  margin-left: auto;\n}\n\n.sidebarBottom {\n  border-top: 1px solid #22302c;\n  margin-top: auto;\n  padding: 16px 20px 20px;\n}\n\n.apiState {\n  display: flex;\n  gap: 9px;\n  align-items: flex-start;\n}\n\n.apiState i {\n  width: 7px;\n  height: 7px;\n  margin-top: 5px;\n  border-radius: 50%;\n  background: #3fce79;\n  box-shadow: 0 0 0 3px rgba(63, 206, 121, 0.08);\n}\n\n.apiState b {\n  display: block;\n  color: #edf2ef;\n  font-size: 10px;\n  font-weight: 600;\n}\n\n.apiState span {\n  display: block;\n  margin-top: 4px;\n  color: #77837f;\n  font-size: 9px;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n\n.main {\n  background: var(--lumera-canvas);\n}\n\n.body {\n  max-width: none;\n  padding: 28px 34px 92px;\n}\n\n.stack {\n  gap: 16px;\n}\n\n.pageTitle,\n.dashboardIntro h1 {\n  color: #14231f;\n  font-size: clamp(24px, 2vw, 36px);\n  font-weight: 700;\n  letter-spacing: -0.035em;\n}\n\n.sectionEyebrow {\n  color: #77837f;\n  font-size: 9px;\n  font-weight: 700;\n  letter-spacing: 0.16em;\n}\n\n.helper,\n.dashboardIntro p {\n  color: var(--lumera-muted);\n  line-height: 1.55;\n}\n\n/* ---------- Buttons ---------- */\n\n.primary,\n.secondary,\n.textBtn,\n.iconButton,\n.pageBtn {\n  border-radius: var(--lumera-radius) !important;\n  box-shadow: none !important;\n}\n\n.primary {\n  background: var(--lumera-accent) !important;\n  border: 1px solid var(--lumera-accent-strong) !important;\n  color: #13201c !important;\n  font-weight: 700 !important;\n}\n\n.primary:hover:not(:disabled) {\n  background: #ffc34e !important;\n}\n\n.secondary {\n  background: #f7f9f7 !important;\n  border: 1px solid #bfc9c4 !important;\n  color: #24332f !important;\n}\n\n.secondary:hover:not(:disabled) {\n  background: #fff !important;\n  border-color: #8c9994 !important;\n}\n\n.textBtn {\n  color: #43514c !important;\n}\n\n/* ---------- Generic surfaces ---------- */\n\n.panel,\n.metric,\n.resultSummaryCard,\n.levelSummaryPanel,\n.resultLevelClean,\n.analysisReportSection {\n  background: var(--lumera-surface) !important;\n  border: 1px solid var(--lumera-line) !important;\n  border-radius: var(--lumera-radius) !important;\n  box-shadow: var(--lumera-shadow) !important;\n}\n\n.panelHeader,\n.panelHead,\n.evidenceSectionHead,\n.levelSummaryHead,\n.analysisSectionHeading {\n  border-bottom-color: var(--lumera-line-soft) !important;\n}\n\n/* ---------- Comparison builder header and workflow ---------- */\n\n.comparisonBuilder {\n  padding-bottom: 12px;\n}\n\n.comparisonBuilder > .wizardFooter {\n  position: sticky;\n  top: 0;\n  z-index: 18;\n  margin: -28px -34px 14px;\n  padding: 18px 34px;\n  background: rgba(233, 238, 235, 0.97);\n  backdrop-filter: blur(12px);\n  border-bottom: 1px solid var(--lumera-line);\n}\n\n.builderHeading {\n  display: flex;\n  align-items: center;\n  gap: 34px;\n}\n\n.comparisonProgress {\n  min-width: 360px;\n  align-items: center;\n}\n\n.comparisonProgress span {\n  color: #87928d;\n  font-size: 10px;\n  letter-spacing: 0.03em;\n}\n\n.comparisonProgress span b {\n  width: 23px;\n  height: 23px;\n  display: inline-grid;\n  place-items: center;\n  margin-right: 8px;\n  border: 1px solid #bfc8c4;\n  color: #7f8a85;\n  background: transparent;\n}\n\n.comparisonProgress span.active {\n  color: #172521;\n  font-weight: 700;\n}\n\n.comparisonProgress span.active b {\n  background: #15201d;\n  border-color: #15201d;\n  color: var(--lumera-accent);\n}\n\n.comparisonProgress i {\n  background: #bec7c3 !important;\n}\n\n.scopeSourceSection {\n  margin: 0;\n}\n\n.scopeSectionIntro {\n  margin-bottom: 8px;\n}\n\n.scopeSectionIntro h2 {\n  margin: 0;\n  color: #26342f;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.04em;\n  text-transform: uppercase;\n}\n\n.scopeSourceGrid {\n  gap: 0 !important;\n  border: 1px solid var(--lumera-line);\n  background: var(--lumera-surface);\n}\n\n.scopeSourceGrid > .panel {\n  border: 0 !important;\n  box-shadow: none !important;\n}\n\n.scopeSourceGrid > .panel:first-child {\n  border-right: 1px solid var(--lumera-line) !important;\n}\n\n.scopeDatasetCard .panelHead,\n.scopeDatasetCard .panelHeader {\n  color: #37678b;\n  text-transform: uppercase;\n  letter-spacing: 0.12em;\n  font-size: 9px;\n}\n\n.scopeSourceGrid > .panel:last-child .panelHead,\n.scopeSourceGrid > .panel:last-child .panelHeader {\n  color: #75528c;\n}\n\n/* ---------- Inputs ---------- */\n\n.field > span,\n.field > label,\n.mappingPickerBlock > label {\n  color: #687670 !important;\n  font-size: 9px !important;\n  font-weight: 700 !important;\n  letter-spacing: 0.09em;\n  text-transform: uppercase;\n}\n\n.field select,\n.field input,\n.field textarea,\nselect,\ninput[type=\"text\"],\ninput[type=\"number\"],\ninput[type=\"search\"],\n.multiSelectTrigger {\n  min-height: 38px;\n  background: #f5f7f5 !important;\n  border: 1px solid #c7d0cc !important;\n  border-radius: var(--lumera-radius) !important;\n  color: #20302b !important;\n  box-shadow: none !important;\n}\n\n.field select:focus,\n.field input:focus,\nselect:focus,\ninput:focus,\n.multiSelectTrigger:focus {\n  outline: 2px solid rgba(242, 180, 59, 0.2) !important;\n  border-color: #d79c2f !important;\n}\n\n.connectionSelectorState {\n  border-radius: var(--lumera-radius) !important;\n}\n\n/* ---------- Comparison depth ---------- */\n\n.scopeLevelsPanel {\n  overflow: hidden;\n}\n\n.scopeLevelIntro {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 2px 0 12px;\n}\n\n.scopeSelectionCount {\n  color: #697771;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  font-size: 9px;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n}\n\n.levelGrid {\n  display: block !important;\n  border-top: 1px solid var(--lumera-line-soft);\n}\n\n.level {\n  width: 100%;\n  min-height: 58px;\n  display: grid !important;\n  grid-template-columns: 72px minmax(220px, 1fr) 34px;\n  align-items: center;\n  gap: 0 !important;\n  padding: 10px 14px !important;\n  background: transparent !important;\n  border: 0 !important;\n  border-bottom: 1px solid var(--lumera-line-soft) !important;\n  border-radius: 0 !important;\n  box-shadow: none !important;\n  text-align: left;\n}\n\n.level:hover {\n  background: #f1f4f2 !important;\n}\n\n.level.selected {\n  background: linear-gradient(90deg, rgba(242, 180, 59, 0.09), transparent 36%) !important;\n  box-shadow: inset 3px 0 0 var(--lumera-accent) !important;\n}\n\n.levelVisual {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.levelVisual svg {\n  display: none;\n}\n\n.levelCode {\n  width: 30px;\n  height: 26px;\n  display: grid;\n  place-items: center;\n  background: #eef1ef;\n  border: 1px solid #ccd3d0;\n  color: #6c7974;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  font-size: 10px;\n}\n\n.level.selected .levelCode {\n  background: #17211e;\n  border-color: #17211e;\n  color: var(--lumera-accent);\n}\n\n.level b {\n  color: #1d2b27;\n  font-size: 12px;\n}\n\n.level small {\n  display: block;\n  margin-top: 3px;\n  color: #78857f;\n  font-size: 10px;\n}\n\n.checkCircle {\n  width: 17px !important;\n  height: 17px !important;\n  border-radius: 1px !important;\n  border-color: #bdc7c2 !important;\n}\n\n.level.selected .checkCircle {\n  background: var(--lumera-accent) !important;\n  border-color: var(--lumera-accent-strong) !important;\n  color: #18231f !important;\n}\n\n/* ---------- Review & run ---------- */\n\n.reviewRunStep {\n  gap: 12px !important;\n}\n\n.filtersGrid {\n  gap: 12px !important;\n}\n\n.reviewRunCard,\n.filtersGrid > * {\n  background: var(--lumera-surface) !important;\n  border-color: var(--lumera-line) !important;\n  border-radius: var(--lumera-radius) !important;\n  box-shadow: none !important;\n}\n\n.formGrid {\n  gap: 14px !important;\n}\n\n.chipRow {\n  gap: 6px !important;\n}\n\n.chip {\n  background: #eef1ef !important;\n  border: 1px solid #c8d0cc !important;\n  border-radius: 2px !important;\n  color: #394741 !important;\n  font-size: 10px !important;\n}\n\n.chip button {\n  color: #7b8882 !important;\n}\n\n.multiSelectMenu {\n  background: #fbfcfb !important;\n  border: 1px solid #aebbb5 !important;\n  border-radius: var(--lumera-radius) !important;\n  box-shadow: 0 12px 30px rgba(17, 30, 25, 0.14) !important;\n}\n\n.multiSelectOption:hover {\n  background: var(--lumera-accent-soft) !important;\n}\n\n.multiSelectCheck {\n  color: #b87500 !important;\n}\n\n.mappingRow,\n.groupMappingRow,\n.columnMappingRow {\n  border-color: var(--lumera-line-soft) !important;\n}\n\n/* Existing top wizard action area becomes a clean command strip. */\n.comparisonBuilder .actionRow {\n  gap: 8px;\n}\n\n/* Sticky bottom command bar using the existing builder footer semantics. */\n.comparisonBuilder::after {\n  content: \"Configuration changes remain local until Review & Run\";\n  position: fixed;\n  left: 218px;\n  right: 0;\n  bottom: 0;\n  z-index: 15;\n  min-height: 34px;\n  display: flex;\n  align-items: center;\n  padding: 0 34px;\n  background: #111b18;\n  border-top: 1px solid #293531;\n  color: #8f9b96;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  font-size: 9px;\n  letter-spacing: 0.04em;\n  pointer-events: none;\n}\n\n/* ---------- Dashboard ---------- */\n\n.dashboardIntro {\n  padding-bottom: 18px;\n  border-bottom: 1px solid var(--lumera-line);\n}\n\n.stats {\n  gap: 0 !important;\n  border: 1px solid var(--lumera-line);\n  background: var(--lumera-surface);\n}\n\n.stats .metric {\n  border: 0 !important;\n  border-right: 1px solid var(--lumera-line) !important;\n  box-shadow: none !important;\n}\n\n.stats .metric:last-child {\n  border-right: 0 !important;\n}\n\n.metric strong {\n  color: #172521 !important;\n}\n\n/* ---------- History ---------- */\n\n.historyPage > .wizardFooter,\n.resultsPage > .wizardFooter {\n  margin-bottom: 2px;\n  padding: 0 0 17px;\n  background: transparent;\n  border-bottom: 1px solid var(--lumera-line);\n}\n\n.tableWrapper {\n  overflow: hidden;\n  border: 1px solid var(--lumera-line);\n  background: var(--lumera-surface);\n}\n\n.dataTable,\n.evidenceTable,\n.rowDataTable {\n  border-collapse: collapse !important;\n}\n\n.dataTable thead th,\n.evidenceSection table thead th,\n.rowDataTable thead th {\n  background: #eef2ef !important;\n  color: #72807a !important;\n  border-bottom: 1px solid var(--lumera-line) !important;\n  font-size: 8px !important;\n  font-weight: 700 !important;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n}\n\n.dataTable tbody td,\n.evidenceSection table tbody td,\n.rowDataTable tbody td {\n  border-bottom-color: #dde3e0 !important;\n  color: #31403a;\n  font-size: 10px;\n}\n\n.dataTable tbody tr:hover,\n.evidenceSection table tbody tr:hover {\n  background: #f3f6f4 !important;\n}\n\n.codeCell,\n.runIdText {\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;\n}\n\n.tablePagination {\n  background: #f7f9f7;\n  border-top-color: var(--lumera-line) !important;\n  color: #718079;\n}\n\n.pageBtn {\n  background: #fff !important;\n  border: 1px solid #c6cfca !important;\n}\n\n/* ---------- Results ---------- */\n\n.resultsPage {\n  gap: 12px !important;\n}\n\n.resultSummaryGrid {\n  display: grid !important;\n  grid-template-columns: repeat(4, minmax(140px, 1fr));\n  gap: 0 !important;\n  border: 1px solid var(--lumera-line);\n  background: var(--lumera-surface);\n}\n\n.resultSummaryCard {\n  border: 0 !important;\n  border-right: 1px solid var(--lumera-line) !important;\n  box-shadow: none !important;\n  min-height: 84px;\n}\n\n.resultSummaryCard:last-child {\n  border-right: 0 !important;\n}\n\n.resultSummaryCard span {\n  color: #75827c !important;\n  font-size: 8px !important;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n}\n\n.resultSummaryCard strong {\n  color: #1c2925 !important;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  font-size: 20px !important;\n}\n\n.resultSummaryCard.pass strong {\n  color: var(--lumera-pass) !important;\n}\n\n.resultSummaryCard.fail strong {\n  color: var(--lumera-fail) !important;\n}\n\n.levelSummaryPanel {\n  padding: 0 !important;\n  overflow: hidden;\n}\n\n.levelSummaryHead {\n  padding: 15px 18px !important;\n}\n\n.levelSummaryGrid {\n  gap: 0 !important;\n}\n\n.levelSummaryItem {\n  border: 0 !important;\n  border-top: 1px solid var(--lumera-line-soft) !important;\n  border-radius: 0 !important;\n  background: transparent !important;\n  box-shadow: none !important;\n}\n\n.levelSummaryItem:hover {\n  background: #f1f4f2 !important;\n}\n\n.levelSummaryCode,\n.resultLevelCode {\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;\n  color: #697771 !important;\n}\n\n.resultLevelsClean {\n  display: grid;\n  gap: 10px;\n}\n\n.resultLevelClean {\n  overflow: hidden;\n}\n\n.resultLevelClean.pass {\n  border-left: 3px solid var(--lumera-pass) !important;\n}\n\n.resultLevelClean.fail {\n  border-left: 3px solid var(--lumera-fail) !important;\n}\n\n.resultLevelClean.review {\n  border-left: 3px solid var(--lumera-review) !important;\n}\n\n.resultLevelHeader {\n  min-height: 66px;\n  background: transparent !important;\n}\n\n.resultLevelHeader:hover {\n  background: #f1f4f2 !important;\n}\n\n.resultLevelContent {\n  border-top-color: var(--lumera-line) !important;\n  background: #f6f8f6 !important;\n}\n\n.resultMetricGrid {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));\n  gap: 0 !important;\n  border: 1px solid var(--lumera-line);\n  background: #fbfcfb;\n}\n\n.resultMetric {\n  min-height: 70px;\n  padding: 12px 14px !important;\n  border: 0 !important;\n  border-right: 1px solid var(--lumera-line-soft) !important;\n  border-bottom: 1px solid var(--lumera-line-soft) !important;\n  background: transparent !important;\n}\n\n.resultMetric span {\n  color: #74817b !important;\n  font-size: 8px !important;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n}\n\n.resultMetric strong {\n  color: #20302b !important;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n\n.evidenceSection {\n  margin-top: 12px;\n  overflow: hidden;\n  background: #fbfcfb !important;\n  border: 1px solid var(--lumera-line) !important;\n  border-radius: var(--lumera-radius) !important;\n}\n\n.evidenceSectionHead {\n  padding: 12px 14px !important;\n  background: #f4f7f5;\n}\n\n.evidenceSectionHead h4 {\n  color: #263630;\n}\n\n.evidenceSectionHead span {\n  color: #7d8984;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n\n.evidenceEmpty {\n  background: #f7f9f7 !important;\n  color: #7b8882 !important;\n}\n\n.evidenceEmpty.success {\n  background: #edf7f1 !important;\n  color: #347451 !important;\n}\n\n.expandedRowCell {\n  background: #eef2ef !important;\n}\n\n.expandedRowCell pre,\n.analysisTechnicalEvidence {\n  background: #111b18 !important;\n  border-color: #293631 !important;\n  color: #c9d5d0 !important;\n  border-radius: var(--lumera-radius) !important;\n}\n\n/* ---------- Status pills ---------- */\n\n.status,\n[class*=\"status\"] {\n  border-radius: 2px !important;\n}\n\n/* ---------- Modals ---------- */\n\n.modalBackdrop {\n  background: rgba(8, 15, 13, 0.66) !important;\n  backdrop-filter: blur(3px);\n}\n\n.modal {\n  background: #f7f9f7 !important;\n  border: 1px solid #aeb9b4 !important;\n  border-radius: 2px !important;\n  box-shadow: 0 22px 70px rgba(4, 12, 9, 0.25) !important;\n}\n\n.modalHead {\n  border-bottom-color: var(--lumera-line) !important;\n}\n\n/* ---------- L7 report ---------- */\n\n.analysisReportSection {\n  overflow: hidden;\n}\n\n.analysisSectionHeading {\n  background: #f2f5f3;\n}\n\n.analysisEvidenceTag {\n  background: var(--lumera-accent-soft) !important;\n  color: #865a00 !important;\n  border-radius: 2px !important;\n}\n\n/* ---------- Scrollbars ---------- */\n\n* {\n  scrollbar-width: thin;\n  scrollbar-color: #aab4af transparent;\n}\n\n*::-webkit-scrollbar {\n  width: 8px;\n  height: 8px;\n}\n\n*::-webkit-scrollbar-thumb {\n  background: #aab4af;\n  border-radius: 8px;\n}\n\n*::-webkit-scrollbar-track {\n  background: transparent;\n}\n\n/* ---------- Responsive behavior ---------- */\n\n@media (max-width: 1100px) {\n  .body {\n    padding: 22px 20px 82px;\n  }\n\n  .comparisonBuilder > .wizardFooter {\n    margin: -22px -20px 12px;\n    padding: 15px 20px;\n  }\n\n  .builderHeading {\n    align-items: flex-start;\n    flex-direction: column;\n    gap: 10px;\n  }\n\n  .comparisonProgress {\n    min-width: 0;\n  }\n\n  .resultSummaryGrid {\n    grid-template-columns: repeat(2, 1fr);\n  }\n}\n\n@media (max-width: 820px) {\n  .sidebar {\n    width: 176px;\n  }\n\n  .brandWordmark::after {\n    display: none;\n  }\n\n  .comparisonBuilder::after {\n    left: 176px;\n  }\n\n  .scopeSourceGrid {\n    display: block !important;\n  }\n\n  .scopeSourceGrid > .panel:first-child {\n    border-right: 0 !important;\n    border-bottom: 1px solid var(--lumera-line) !important;\n  }\n\n  .filtersGrid,\n  .grid2 {\n    grid-template-columns: 1fr !important;\n  }\n}\n
+/* Lumera enterprise validation-console theme */
+:root {
+  --lumera-shell: #0d1513;
+  --lumera-shell-soft: #121d1a;
+  --lumera-accent: #f2b43b;
+  --lumera-accent-strong: #e6a72f;
+  --lumera-canvas: #e9eeeb;
+  --lumera-surface: #f8faf8;
+  --lumera-surface-2: #f2f5f3;
+  --lumera-line: #cbd3cf;
+  --lumera-line-soft: #dce2df;
+  --lumera-text: #172521;
+  --lumera-muted: #73807b;
+  --lumera-pass: #24965a;
+  --lumera-fail: #d8493f;
+  --lumera-review: #d99212;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--lumera-canvas);
+  color: var(--lumera-text);
+}
+
+.app,
+.main {
+  background: var(--lumera-canvas);
+}
+
+.sidebar {
+  width: 218px;
+  background: linear-gradient(180deg, #0b1412 0%, #101b18 100%);
+  border-right: 1px solid #1e2b27;
+  color: #d9e0dc;
+}
+
+.brand {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid #22302c;
+}
+
+.brand::before {
+  content: "L";
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin-right: 11px;
+  transform: rotate(45deg);
+  background: var(--lumera-accent);
+  color: #13201c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brandWordmark {
+  color: #f5f7f6;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.brandWordmark::after {
+  content: " · VALIDATION CONSOLE";
+  margin-left: 8px;
+  color: #77837f;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+}
+
+.workspace {
+  padding: 19px 20px 8px;
+  color: #6f7d78;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.nav {
+  width: calc(100% - 16px);
+  min-height: 40px;
+  margin: 2px 8px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #bdc7c3;
+  font-size: 12px;
+}
+
+.nav:hover {
+  background: #17231f;
+  color: #fff;
+}
+
+.nav.active {
+  background: #202b28;
+  border-left-color: var(--lumera-accent);
+  color: var(--lumera-accent);
+}
+
+.sidebarBottom {
+  border-top: 1px solid #22302c;
+  padding: 16px 20px 20px;
+}
+
+.apiState i {
+  background: #3fce79;
+  box-shadow: 0 0 0 3px rgba(63, 206, 121, 0.08);
+}
+
+.apiState b {
+  color: #edf2ef;
+}
+
+.apiState span {
+  color: #77837f;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.body {
+  max-width: none;
+  padding: 28px 34px 88px;
+}
+
+.pageTitle,
+.dashboardIntro h1 {
+  color: #14231f;
+  font-size: clamp(24px, 2vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.sectionEyebrow {
+  color: #77837f;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.helper,
+.dashboardIntro p {
+  color: var(--lumera-muted);
+}
+
+.primary,
+.secondary,
+.textBtn,
+.iconButton,
+.pageBtn,
+.panel,
+.metric,
+.resultSummaryCard,
+.levelSummaryPanel,
+.resultLevelClean,
+.analysisReportSection,
+.modal,
+.field select,
+.field input,
+.field textarea,
+.multiSelectTrigger,
+.multiSelectMenu {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.primary {
+  background: var(--lumera-accent) !important;
+  border-color: var(--lumera-accent-strong) !important;
+  color: #13201c !important;
+  font-weight: 700 !important;
+}
+
+.primary:hover:not(:disabled) {
+  background: #ffc34e !important;
+}
+
+.secondary {
+  background: #f7f9f7 !important;
+  border-color: #bfc9c4 !important;
+  color: #24332f !important;
+}
+
+.panel,
+.metric,
+.resultSummaryCard,
+.levelSummaryPanel,
+.resultLevelClean,
+.analysisReportSection {
+  background: var(--lumera-surface) !important;
+  border-color: var(--lumera-line) !important;
+}
+
+.comparisonBuilder > .wizardFooter {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: -28px -34px 14px;
+  padding: 18px 34px;
+  background: rgba(233, 238, 235, 0.97);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--lumera-line);
+}
+
+.builderHeading {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+}
+
+.comparisonProgress {
+  min-width: 360px;
+}
+
+.comparisonProgress span {
+  color: #87928d;
+  font-size: 10px;
+}
+
+.comparisonProgress span b {
+  width: 23px;
+  height: 23px;
+  display: inline-grid;
+  place-items: center;
+  margin-right: 8px;
+  border: 1px solid #bfc8c4;
+  color: #7f8a85;
+}
+
+.comparisonProgress span.active {
+  color: #172521;
+  font-weight: 700;
+}
+
+.comparisonProgress span.active b {
+  background: #15201d;
+  border-color: #15201d;
+  color: var(--lumera-accent);
+}
+
+.scopeSectionIntro h2 {
+  color: #26342f;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scopeSourceGrid {
+  gap: 0 !important;
+  border: 1px solid var(--lumera-line);
+  background: var(--lumera-surface);
+}
+
+.scopeSourceGrid > .panel {
+  border: 0 !important;
+}
+
+.scopeSourceGrid > .panel:first-child {
+  border-right: 1px solid var(--lumera-line) !important;
+}
+
+.scopeDatasetCard .panelHead,
+.scopeDatasetCard .panelHeader {
+  color: #37678b;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 9px;
+}
+
+.scopeSourceGrid > .panel:last-child .panelHead,
+.scopeSourceGrid > .panel:last-child .panelHeader {
+  color: #75528c;
+}
+
+.field > span,
+.field > label,
+.mappingPickerBlock > label {
+  color: #687670 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.field select,
+.field input,
+.field textarea,
+select,
+input[type="text"],
+input[type="number"],
+input[type="search"],
+.multiSelectTrigger {
+  min-height: 38px;
+  background: #f5f7f5 !important;
+  border-color: #c7d0cc !important;
+  color: #20302b !important;
+}
+
+.field select:focus,
+.field input:focus,
+select:focus,
+input:focus,
+.multiSelectTrigger:focus {
+  outline: 2px solid rgba(242, 180, 59, 0.2) !important;
+  border-color: #d79c2f !important;
+}
+
+.scopeLevelIntro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.scopeSelectionCount {
+  color: #697771;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.levelGrid {
+  display: block !important;
+  border-top: 1px solid var(--lumera-line-soft);
+}
+
+.level {
+  width: 100%;
+  min-height: 58px;
+  display: grid !important;
+  grid-template-columns: 72px minmax(220px, 1fr) 34px;
+  align-items: center;
+  padding: 10px 14px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--lumera-line-soft) !important;
+  border-radius: 0 !important;
+  text-align: left;
+}
+
+.level:hover {
+  background: #f1f4f2 !important;
+}
+
+.level.selected {
+  background: linear-gradient(90deg, rgba(242, 180, 59, 0.09), transparent 36%) !important;
+  box-shadow: inset 3px 0 0 var(--lumera-accent) !important;
+}
+
+.levelVisual svg {
+  display: none;
+}
+
+.levelCode {
+  width: 30px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: #eef1ef;
+  border: 1px solid #ccd3d0;
+  color: #6c7974;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+}
+
+.level.selected .levelCode {
+  background: #17211e;
+  border-color: #17211e;
+  color: var(--lumera-accent);
+}
+
+.level b {
+  color: #1d2b27;
+  font-size: 12px;
+}
+
+.level small {
+  color: #78857f;
+  font-size: 10px;
+}
+
+.checkCircle {
+  width: 17px !important;
+  height: 17px !important;
+  border-radius: 1px !important;
+}
+
+.level.selected .checkCircle {
+  background: var(--lumera-accent) !important;
+  border-color: var(--lumera-accent-strong) !important;
+  color: #18231f !important;
+}
+
+.reviewRunStep {
+  gap: 12px !important;
+}
+
+.chip {
+  background: #eef1ef !important;
+  border-color: #c8d0cc !important;
+  border-radius: 2px !important;
+  color: #394741 !important;
+}
+
+.multiSelectMenu {
+  background: #fbfcfb !important;
+  border-color: #aebbb5 !important;
+  box-shadow: 0 12px 30px rgba(17, 30, 25, 0.14) !important;
+}
+
+.multiSelectOption:hover {
+  background: #fff4d9 !important;
+}
+
+.dashboardIntro {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--lumera-line);
+}
+
+.stats {
+  gap: 0 !important;
+  border: 1px solid var(--lumera-line);
+  background: var(--lumera-surface);
+}
+
+.stats .metric {
+  border: 0 !important;
+  border-right: 1px solid var(--lumera-line) !important;
+}
+
+.stats .metric:last-child {
+  border-right: 0 !important;
+}
+
+.historyPage > .wizardFooter,
+.resultsPage > .wizardFooter {
+  padding-bottom: 17px;
+  border-bottom: 1px solid var(--lumera-line);
+}
+
+.tableWrapper {
+  overflow: hidden;
+  border: 1px solid var(--lumera-line);
+  background: var(--lumera-surface);
+}
+
+.dataTable thead th,
+.evidenceSection table thead th,
+.rowDataTable thead th {
+  background: #eef2ef !important;
+  color: #72807a !important;
+  border-bottom-color: var(--lumera-line) !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dataTable tbody td,
+.evidenceSection table tbody td,
+.rowDataTable tbody td {
+  border-bottom-color: #dde3e0 !important;
+  color: #31403a;
+  font-size: 10px;
+}
+
+.dataTable tbody tr:hover,
+.evidenceSection table tbody tr:hover {
+  background: #f3f6f4 !important;
+}
+
+.codeCell,
+.runIdText {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+}
+
+.tablePagination {
+  background: #f7f9f7;
+  border-top-color: var(--lumera-line) !important;
+  color: #718079;
+}
+
+.resultSummaryGrid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 0 !important;
+  border: 1px solid var(--lumera-line);
+  background: var(--lumera-surface);
+}
+
+.resultSummaryCard {
+  border: 0 !important;
+  border-right: 1px solid var(--lumera-line) !important;
+  min-height: 84px;
+}
+
+.resultSummaryCard:last-child {
+  border-right: 0 !important;
+}
+
+.resultSummaryCard span {
+  color: #75827c !important;
+  font-size: 8px !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.resultSummaryCard strong {
+  color: #1c2925 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.resultSummaryCard.pass strong {
+  color: var(--lumera-pass) !important;
+}
+
+.resultSummaryCard.fail strong {
+  color: var(--lumera-fail) !important;
+}
+
+.levelSummaryPanel {
+  overflow: hidden;
+}
+
+.levelSummaryGrid {
+  gap: 0 !important;
+}
+
+.levelSummaryItem {
+  border: 0 !important;
+  border-top: 1px solid var(--lumera-line-soft) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.levelSummaryItem:hover {
+  background: #f1f4f2 !important;
+}
+
+.resultLevelClean.pass {
+  border-left: 3px solid var(--lumera-pass) !important;
+}
+
+.resultLevelClean.fail {
+  border-left: 3px solid var(--lumera-fail) !important;
+}
+
+.resultLevelClean.review {
+  border-left: 3px solid var(--lumera-review) !important;
+}
+
+.resultLevelHeader {
+  min-height: 66px;
+  background: transparent !important;
+}
+
+.resultLevelHeader:hover {
+  background: #f1f4f2 !important;
+}
+
+.resultLevelContent {
+  background: #f6f8f6 !important;
+  border-top-color: var(--lumera-line) !important;
+}
+
+.resultMetricGrid {
+  gap: 0 !important;
+  border: 1px solid var(--lumera-line);
+  background: #fbfcfb;
+}
+
+.resultMetric {
+  background: transparent !important;
+  border-color: var(--lumera-line-soft) !important;
+}
+
+.resultMetric span {
+  color: #74817b !important;
+  font-size: 8px !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.resultMetric strong {
+  color: #20302b !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.evidenceSection {
+  background: #fbfcfb !important;
+  border-color: var(--lumera-line) !important;
+  border-radius: 2px !important;
+}
+
+.evidenceSectionHead {
+  background: #f4f7f5;
+  border-bottom-color: var(--lumera-line) !important;
+}
+
+.expandedRowCell {
+  background: #eef2ef !important;
+}
+
+.expandedRowCell pre,
+.analysisTechnicalEvidence {
+  background: #111b18 !important;
+  border-color: #293631 !important;
+  color: #c9d5d0 !important;
+  border-radius: 2px !important;
+}
+
+.modalBackdrop {
+  background: rgba(8, 15, 13, 0.66) !important;
+  backdrop-filter: blur(3px);
+}
+
+.modal {
+  background: #f7f9f7 !important;
+  border-color: #aeb9b4 !important;
+}
+
+.analysisEvidenceTag {
+  background: #fff4d9 !important;
+  color: #865a00 !important;
+  border-radius: 2px !important;
+}
+
+@media (max-width: 1100px) {
+  .body {
+    padding: 22px 20px 82px;
+  }
+
+  .comparisonBuilder > .wizardFooter {
+    margin: -22px -20px 12px;
+    padding: 15px 20px;
+  }
+
+  .builderHeading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .resultSummaryGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
