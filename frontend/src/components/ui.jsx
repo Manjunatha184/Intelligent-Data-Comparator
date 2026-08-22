@@ -36,7 +36,7 @@ export function Status({ status }) {
 }
 
 export function Empty({ icon: Icon, title, text }) {
-  return <div className="empty"><Icon size={22} /><b>{title}</b><span>{text}</span></div>;
+  return <div className="empty">{Icon ? <Icon size={22} /> : null}<b>{title}</b><span>{text}</span></div>;
 }
 
 export function Loading({ text }) {
