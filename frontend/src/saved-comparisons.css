@@ -4,8 +4,9 @@
 .savedComparisonsToolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 12px; border: 1px solid #c7d0cc; background: #fbfcfb; }
 .savedComparisonsToolbar input { width: min(440px, 100%); min-height: 34px; padding: 0 11px; border: 1px solid #c7d0cc; border-radius: 0; background: #fff; color: #192823; font: inherit; font-size: 11px; }
 .savedComparisonsToolbar span { color: #74817b; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.savedComparisonsPanel { min-height: 0; overflow: hidden !important; border-radius: 0 !important; }
-.savedComparisonsTableWrap { width: 100%; max-height: calc(100vh - 270px); overflow: auto; }
+.savedComparisonsPanel { min-height: 0; overflow: hidden !important; border-radius: 0 !important; padding: 0 !important; }
+.savedComparisonsTableShell { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.savedComparisonsTableWrap { width: 100%; max-height: calc(100vh - 320px); overflow: auto; }
 .savedComparisonsTable { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .savedComparisonsTable th { position: sticky; top: 0; z-index: 2; background: #f4f7f5; color: #68756f; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
 .savedComparisonsTable th, .savedComparisonsTable td { padding: 10px 12px; border-bottom: 1px solid #e1e6e3; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
@@ -16,4 +17,5 @@
 .configurationState.draft { background: #f6f4ea; color: #746321; border-color: #ded4a9; }
 .savedComparisonActions { display: flex; align-items: center; gap: 6px; }
 .savedComparisonActions button { white-space: nowrap; }
-@media (max-width: 900px) { .savedComparisonsPage .wizardFooter, .savedComparisonsToolbar { align-items: stretch; flex-direction: column; } .savedComparisonsToolbar input { width: 100%; } .savedComparisonsTableWrap { max-height: calc(100vh - 320px); } }
+.savedComparisonsPagination { flex: 0 0 auto; margin: 0 !important; padding: 9px 12px; background: #fbfcfb; border-top: 1px solid #d7dfdb; }
+@media (max-width: 900px) { .savedComparisonsPage .wizardFooter, .savedComparisonsToolbar { align-items: stretch; flex-direction: column; } .savedComparisonsToolbar input { width: 100%; } .savedComparisonsTableWrap { max-height: calc(100vh - 350px); } }
