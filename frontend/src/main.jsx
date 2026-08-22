@@ -11,5 +11,6 @@ import "./enterprise-theme.css";
 import "./comparison-reference.css";
 import "./comparison-polish.css";
 import "./page-header.css";
+import "./layout-consistency.css";
 
 createRoot(document.getElementById("root")).render(<App />);
