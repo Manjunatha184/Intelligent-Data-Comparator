@@ -14,5 +14,6 @@ import "./page-header.css";
 import "./layout-consistency.css";
 import "./comparison-step2.css";
 import "./comparison-final-fix.css";
+import "./console-pages.css";
 
 createRoot(document.getElementById("root")).render(<App />);
