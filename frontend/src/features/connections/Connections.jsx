@@ -69,7 +69,7 @@ export function ConnectionManager({
   }
 
   return (
-    <div className="stack">
+    <div className="stack connectionManagerPage">
       <div className="wizardFooter">
         <h1 className="pageTitle" style={{ margin: 0 }}>Connection Manager</h1>
 
@@ -125,6 +125,7 @@ export function ConnectionManager({
 
       <Panel
         title="Configured connections"
+        className="connectionListPanel"
         action={
           <span className="countPill">
             {connections.length} total
@@ -149,90 +150,92 @@ export function ConnectionManager({
               <span />
             </div>
 
-            {connections.map((connection) => {
-              const ConnectorIcon =
-                CONNECTORS[
-                  connection.connector_type
-                ]?.icon || Database;
+            <div className="connectionRowsScroll">
+              {connections.map((connection) => {
+                const ConnectorIcon =
+                  CONNECTORS[
+                    connection.connector_type
+                  ]?.icon || Database;
 
-              return (
-                <div
-                  className="trow"
-                  key={connection.connection_id}
-                >
-                  <div className="nameCell">
-                    <div className="sourceIcon">
-                      <ConnectorIcon size={15} />
+                return (
+                  <div
+                    className="trow"
+                    key={connection.connection_id}
+                  >
+                    <div className="nameCell">
+                      <div className="sourceIcon">
+                        <ConnectorIcon size={15} />
+                      </div>
+
+                      <div>
+                        <b>{connection.name}</b>
+                        <span>
+                          {connection.connector_type}
+                        </span>
+                      </div>
                     </div>
 
                     <div>
-                      <b>{connection.name}</b>
-                      <span>
-                        {connection.connector_type}
+                      <span className="typeTag">
+                        {
+                          CONNECTORS[
+                            connection.connector_type
+                          ]?.label
+                        }
                       </span>
                     </div>
-                  </div>
 
-                  <div>
-                    <span className="typeTag">
-                      {
-                        CONNECTORS[
-                          connection.connector_type
-                        ]?.label
-                      }
-                    </span>
-                  </div>
+                    <div>
+                      <Status
+                        status={connection.status}
+                      />
+                    </div>
 
-                  <div>
-                    <Status
-                      status={connection.status}
-                    />
-                  </div>
+                    <code>
+                      #{connection.connection_id}
+                    </code>
 
-                  <code>
-                    #{connection.connection_id}
-                  </code>
-
-                  <div className="rowButtons">
-                    <button
-                      onClick={() =>
-                        testConnection(
+                    <div className="rowButtons">
+                      <button
+                        onClick={() =>
+                          testConnection(
+                            connection.connection_id
+                          )
+                        }
+                        disabled={
+                          testingId ===
                           connection.connection_id
-                        )
-                      }
-                      disabled={
-                        testingId ===
-                        connection.connection_id
-                      }
-                    >
-                      {testingId ===
-                        connection.connection_id ? (
-                        <Loader2
-                          className="spin"
-                          size={14}
-                        />
-                      ) : (
-                        <RefreshCw size={14} />
-                      )}
+                        }
+                      >
+                        {testingId ===
+                          connection.connection_id ? (
+                          <Loader2
+                            className="spin"
+                            size={14}
+                          />
+                        ) : (
+                          <RefreshCw size={14} />
+                        )}
 
-                      Test
-                    </button>
+                        Test
+                      </button>
 
-                    <button
-                      className="danger"
-                      onClick={() =>
-                        deleteConnection(
-                          connection.connection_id
-                        )
-                      }
-                    >
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
+                      <button
+                        className="danger"
+                        onClick={() =>
+                          deleteConnection(
+                            connection.connection_id
+                          )
+                        }
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </Panel>
