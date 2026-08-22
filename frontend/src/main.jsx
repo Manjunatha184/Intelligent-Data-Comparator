@@ -12,5 +12,6 @@ import "./comparison-reference.css";
 import "./comparison-polish.css";
 import "./page-header.css";
 import "./layout-consistency.css";
+import "./comparison-step2.css";
 
 createRoot(document.getElementById("root")).render(<App />);
