@@ -21,5 +21,6 @@ import "./header-geometry-fix.css";
 import "./saved-comparisons.css";
 import "./recent-results-viewport.css";
 import "./ui-final-corrections.css";
+import "./recent-comparisons-final.css";
 
 createRoot(document.getElementById("root")).render(<App />);
