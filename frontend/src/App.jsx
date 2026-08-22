@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Activity, ArrowRight, ChevronRight, Database, GitCompare, LayoutDashboard, Link2, Plus, SlidersHorizontal, Zap } from "lucide-react";
+import { Activity, ArrowRight, ChevronRight, Database, GitCompare, LayoutDashboard, Link2, Plus, SlidersHorizontal, Zap, Copy, Settings } from "lucide-react";
 
 import { API_BASE, apiRequest } from "./api/client";
 import { ConnectionLine, Empty, Loading, Metric, Panel, Toast } from "./components/ui";
@@ -163,68 +163,71 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar
-        page={page}
-        setPage={setPage}
-        hasResults={Boolean(activeRunId)}
-        onOpenResultsHistory={openResultsHistory}
-      />
+      <TopNav />
+      <div className="appBody">
+        <Sidebar
+          page={page}
+          setPage={setPage}
+          hasResults={Boolean(activeRunId)}
+          onOpenResultsHistory={openResultsHistory}
+        />
 
-      <main className="main">
-        <div className="body">
-          {page === "dashboard" && (
-            <Dashboard
-              connections={connections}
-              onNewComparison={() => setPage("comparison")}
-              onConnections={() => setPage("connections")}
-            />
-          )}
+        <main className="main">
+          <div className="body">
+            {page === "dashboard" && (
+              <Dashboard
+                connections={connections}
+                onNewComparison={() => setPage("comparison")}
+                onConnections={() => setPage("connections")}
+              />
+            )}
 
-          {page === "connections" && (
-            <ConnectionManager
-              connections={connections}
-              loading={loadingConnections}
-              reload={loadConnections}
-              onAdd={() => setConnectionModalOpen(true)}
-              notify={notify}
-            />
-          )}
+            {page === "connections" && (
+              <ConnectionManager
+                connections={connections}
+                loading={loadingConnections}
+                reload={loadConnections}
+                onAdd={() => setConnectionModalOpen(true)}
+                notify={notify}
+              />
+            )}
 
-          {page === "comparison" && (
-            <ComparisonBuilder
-              connections={connections}
-              notify={notify}
-              connectionsLoading={loadingConnections}
-              connectionsError={connectionsError}
-              reloadConnections={loadConnections}
-              onComplete={handleComparisonComplete}
-            />
-          )}
+            {page === "comparison" && (
+              <ComparisonBuilder
+                connections={connections}
+                notify={notify}
+                connectionsLoading={loadingConnections}
+                connectionsError={connectionsError}
+                reloadConnections={loadConnections}
+                onComplete={handleComparisonComplete}
+              />
+            )}
 
-          {page === "results" && (
-            <ResultsConsole
-              runId={activeRunId}
-              onOpenRun={handleComparisonComplete}
-              onBack={backToResultsHistory}
-              onOpenAnalysis={openAnalysis}
-              notify={notify}
-            />
-          )}
+            {page === "results" && (
+              <ResultsConsole
+                runId={activeRunId}
+                onOpenRun={handleComparisonComplete}
+                onBack={backToResultsHistory}
+                onOpenAnalysis={openAnalysis}
+                notify={notify}
+              />
+            )}
 
-          {page === "analysis" && (
-            <AnalysisPage
-              runId={activeRunId}
-              onBack={() => {
-                setPage("results");
-                window.history.pushState(null, "", "/");
-              }}
-              notify={notify}
-            />
-          )}
+            {page === "analysis" && (
+              <AnalysisPage
+                runId={activeRunId}
+                onBack={() => {
+                  setPage("results");
+                  window.history.pushState(null, "", "/");
+                }}
+                notify={notify}
+              />
+            )}
 
-          {page === "rules" && <RulesPage notify={notify} />}
-        </div>
-      </main>
+            {page === "rules" && <RulesPage notify={notify} />}
+          </div>
+        </main>
+      </div>
 
       {connectionModalOpen && (
         <ConnectionModal
@@ -244,7 +247,54 @@ export default function App() {
           onClose={() => setToast(null)}
         />
       )}
+
+      <Footer />
     </div>
+  );
+}
+
+/* ============================================================
+   FOOTER
+============================================================ */
+
+function Footer() {
+  return (
+    <footer className="globalFooter">
+      <div className="footerLeft">Lumera Corporation © 2026</div>
+      <div className="footerRight">
+        <span>Terms of Service</span>
+        <span>Privacy Policy</span>
+        <span>v1.0.0</span>
+      </div>
+    </footer>
+  );
+}
+
+/* ============================================================
+   TOPNAV
+============================================================ */
+
+function TopNav() {
+  return (
+    <header className="topnav">
+      <div className="topnavBrand">
+        <div className="brandLogoIcon"><span>L</span></div>
+        <div className="brandName">Lumera</div>
+        <div className="brandDivider">|</div>
+        <div className="brandApp">VALIDATION<br/>CONSOLE</div>
+      </div>
+      <div className="topnavLinks">
+        <button className="active">RUNS</button>
+        <button>COMPARE</button>
+        <button>CONNECTORS</button>
+        <button>POLICIES</button>
+      </div>
+      <div className="topnavRight">
+        <span className="workspaceLabel">workspace / prod-data</span>
+        <button className="iconBtn"><Copy size={14} /></button>
+        <button className="iconBtn"><Settings size={14} /></button>
+      </div>
+    </header>
   );
 }
 
@@ -255,10 +305,6 @@ export default function App() {
 function Sidebar({ page, setPage, hasResults, onOpenResultsHistory }) {
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <div className="brandWordmark">DATA COMPARATOR</div>
-      </div>
-
       <div className="workspace">WORKSPACE</div>
 
       <NavigationItem

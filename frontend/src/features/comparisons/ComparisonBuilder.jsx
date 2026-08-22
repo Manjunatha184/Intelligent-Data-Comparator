@@ -221,6 +221,14 @@ export function ComparisonBuilder({
     });
   }
 
+  function selectAllLevels() {
+    setLevels(COMPARISON_LEVELS.map(l => l.id));
+  }
+
+  function clearAllLevels() {
+    setLevels([]);
+  }
+
   async function runComparison() {
     if (!source || !target) {
       notify(
@@ -511,19 +519,21 @@ export function ComparisonBuilder({
 
   return (
     <div className="stack comparisonBuilder">
-      <div className="wizardFooter">
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <div className="builderHeading">
-            <h1 className="pageTitle" style={{ margin: 0 }}>Create a comparison</h1>
-            <div className="comparisonProgress" aria-label="Comparison setup progress">
-              <span className={step >= 1 ? "active" : ""}><b>01</b> Define scope</span>
-              <i />
-              <span className={step >= 2 ? "active" : ""}><b>02</b> Review & run</span>
-            </div>
+      <div className="wizardHeader">
+        <div className="wizardHeaderLeft">
+          <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#14231f", letterSpacing: "-0.02em" }}>Create Comparison</h1>
+          <p className="helper" style={{ margin: 0, marginTop: "6px" }}>Configure datasets, mappings, rules and validation scope for this comparison run.</p>
+        </div>
+
+        <div className="wizardHeaderCenter">
+          <div className="comparisonProgress" aria-label="Comparison setup progress">
+            <span className={step >= 1 ? "active" : ""}><b>1</b> Define scope</span>
+            <ArrowRight size={12} className="progressArrow" />
+            <span className={step >= 2 ? "active" : ""}><b>2</b> Review & run</span>
           </div>
         </div>
 
-        <div className="actionRow">
+        <div className="actionRow wizardHeaderRight">
           {step > 1 && (
             <button
               className="secondary"
@@ -541,7 +551,7 @@ export function ComparisonBuilder({
               disabled={!sourceId || !targetId || !levels.some((level) => level !== "L7")}
               onClick={() => setStep(2)}
             >
-              Continue
+              Next: Review & run
               <ArrowRight size={15} />
             </button>
           ) : (
@@ -549,7 +559,7 @@ export function ComparisonBuilder({
               className="primary"
               onClick={() => setReviewModalOpen(true)}
             >
-              Review & Run
+              Run Comparison
               <ArrowRight size={15} />
             </button>
           )}
@@ -586,6 +596,8 @@ export function ComparisonBuilder({
           <LevelsStep
             levels={levels}
             toggleLevel={toggleLevel}
+            selectAll={selectAllLevels}
+            clearAll={clearAllLevels}
           />
         </div>
       )}
@@ -939,47 +951,43 @@ function ConnectionSelector({
 function LevelsStep({
   levels,
   toggleLevel,
+  selectAll,
+  clearAll
 }) {
   return (
     <Panel title="Comparison depth" className="scopeLevelsPanel">
-      <div className="scopeLevelIntro">
-        <p className="helper">
-          Build the validation path from structural checks through plain-language analysis.
-        </p>
-        <span className="scopeSelectionCount">{levels.length} of {COMPARISON_LEVELS.length} selected</span>
+      <div className="scopeLevelIntro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <span className="scopeSelectionCount" style={{ color: "#74817b", fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>{levels.length} of {COMPARISON_LEVELS.length} selected</span>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button type="button" style={{ background: "none", border: "none", color: "#172521", fontSize: "11px", fontWeight: 600, cursor: "pointer", padding: 0 }} onClick={selectAll}>Select all</button>
+          <button type="button" style={{ background: "none", border: "none", color: "#172521", fontSize: "11px", fontWeight: 600, cursor: "pointer", padding: 0 }} onClick={clearAll}>Clear</button>
+        </div>
       </div>
 
-      <div className="levelGrid">
+      <div className="levelGrid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "10px" }}>
         {COMPARISON_LEVELS.map((level) => {
           const selected = levels.includes(
             level.id
           );
-          const LevelIcon = COMPARISON_LEVEL_ICONS[level.id];
 
+          // We don't use the LevelIcon here to match reference exactly
           return (
             <button
               type="button"
               key={level.id}
-              className={`level ${selected ? "selected" : ""} level-${level.id}`}
+              className={`levelRow ${selected ? "selected" : ""}`}
               onClick={() => toggleLevel(level.id)}
             >
-              <span className="levelVisual">
-                <LevelIcon size={17} />
-                <span className="levelCode">{level.id}</span>
-              </span>
-
-              <div>
-                <b>{level.name}</b>
-                <small>
-                  {level.description}
-                </small>
+              <div className="levelRowLeft">
+                <span className={`customCheckbox ${selected ? "checked" : ""}`}>
+                  {selected && <Check size={12} strokeWidth={3} />}
+                </span>
+                <span className="levelChip">{level.id}</span>
+                <div className="levelRowText">
+                  <b>{level.name}</b>
+                  <small>{level.description}</small>
+                </div>
               </div>
-
-              <span className="checkCircle">
-                {selected && (
-                  <Check size={13} />
-                )}
-              </span>
             </button>
           );
         })}
