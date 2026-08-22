@@ -1,0 +1,157 @@
+/* Isolated final geometry for Recent Comparisons. Loaded last on purpose. */
+@media (min-width: 900px) {
+  .body:has(.recentComparisonsPage) {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 22px 18px !important;
+    box-sizing: border-box !important;
+  }
+
+  .recentComparisonsPage {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: grid !important;
+    grid-template-rows: 72px minmax(0, 1fr) !important;
+    gap: 14px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .recentComparisonsHeader {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 72px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    border-bottom: 1px solid #ccd5d0 !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .recentComparisonsHeader h1 {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 22px !important;
+    line-height: 1.1 !important;
+    letter-spacing: -.03em !important;
+    color: #13211d !important;
+  }
+
+  .recentComparisonsHeader button {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .recentComparisonsPage > .recentComparisonsPanel {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    display: block !important;
+    box-sizing: border-box !important;
+  }
+
+  .recentComparisonsTableShell {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) 48px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .recentComparisonsRowsScroll {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  .recentComparisonsTable {
+    width: 100% !important;
+    min-width: 980px !important;
+    margin: 0 !important;
+    table-layout: auto !important;
+  }
+
+  .recentComparisonsTable thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5 !important;
+    background: #eef2ef !important;
+  }
+
+  .recentComparisonsPagination {
+    width: 100% !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 14px !important;
+    position: static !important;
+    background: #fbfcfb !important;
+    border-top: 1px solid var(--border) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .recentComparisonsPagination .tablePaginationActions {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    white-space: nowrap !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .body:has(.recentComparisonsPage) {
+    overflow: auto !important;
+    padding: 0 14px 18px !important;
+  }
+  .recentComparisonsPage {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+  .recentComparisonsHeader {
+    min-height: 64px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    border-bottom: 1px solid #ccd5d0 !important;
+  }
+  .recentComparisonsHeader h1 { margin: 0 !important; font-size: 20px !important; }
+  .recentComparisonsPanel { margin-top: 12px !important; overflow: hidden !important; }
+  .recentComparisonsRowsScroll { overflow: auto !important; }
+  .recentComparisonsPagination { min-height: 48px !important; }
+}
