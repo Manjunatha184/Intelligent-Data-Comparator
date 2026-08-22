@@ -87,21 +87,6 @@
   margin-right: 0 !important;
 }
 
-/* Ignored columns is the full-width finishing row of Define scope. */
-.comparisonBuilder .scopeIgnoredColumnsCard {
-  width: 100% !important;
-}
-
-.comparisonBuilder .scopeIgnoredColumnsCard .formGrid {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: var(--app-page-gap) !important;
-}
-
-.comparisonBuilder .scopeIgnoredColumnsCard .mappingPickerBlock {
-  min-width: 0 !important;
-}
-
 /* Do not let comparison-specific styles create extra side indentation. */
 .comparisonBuilder .scopeSourceGrid,
 .comparisonBuilder .levelGrid {
@@ -109,9 +94,112 @@
   max-width: none !important;
 }
 
+/* ============================================================
+   DEFINE SCOPE — final grid alignment
+============================================================ */
+
+@media (min-width: 1100px) {
+  /*
+   * Make Ignored Columns a true page-width finishing row.
+   * The first two rows keep the left/right builder composition.
+   */
+  .comparisonBuilder > .stack:not(.reviewRunStep) {
+    grid-template-areas:
+      "ledger depth"
+      "extras depth"
+      "ignored ignored" !important;
+    grid-template-rows: auto auto auto !important;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard {
+    grid-area: ignored !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    align-self: start !important;
+    background: #fbfcfb !important;
+    border: 1px solid #c7d0cc !important;
+    box-shadow: none !important;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard > .panelHead {
+    min-height: 38px !important;
+    height: 38px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    border-bottom: 1px solid #d9e0dc !important;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard > .panelHead h3 {
+    margin: 0 !important;
+    font-size: 10px !important;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard > .helper {
+    margin: 10px 14px 0 !important;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard .formGrid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    padding: 10px 14px 14px !important;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard .mappingPickerBlock {
+    min-width: 0 !important;
+  }
+
+  /*
+   * Both filter panels share one grid row. Stretching them prevents the
+   * empty card from becoming shorter when a filter is added on one side.
+   */
+  .scopeFirstPageExtras .scopeFiltersGrid {
+    align-items: stretch !important;
+  }
+
+  .scopeFirstPageExtras .scopeFiltersGrid > .filterCard {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .scopeFirstPageExtras .scopeFiltersGrid > .filterCard > .stack {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* Keep Add filter pinned to the bottom so both cards remain symmetrical. */
+  .scopeFirstPageExtras .scopeFiltersGrid > .filterCard > .stack > button.secondary:last-child {
+    margin-top: auto !important;
+  }
+}
+
 @media (max-width: 1099px) {
   :root {
     --app-page-gutter: 20px;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard {
+    width: 100% !important;
+    margin-top: 12px !important;
+  }
+
+  .comparisonBuilder .scopeIgnoredColumnsCard .formGrid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: var(--app-page-gap) !important;
+  }
+
+  .scopeFirstPageExtras .scopeFiltersGrid {
+    align-items: stretch !important;
+  }
+
+  .scopeFirstPageExtras .scopeFiltersGrid > .filterCard {
+    height: 100% !important;
   }
 }
 
