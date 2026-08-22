@@ -1,0 +1,150 @@
+/* Final Step-1 visual polish: contain filter rows and tighten left-column alignment. */
+
+@media (min-width: 1100px) {
+  .scopeFirstPageExtras {
+    gap: 10px !important;
+  }
+
+  .scopeFirstPageExtras .scopeFiltersGrid {
+    gap: 10px !important;
+  }
+
+  .scopeFirstPageExtras .filterCard,
+  .scopeFirstPageExtras .scopeRecordMatchingCard {
+    overflow: hidden !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .panelHead,
+  .scopeFirstPageExtras .scopeRecordMatchingCard .panelHead {
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 12px !important;
+  }
+
+  .scopeFirstPageExtras .filterCard > .stack {
+    padding: 9px 12px 11px !important;
+    gap: 7px !important;
+  }
+
+  /* Keep one filter row completely inside its half-width card. */
+  .scopeFirstPageExtras .filterCard .formGrid {
+    display: grid !important;
+    grid-template-columns: minmax(105px, 1.15fr) 82px minmax(105px, 1fr) 32px !important;
+    gap: 6px !important;
+    align-items: end !important;
+    min-width: 0 !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .formGrid > * {
+    min-width: 0 !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .field {
+    margin: 0 !important;
+    min-width: 0 !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .field select,
+  .scopeFirstPageExtras .filterCard .field input {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding-left: 8px !important;
+    padding-right: 22px !important;
+  }
+
+  /* The per-row Remove control becomes a compact icon-sized action. */
+  .scopeFirstPageExtras .filterCard .formGrid > button.secondary {
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .formGrid > button.secondary svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  /* Add Filter stays full-width but visually lighter. */
+  .scopeFirstPageExtras .filterCard > .stack > button.secondary:last-child {
+    width: 100% !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 10px !important;
+    font-size: 9px !important;
+    justify-content: center !important;
+  }
+
+  /* Record matching should read as a continuation of filters, not a giant card. */
+  .scopeFirstPageExtras .scopeRecordMatchingCard .formGrid {
+    padding: 9px 12px 11px !important;
+    gap: 10px !important;
+  }
+
+  .scopeFirstPageExtras .scopeRecordMatchingCard .field select {
+    height: 34px !important;
+    min-height: 34px !important;
+  }
+
+  /* Slightly tighten the ledger so the entire left column feels balanced. */
+  .scopeSourceGrid > .scopeDatasetCard {
+    min-height: 132px !important;
+  }
+
+  .scopeDatasetCard > .connectionSelector {
+    margin-top: 11px !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* Keep the right panel visually aligned with the left stack. */
+  .scopeLevelsPanel .levelRow {
+    min-height: 53px !important;
+    height: 53px !important;
+  }
+}
+
+@media (min-width: 1100px) and (max-width: 1360px) {
+  .scopeFirstPageExtras .filterCard .formGrid {
+    grid-template-columns: minmax(100px, 1fr) 76px minmax(100px, 1fr) 32px !important;
+  }
+}
+
+@media (max-width: 1099px) {
+  .scopeFirstPageExtras .filterCard .formGrid {
+    display: grid !important;
+    grid-template-columns: minmax(110px, 1fr) 82px minmax(110px, 1fr) 34px !important;
+    gap: 6px !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .formGrid > button.secondary {
+    width: 34px !important;
+    min-width: 34px !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .scopeFirstPageExtras .filterCard .formGrid {
+    grid-template-columns: 1fr 86px !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .formGrid > .field:nth-child(3) {
+    grid-column: 1 / -1 !important;
+  }
+
+  .scopeFirstPageExtras .filterCard .formGrid > button.secondary {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+  }
+}
