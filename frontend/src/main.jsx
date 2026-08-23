@@ -5,6 +5,10 @@ import "@fontsource/montserrat/latin-500.css";
 import "@fontsource/montserrat/latin-600.css";
 import "@fontsource/montserrat/latin-700.css";
 
+// Comparison step 2 can create DQ/Aggregate rules inline. Register its rule
+// editor before the application is rendered so the existing RuleSelectionModal
+// can open it without crashing the React tree.
+import "./features/rules/ComparisonRuleModalGlobal";
 import App from "./App";
 import "./styles.css";
 import "./enterprise-theme.css";
