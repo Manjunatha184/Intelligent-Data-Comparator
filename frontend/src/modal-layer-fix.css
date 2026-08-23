@@ -33,9 +33,19 @@ body:has(.modalBackdrop) .topnavSearch {
   pointer-events: none !important;
 }
 
+/* ResultsConsole owns this metadata strip OUTSIDE .resultsPage. Previous
+   selectors only targeted .resultsPage children, so STATUS / RESULT / ENGINE /
+   DURATION remained sharp above the modal. Blur this exact sibling whenever a
+   modal exists anywhere inside the results console. */
+.resultsConsole:has(.modalBackdrop) > .runMetaStrip {
+  z-index: 0 !important;
+  opacity: .18 !important;
+  filter: blur(3px) !important;
+  pointer-events: none !important;
+}
+
 /* Result page sticky chrome must also become background while View row / Raw
-   evidence is open. This is intentionally scoped to a results page that owns
-   an active modal so normal result-page behavior is unchanged. */
+   evidence is open. */
 .resultsPage:has(.modalBackdrop) > .wizardFooter,
 .resultsPage:has(.modalBackdrop) > .resultSummaryGrid,
 .resultsPage:has(.modalBackdrop) > .levelSummaryPanel {
