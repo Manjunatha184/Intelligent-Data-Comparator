@@ -24,6 +24,17 @@
   backdrop-filter: blur(4px) !important;
 }
 
+/* A rule can be created from inside the rule-selection modal. That creates a
+   nested modalBackdrop. Give the nested editor its own higher layer so the
+   selector cannot cut through the editor. */
+.modalBackdrop > .modalBackdrop {
+  z-index: 2147483100 !important;
+}
+
+.modalBackdrop > .modalBackdrop > .modal {
+  z-index: 2147483101 !important;
+}
+
 /* When any modal is open, the global search must visually belong to the
    background, never look like it is floating above the overlay. */
 body:has(.modalBackdrop) .topnavSearch {
@@ -33,10 +44,6 @@ body:has(.modalBackdrop) .topnavSearch {
   pointer-events: none !important;
 }
 
-/* ResultsConsole owns this metadata strip OUTSIDE .resultsPage. Previous
-   selectors only targeted .resultsPage children, so STATUS / RESULT / ENGINE /
-   DURATION remained sharp above the modal. Blur this exact sibling whenever a
-   modal exists anywhere inside the results console. */
 .resultsConsole:has(.modalBackdrop) > .runMetaStrip {
   z-index: 0 !important;
   opacity: .18 !important;
@@ -44,8 +51,6 @@ body:has(.modalBackdrop) .topnavSearch {
   pointer-events: none !important;
 }
 
-/* Result page sticky chrome must also become background while View row / Raw
-   evidence is open. */
 .resultsPage:has(.modalBackdrop) > .wizardFooter,
 .resultsPage:has(.modalBackdrop) > .resultSummaryGrid,
 .resultsPage:has(.modalBackdrop) > .levelSummaryPanel {
@@ -124,9 +129,6 @@ body:has(.modalBackdrop) .topnavSearch {
   box-sizing: border-box !important;
 }
 
-/* ------------------------------------------------------------
-   Review / configuration summary
------------------------------------------------------------- */
 .modalBackdrop .reviewGrid {
   width: 100% !important;
   max-width: 640px !important;
@@ -147,14 +149,6 @@ body:has(.modalBackdrop) .topnavSearch {
   gap: 16px !important;
 }
 
-/* ------------------------------------------------------------
-   Result row evidence
-
-   Result rows already expand inline and show source/target record JSON.
-   The separate "View row" action duplicated the same evidence and introduced
-   an unnecessary modal. Remove any evidence-table column whose cells render a
-   rowDataLink button. The existing row click/inline expansion remains intact.
------------------------------------------------------------- */
 .resultsPage .rowDataLink {
   display: none !important;
 }
