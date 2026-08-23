@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Check, Database, FileText, Link2, Loader2, Plus, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
 
 import { apiRequest } from "../../api/client";
@@ -263,6 +263,7 @@ export function ConnectionModal({
   const [csvFile, setCsvFile] = useState(null);
   const [csvUpload, setCsvUpload] = useState(null);
   const [uploadingCsv, setUploadingCsv] = useState(false);
+  const csvInputRef = useRef(null);
   const connector = CONNECTORS[connectorType];
 
   function updateValue(key, value) {
@@ -272,10 +273,16 @@ export function ConnectionModal({
     }));
   }
 
+  function openCsvPicker() {
+    if (uploadingCsv || saving) return;
+    csvInputRef.current?.click();
+  }
+
   useEffect(() => {
     setValues({});
     setCsvFile(null);
     setCsvUpload(null);
+    if (csvInputRef.current) csvInputRef.current.value = "";
   }, [connectorType]);
 
   async function handleCsvFile(event) {
@@ -328,6 +335,7 @@ export function ConnectionModal({
     } catch (error) {
       setCsvFile(null);
       setCsvUpload(null);
+      if (csvInputRef.current) csvInputRef.current.value = "";
       notify(error.message, "error");
     } finally {
       setUploadingCsv(false);
@@ -491,66 +499,61 @@ export function ConnectionModal({
                 label="CSV file"
                 required
               >
-                <div>
-                  <label
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    minHeight: "44px",
+                    padding: "7px 10px",
+                    border: "1px solid var(--border)",
+                    borderRadius: "2px",
+                    background: "var(--surface)",
+                    opacity: uploadingCsv || saving ? 0.65 : 1,
+                  }}
+                >
+                  <input
+                    ref={csvInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handleCsvFile}
+                    disabled={uploadingCsv || saving}
+                    style={{ display: "none" }}
+                  />
+
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={openCsvPicker}
+                    disabled={uploadingCsv || saving}
                     style={{
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
-                      gap: "10px",
-                      minHeight: "44px",
-                      padding: "7px 10px",
-                      border: "1px solid var(--border)",
-                      borderRadius: "10px",
-                      background: "var(--surface)",
-                      cursor: uploadingCsv || saving ? "not-allowed" : "pointer",
-                      opacity: uploadingCsv || saving ? 0.65 : 1,
+                      gap: "7px",
+                      minHeight: "30px",
+                      padding: "5px 10px",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      onChange={handleCsvFile}
-                      disabled={uploadingCsv || saving}
-                      style={{
-                        position: "absolute",
-                        width: 1,
-                        height: 1,
-                        opacity: 0,
-                        pointerEvents: "none",
-                      }}
-                    />
+                    <FileText size={15} />
+                    {csvUpload || csvFile ? "Change file" : "Choose CSV"}
+                  </button>
 
-                    <span
-                      className="secondary"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "7px",
-                        minHeight: "30px",
-                        padding: "5px 10px",
-                        borderRadius: "7px",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <FileText size={15} />
-                      {csvUpload ? "Change file" : "Choose CSV"}
-                    </span>
-
-                    <span
-                      style={{
-                        minWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        color: csvUpload ? "var(--text)" : "var(--muted)",
-                        fontSize: "13px",
-                      }}
-                    >
-                      {uploadingCsv
-                        ? "Uploading CSV..."
-                        : csvUpload?.filename || "No file selected"}
-                    </span>
-                  </label>
+                  <span
+                    style={{
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: csvUpload ? "var(--text)" : "var(--muted)",
+                      fontSize: "13px",
+                    }}
+                    title={csvFile?.name || csvUpload?.filename || ""}
+                  >
+                    {uploadingCsv
+                      ? `Uploading ${csvFile?.name || "CSV"}...`
+                      : csvUpload?.filename || csvFile?.name || "No file selected"}
+                  </span>
                 </div>
               </Field>
             )}
