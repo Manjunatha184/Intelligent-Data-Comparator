@@ -1,0 +1,116 @@
+/* Modal layering corrections.
+   All modal backdrops must cover and blur the complete application chrome,
+   including the global search, sticky result header and validation-level strip. */
+
+.modalBackdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 10000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 18px !important;
+  box-sizing: border-box !important;
+  overflow: auto !important;
+  background: rgba(8, 17, 14, 0.66) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  backdrop-filter: blur(4px) !important;
+  isolation: isolate !important;
+}
+
+.modalBackdrop > .modal {
+  position: relative !important;
+  z-index: 10001 !important;
+  max-height: calc(100vh - 36px) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #fbfcfb !important;
+}
+
+.modalBackdrop > .modal > .modalHead,
+.modalBackdrop > .modal > .modalFooter {
+  flex: 0 0 auto !important;
+}
+
+.modalBackdrop > .modal > .modalBody,
+.modalBackdrop .rowDataTableWrap {
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+/* Review & Run configuration modal: compact instead of nearly full-screen. */
+.comparisonBuilder .modalBackdrop > .modal:not(.wide) {
+  width: min(760px, calc(100vw - 48px)) !important;
+  max-width: 760px !important;
+}
+
+.comparisonBuilder .modalBackdrop .modalBody {
+  padding: 16px 22px !important;
+}
+
+.comparisonBuilder .modalBackdrop .reviewGrid {
+  width: 100% !important;
+  max-width: 640px !important;
+  margin: 0 auto !important;
+}
+
+.comparisonBuilder .modalBackdrop .reviewGrid > .panel {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+.comparisonBuilder .modalBackdrop .reviewRow {
+  min-height: 34px !important;
+  padding: 7px 0 !important;
+}
+
+.comparisonBuilder .modalBackdrop .modalHead {
+  padding-top: 14px !important;
+  padding-bottom: 12px !important;
+}
+
+.comparisonBuilder .modalBackdrop .modalFooter {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+/* Result row/evidence modal must remain above sticky result chrome. */
+.resultsPage .modalBackdrop,
+.resultsConsole .modalBackdrop {
+  z-index: 12000 !important;
+}
+
+.resultsPage .modalBackdrop > .modal,
+.resultsConsole .modalBackdrop > .modal {
+  z-index: 12001 !important;
+}
+
+.resultsPage .rowDataModal,
+.resultsConsole .rowDataModal {
+  width: min(760px, calc(100vw - 48px)) !important;
+  max-width: 760px !important;
+  max-height: min(78vh, 720px) !important;
+}
+
+.resultsPage .rowDataTableWrap,
+.resultsConsole .rowDataTableWrap {
+  flex: 1 1 auto !important;
+  max-height: none !important;
+  overflow: auto !important;
+}
+
+@media (max-width: 899px) {
+  .modalBackdrop {
+    padding: 10px !important;
+  }
+
+  .comparisonBuilder .modalBackdrop > .modal:not(.wide),
+  .resultsPage .rowDataModal,
+  .resultsConsole .rowDataModal {
+    width: calc(100vw - 20px) !important;
+    max-width: none !important;
+  }
+}
