@@ -1,0 +1,45 @@
+/* Final L7 presentation rules. Keep report content vertical and evidence-focused. */
+.resultsPage.analysisResultsPage .analysisFindingList,
+.resultsPage.analysisResultsPage .analysisCorrelationList {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.resultsPage.analysisResultsPage .analysisFindingCard,
+.resultsPage.analysisResultsPage .analysisCorrelationCard {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+/* Severity is intentionally not presented in L7. L1-L6 PASS/FAIL evidence is
+   the authoritative validation signal; L7 explains that evidence. */
+.resultsPage.analysisResultsPage .analysisFindingTop > .analysisSeverity {
+  display: none !important;
+}
+
+/* The status rail contains Overall status, Severity, Timestamp in that order.
+   Hide the severity cell and let the two useful facts share the row. */
+.resultsPage.analysisResultsPage .analysisReportStatus {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.resultsPage.analysisResultsPage .analysisReportStatus > div:nth-child(2) {
+  display: none !important;
+}
+
+.resultsPage.analysisResultsPage .analysisReportStatus > div:nth-child(1) {
+  border-right: 1px solid #dce2df !important;
+}
+
+.resultsPage.analysisResultsPage .analysisReportStatus > div:nth-child(3) {
+  border-right: 0 !important;
+}
+
+@media (max-width: 899px) {
+  .resultsPage.analysisResultsPage .analysisReportStatus {
+    grid-template-columns: 1fr !important;
+  }
+}
