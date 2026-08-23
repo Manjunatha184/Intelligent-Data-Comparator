@@ -1,105 +1,186 @@
-/* Modal layering corrections.
-   All modal backdrops must cover and blur the complete application chrome,
-   including the global search, sticky result header and validation-level strip. */
+/* Final modal ownership rules.
+   This file is loaded LAST. Modals must sit above every sticky page/header layer. */
 
+/* Full-screen overlay, including sidebar/top search area. */
 .modalBackdrop {
   position: fixed !important;
   inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100vw !important;
-  height: 100vh !important;
-  z-index: 10000 !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+  z-index: 2147483000 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 18px !important;
-  box-sizing: border-box !important;
   overflow: auto !important;
-  background: rgba(8, 17, 14, 0.66) !important;
+  background: rgba(7, 15, 13, .62) !important;
   -webkit-backdrop-filter: blur(4px) !important;
   backdrop-filter: blur(4px) !important;
-  isolation: isolate !important;
+}
+
+/* When any modal is open, the global search must visually belong to the
+   background, never look like it is floating above the overlay. */
+body:has(.modalBackdrop) .topnavSearch {
+  z-index: 0 !important;
+  opacity: .18 !important;
+  filter: blur(3px) !important;
+  pointer-events: none !important;
+}
+
+/* Result page sticky chrome must also become background while View row / Raw
+   evidence is open. This is intentionally scoped to a results page that owns
+   an active modal so normal result-page behavior is unchanged. */
+.resultsPage:has(.modalBackdrop) > .wizardFooter,
+.resultsPage:has(.modalBackdrop) > .resultSummaryGrid,
+.resultsPage:has(.modalBackdrop) > .levelSummaryPanel {
+  z-index: 0 !important;
+  opacity: .28 !important;
+  filter: blur(3px) !important;
+  pointer-events: none !important;
 }
 
 .modalBackdrop > .modal {
   position: relative !important;
-  z-index: 10001 !important;
-  max-height: calc(100vh - 36px) !important;
+  z-index: 2147483001 !important;
+  width: min(780px, calc(100vw - 48px)) !important;
+  max-width: 780px !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   background: #fbfcfb !important;
+  border: 1px solid #bfcac5 !important;
+  border-radius: 2px !important;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .38) !important;
 }
 
-.modalBackdrop > .modal > .modalHead,
+.modalBackdrop > .modal > .modalHead {
+  flex: 0 0 auto !important;
+  min-height: 66px !important;
+  padding: 14px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  background: #fbfcfb !important;
+  border-bottom: 1px solid #d7dfdb !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.modalBackdrop > .modal > .modalHead h2,
+.modalBackdrop > .modal > .modalHead h3 {
+  margin: 0 0 3px !important;
+  font-size: 17px !important;
+  line-height: 1.2 !important;
+  color: #13211d !important;
+}
+
+.modalBackdrop > .modal > .modalHead p {
+  margin: 0 !important;
+  font-size: 10px !important;
+  color: #778680 !important;
+}
+
 .modalBackdrop > .modal > .modalFooter {
   flex: 0 0 auto !important;
+  min-height: 58px !important;
+  padding: 10px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  background: #fbfcfb !important;
+  border-top: 1px solid #d7dfdb !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 2 !important;
 }
 
-.modalBackdrop > .modal > .modalBody,
-.modalBackdrop .rowDataTableWrap {
+.modalBackdrop > .modal > .modalBody {
+  flex: 1 1 auto !important;
   min-height: 0 !important;
   overflow: auto !important;
+  padding: 16px 18px !important;
+  box-sizing: border-box !important;
 }
 
-/* Review & Run configuration modal: compact instead of nearly full-screen. */
-.comparisonBuilder .modalBackdrop > .modal:not(.wide) {
-  width: min(760px, calc(100vw - 48px)) !important;
-  max-width: 760px !important;
-}
-
-.comparisonBuilder .modalBackdrop .modalBody {
-  padding: 16px 22px !important;
-}
-
-.comparisonBuilder .modalBackdrop .reviewGrid {
+/* ------------------------------------------------------------
+   Review / configuration summary
+------------------------------------------------------------ */
+.modalBackdrop .reviewGrid {
   width: 100% !important;
   max-width: 640px !important;
   margin: 0 auto !important;
 }
 
-.comparisonBuilder .modalBackdrop .reviewGrid > .panel {
+.modalBackdrop .reviewGrid > .panel,
+.modalBackdrop .reviewGrid .panel {
   width: 100% !important;
   margin: 0 !important;
+  padding: 14px 16px !important;
+  box-sizing: border-box !important;
 }
 
-.comparisonBuilder .modalBackdrop .reviewRow {
-  min-height: 34px !important;
-  padding: 7px 0 !important;
+.modalBackdrop .reviewRow {
+  min-height: 32px !important;
+  padding: 6px 0 !important;
+  gap: 16px !important;
 }
 
-.comparisonBuilder .modalBackdrop .modalHead {
-  padding-top: 14px !important;
-  padding-bottom: 12px !important;
+/* ------------------------------------------------------------
+   Result "View row" popup
+------------------------------------------------------------ */
+.modalBackdrop > .rowDataModal {
+  width: min(720px, calc(100vw - 48px)) !important;
+  max-width: 720px !important;
+  height: auto !important;
+  max-height: min(76dvh, 700px) !important;
 }
 
-.comparisonBuilder .modalBackdrop .modalFooter {
-  padding-top: 12px !important;
-  padding-bottom: 12px !important;
-}
-
-/* Result row/evidence modal must remain above sticky result chrome. */
-.resultsPage .modalBackdrop,
-.resultsConsole .modalBackdrop {
-  z-index: 12000 !important;
-}
-
-.resultsPage .modalBackdrop > .modal,
-.resultsConsole .modalBackdrop > .modal {
-  z-index: 12001 !important;
-}
-
-.resultsPage .rowDataModal,
-.resultsConsole .rowDataModal {
-  width: min(760px, calc(100vw - 48px)) !important;
-  max-width: 760px !important;
-  max-height: min(78vh, 720px) !important;
-}
-
-.resultsPage .rowDataTableWrap,
-.resultsConsole .rowDataTableWrap {
+.rowDataModal .rowDataTableWrap {
   flex: 1 1 auto !important;
-  max-height: none !important;
+  min-height: 0 !important;
+  max-height: calc(min(76dvh, 700px) - 66px) !important;
   overflow: auto !important;
+  position: relative !important;
+  z-index: 1 !important;
+  background: #fbfcfb !important;
+}
+
+.rowDataModal .rowDataTable {
+  width: 100% !important;
+  margin: 0 !important;
+  table-layout: fixed !important;
+}
+
+.rowDataModal .rowDataTable th:first-child,
+.rowDataModal .rowDataTable td:first-child {
+  width: 34% !important;
+}
+
+.rowDataModal .rowDataTable th,
+.rowDataModal .rowDataTable td {
+  padding: 10px 12px !important;
+  vertical-align: top !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.rowDataModal .rowDataTable thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  background: #eef2ef !important;
 }
 
 @media (max-width: 899px) {
@@ -107,10 +188,10 @@
     padding: 10px !important;
   }
 
-  .comparisonBuilder .modalBackdrop > .modal:not(.wide),
-  .resultsPage .rowDataModal,
-  .resultsConsole .rowDataModal {
+  .modalBackdrop > .modal,
+  .modalBackdrop > .rowDataModal {
     width: calc(100vw - 20px) !important;
     max-width: none !important;
+    max-height: calc(100dvh - 20px) !important;
   }
 }
