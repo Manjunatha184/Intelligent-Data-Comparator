@@ -161,10 +161,7 @@
   .recentComparisonsPagination { min-height: 48px !important; }
 }
 
-/* Result-detail tables must scroll with their own section. Generic dataTable
-   headers were sticky and escaped upward over the L1-L6 overview. History is
-   explicitly excluded because its header is intentionally sticky inside its
-   dedicated row scroller. */
+/* Old generic result tables, retained for any non-evidence tables. */
 .dataTable:not(.recentComparisonsTable) thead,
 .dataTable:not(.recentComparisonsTable) thead tr,
 .dataTable:not(.recentComparisonsTable) thead th {
@@ -175,6 +172,35 @@
   transform: none !important;
 }
 
-.dataTable:not(.recentComparisonsTable) thead th {
+/* The actual L1-L6 evidence tables use .evidenceTable. Their header must stay
+   inside the evidence card and move with that card; it must never stick over
+   the horizontal comparison overview. */
+html body #root .app .resultsConsole .resultsPage .evidenceTableWrap,
+html body #root .app .resultsConsole .resultsPage .evidenceTableScroll {
+  position: relative !important;
+  isolation: isolate !important;
+  z-index: 0 !important;
+}
+
+html body #root .app .resultsConsole .resultsPage .evidenceTable {
+  position: relative !important;
+  z-index: 0 !important;
+}
+
+html body #root .app .resultsConsole .resultsPage .evidenceTable thead,
+html body #root .app .resultsConsole .resultsPage .evidenceTable thead tr,
+html body #root .app .resultsConsole .resultsPage .evidenceTable thead th {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: 0 !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+html body #root .app .resultsConsole .resultsPage .evidenceTable thead th {
+  background: #eef2ef !important;
   background-clip: padding-box !important;
 }
