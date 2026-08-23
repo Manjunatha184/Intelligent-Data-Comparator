@@ -148,49 +148,30 @@ body:has(.modalBackdrop) .topnavSearch {
 }
 
 /* ------------------------------------------------------------
-   Result "View row" popup
+   Result row evidence
+
+   Result rows already expand inline and show source/target record JSON.
+   The separate "View row" action duplicated the same evidence and introduced
+   an unnecessary modal. Remove any evidence-table column whose cells render a
+   rowDataLink button. The existing row click/inline expansion remains intact.
 ------------------------------------------------------------ */
-.modalBackdrop > .rowDataModal {
-  width: min(720px, calc(100vw - 48px)) !important;
-  max-width: 720px !important;
-  height: auto !important;
-  max-height: min(76dvh, 700px) !important;
+.resultsPage .rowDataLink {
+  display: none !important;
 }
 
-.rowDataModal .rowDataTableWrap {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  max-height: calc(min(76dvh, 700px) - 66px) !important;
-  overflow: auto !important;
-  position: relative !important;
-  z-index: 1 !important;
-  background: #fbfcfb !important;
-}
-
-.rowDataModal .rowDataTable {
-  width: 100% !important;
-  margin: 0 !important;
-  table-layout: fixed !important;
-}
-
-.rowDataModal .rowDataTable th:first-child,
-.rowDataModal .rowDataTable td:first-child {
-  width: 34% !important;
-}
-
-.rowDataModal .rowDataTable th,
-.rowDataModal .rowDataTable td {
-  padding: 10px 12px !important;
-  vertical-align: top !important;
-  overflow-wrap: anywhere !important;
-  word-break: break-word !important;
-}
-
-.rowDataModal .rowDataTable thead th {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 2 !important;
-  background: #eef2ef !important;
+.resultsPage .evidenceTable:has(tbody td:nth-child(1) .rowDataLink) :is(th, td):nth-child(1),
+.resultsPage .evidenceTable:has(tbody td:nth-child(2) .rowDataLink) :is(th, td):nth-child(2),
+.resultsPage .evidenceTable:has(tbody td:nth-child(3) .rowDataLink) :is(th, td):nth-child(3),
+.resultsPage .evidenceTable:has(tbody td:nth-child(4) .rowDataLink) :is(th, td):nth-child(4),
+.resultsPage .evidenceTable:has(tbody td:nth-child(5) .rowDataLink) :is(th, td):nth-child(5),
+.resultsPage .evidenceTable:has(tbody td:nth-child(6) .rowDataLink) :is(th, td):nth-child(6),
+.resultsPage .evidenceTable:has(tbody td:nth-child(7) .rowDataLink) :is(th, td):nth-child(7),
+.resultsPage .evidenceTable:has(tbody td:nth-child(8) .rowDataLink) :is(th, td):nth-child(8),
+.resultsPage .evidenceTable:has(tbody td:nth-child(9) .rowDataLink) :is(th, td):nth-child(9),
+.resultsPage .evidenceTable:has(tbody td:nth-child(10) .rowDataLink) :is(th, td):nth-child(10),
+.resultsPage .evidenceTable:has(tbody td:nth-child(11) .rowDataLink) :is(th, td):nth-child(11),
+.resultsPage .evidenceTable:has(tbody td:nth-child(12) .rowDataLink) :is(th, td):nth-child(12) {
+  display: none !important;
 }
 
 @media (max-width: 899px) {
