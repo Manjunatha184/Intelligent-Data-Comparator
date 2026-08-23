@@ -1,0 +1,44 @@
+/*
+ * Lumera UI stylesheet entry point.
+ *
+ * IMPORTANT: import order is intentional. These modules were introduced
+ * incrementally and later files contain more specific/final overrides.
+ * Keeping this order preserves the currently approved UI while giving the
+ * application one clear stylesheet entry after the base/theme layers.
+ */
+
+/* Comparison workflow */
+@import "./comparison-reference.css";
+@import "./comparison-polish.css";
+
+/* Shared page headers and geometry */
+@import "./page-header.css";
+@import "./layout-consistency.css";
+
+/* Comparison review/run step */
+@import "./comparison-step2.css";
+@import "./comparison-final-fix.css";
+
+/* Console pages: results, connections, rules */
+@import "./console-pages.css";
+@import "./console-final-polish.css";
+@import "./results-horizontal-levels.css";
+
+/* Final shared header geometry */
+@import "./header-geometry-fix.css";
+
+/* Saved comparison/configuration workspace */
+@import "./saved-comparisons.css";
+
+/* Recent results/history */
+@import "./recent-results-viewport.css";
+
+/* Final scoped corrections */
+@import "./ui-final-corrections.css";
+@import "./recent-comparisons-final.css";
+
+/* L7 report */
+@import "./l7-report-final.css";
+
+/* Modal stacking/final overlay behavior */
+@import "./modal-layer-fix.css";
