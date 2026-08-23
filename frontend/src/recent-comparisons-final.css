@@ -1,23 +1,27 @@
 /* Isolated final geometry for Recent Comparisons. Loaded last on purpose. */
 @media (min-width: 900px) {
   .body:has(.recentComparisonsPage) {
-    height: 100% !important;
+    /* The application already has a 56px top navigation and a 28px footer.
+       Use the remaining viewport instead of an unresolved percentage height. */
+    height: calc(100dvh - 84px) !important;
+    max-height: calc(100dvh - 84px) !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    padding: 0 22px 18px !important;
+    padding: 0 22px 14px !important;
     box-sizing: border-box !important;
   }
 
   .recentComparisonsPage {
     width: 100% !important;
     height: 100% !important;
+    max-height: 100% !important;
     min-width: 0 !important;
     min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     display: grid !important;
-    grid-template-rows: 72px minmax(0, 1fr) !important;
-    gap: 14px !important;
+    grid-template-rows: 64px minmax(0, 1fr) !important;
+    gap: 12px !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
   }
@@ -25,7 +29,7 @@
   .recentComparisonsHeader {
     width: 100% !important;
     min-width: 0 !important;
-    height: 72px !important;
+    height: 64px !important;
     margin: 0 !important;
     padding: 0 !important;
     display: flex !important;
@@ -57,6 +61,7 @@
   .recentComparisonsPage > .recentComparisonsPanel {
     width: 100% !important;
     height: 100% !important;
+    max-height: 100% !important;
     min-width: 0 !important;
     min-height: 0 !important;
     margin: 0 !important;
@@ -69,12 +74,13 @@
   .recentComparisonsTableShell {
     width: 100% !important;
     height: 100% !important;
+    max-height: 100% !important;
     min-width: 0 !important;
     min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     display: grid !important;
-    grid-template-rows: minmax(0, 1fr) 48px !important;
+    grid-template-rows: minmax(0, 1fr) 46px !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
   }
@@ -82,6 +88,7 @@
   .recentComparisonsRowsScroll {
     width: 100% !important;
     height: 100% !important;
+    max-height: 100% !important;
     min-width: 0 !important;
     min-height: 0 !important;
     overflow-y: auto !important;
@@ -106,8 +113,8 @@
 
   .recentComparisonsPagination {
     width: 100% !important;
-    height: 48px !important;
-    min-height: 48px !important;
+    height: 46px !important;
+    min-height: 46px !important;
     margin: 0 !important;
     padding: 0 14px !important;
     display: flex !important;
@@ -154,4 +161,24 @@
   .recentComparisonsPanel { margin-top: 12px !important; overflow: hidden !important; }
   .recentComparisonsRowsScroll { overflow: auto !important; }
   .recentComparisonsPagination { min-height: 48px !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Detailed result evidence tables
+   Do not let an evidence table's header escape its own table and cover the
+   metric cards/section above while the result page scrolls.
+---------------------------------------------------------------------------- */
+.resultsPage .evidenceTable thead th,
+.resultsConsole .evidenceTable thead th,
+.resultLevelsClean .evidenceTable thead th {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+}
+
+.resultsPage .evidenceTableScroll,
+.resultsConsole .evidenceTableScroll,
+.resultLevelsClean .evidenceTableScroll {
+  position: relative !important;
+  isolation: isolate !important;
 }
