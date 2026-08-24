@@ -1,23 +1,18 @@
-/* Isolated final geometry for Recent Comparisons. Loaded last on purpose.
-   Keep this page on the same viewport contract as Connection Manager:
-   the app shell owns height/padding, the page fills that space, and only
-   the row region scrolls. */
+/* Final Recent Comparisons geometry.
+   The app shell owns the viewport. This page uses the same shared header and
+   remaining-space layout contract as Connection Manager. */
 @media (min-width: 900px) {
   .body:has(.recentComparisonsPage) {
     height: 100% !important;
-    max-height: none !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    box-sizing: border-box !important;
-    /* Match console-pages / Connection Manager. Do not recalculate the
-       viewport or replace the shell's horizontal page gutter. */
     padding-bottom: 18px !important;
+    box-sizing: border-box !important;
   }
 
   .recentComparisonsPage {
     width: 100% !important;
     height: 100% !important;
-    max-height: none !important;
     min-width: 0 !important;
     min-height: 0 !important;
     margin: 0 !important;
@@ -26,47 +21,18 @@
     grid-template-rows: auto minmax(0, 1fr) !important;
     gap: 12px !important;
     overflow: hidden !important;
-    box-sizing: border-box !important;
   }
 
-  .recentComparisonsHeader {
-    width: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 10px 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 16px !important;
-    border-bottom: 1px solid #ccd5d0 !important;
-    box-sizing: border-box !important;
-    overflow: visible !important;
+  /* Header geometry comes from the shared wizardFooter/pageTitle/actionRow
+     rules. Do not give Recent Comparisons a second header implementation. */
+  .recentComparisonsPage > .wizardFooter {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
 
-  .recentComparisonsHeader h1 {
-    margin: 0 !important;
-    padding: 0 !important;
-    font-size: 22px !important;
-    line-height: 1.1 !important;
-    letter-spacing: -.03em !important;
-    color: #13211d !important;
-  }
-
-  .recentComparisonsHeader button {
-    flex: 0 0 auto !important;
-    width: auto !important;
-    max-width: none !important;
-    margin: 0 !important;
-    white-space: nowrap !important;
-  }
-
-  /* Own all space below the page header, exactly like connectionListPanel. */
   .recentComparisonsPage > .recentComparisonsPanel {
     width: 100% !important;
     height: 100% !important;
-    max-height: none !important;
     min-width: 0 !important;
     min-height: 0 !important;
     margin: 0 !important;
@@ -74,44 +40,25 @@
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Panel implementations may wrap children in a body/content node. Make that
-     wrapper participate in the flex sizing instead of sizing to table content. */
-  .recentComparisonsPanel > .panelBody,
-  .recentComparisonsPanel > .panelContent {
-    flex: 1 1 auto !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
   }
 
   .recentComparisonsTableShell {
+    flex: 1 1 auto !important;
     width: 100% !important;
     height: 100% !important;
-    max-height: none !important;
     min-width: 0 !important;
     min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    box-sizing: border-box !important;
   }
 
-  /* ONLY this region scrolls. flex:1 allows it to grow in fullscreen and
-     shrink automatically when the browser/window height is reduced. */
   .recentComparisonsRowsScroll {
-    width: 100% !important;
     flex: 1 1 0 !important;
-    height: auto !important;
-    max-height: none !important;
+    width: 100% !important;
     min-width: 0 !important;
     min-height: 0 !important;
-    overflow-y: auto !important;
-    overflow-x: auto !important;
+    overflow: auto !important;
     overscroll-behavior: contain !important;
     scrollbar-gutter: stable !important;
   }
@@ -130,22 +77,19 @@
     background: #eef2ef !important;
   }
 
-  /* Pagination remains pinned to the bottom edge of the expanding panel. */
   .recentComparisonsPagination {
-    width: 100% !important;
-    min-height: 46px !important;
-    height: 46px !important;
     flex: 0 0 46px !important;
+    width: 100% !important;
+    height: 46px !important;
+    min-height: 46px !important;
     margin: 0 !important;
     padding: 0 14px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 14px !important;
-    position: static !important;
     background: #fbfcfb !important;
     border-top: 1px solid var(--border) !important;
-    box-sizing: border-box !important;
     overflow: hidden !important;
   }
 
@@ -162,6 +106,7 @@
   .body:has(.recentComparisonsPage) {
     overflow: auto !important;
   }
+
   .recentComparisonsPage {
     width: 100% !important;
     height: auto !important;
@@ -169,18 +114,19 @@
     display: block !important;
     overflow: visible !important;
   }
-  .recentComparisonsHeader {
-    min-height: 64px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 12px !important;
-    border-bottom: 1px solid #ccd5d0 !important;
+
+  .recentComparisonsPanel {
+    margin-top: 12px !important;
+    overflow: hidden !important;
   }
-  .recentComparisonsHeader h1 { margin: 0 !important; font-size: 20px !important; }
-  .recentComparisonsPanel { margin-top: 12px !important; overflow: hidden !important; }
-  .recentComparisonsRowsScroll { overflow: auto !important; }
-  .recentComparisonsPagination { min-height: 48px !important; }
+
+  .recentComparisonsRowsScroll {
+    overflow: auto !important;
+  }
+
+  .recentComparisonsPagination {
+    min-height: 48px !important;
+  }
 }
 
 /* Old generic result tables, retained for any non-evidence tables. */
@@ -195,8 +141,7 @@
 }
 
 /* Results page layering.
-   The comparison overview is the visual ceiling for all L1-L6 evidence.
-   Evidence rows/headers may scroll, but they must paint underneath it. */
+   The comparison overview is the visual ceiling for all L1-L6 evidence. */
 html body #root .app .resultsConsole .resultsPage > .levelSummaryPanel {
   position: sticky !important;
   top: 0 !important;
@@ -222,8 +167,6 @@ html body #root .app .resultsConsole .resultsPage .evidenceTable {
   z-index: 0 !important;
 }
 
-/* Evidence table headings belong to the evidence card. They are deliberately
-   non-sticky so they cannot detach from their table and cover the overview. */
 html body #root .app .resultsConsole .resultsPage .evidenceTable thead,
 html body #root .app .resultsConsole .resultsPage .evidenceTable thead tr,
 html body #root .app .resultsConsole .resultsPage .evidenceTable thead th,
