@@ -138,12 +138,14 @@ export function History({ onOpenRun, notify }) {
 
   return (
     <div className="recentComparisonsPage">
-      <header className="recentComparisonsHeader">
-        <h1>Recent comparisons</h1>
-        <button type="button" className="secondary small" onClick={loadRuns}>
-          <RefreshCw size={14} className={loading ? "spin" : ""} /> Refresh
-        </button>
-      </header>
+      <div className="wizardFooter recentComparisonsHeader">
+        <h1 className="pageTitle">Recent comparisons</h1>
+        <div className="actionRow">
+          <button type="button" className="secondary" onClick={loadRuns}>
+            <RefreshCw size={14} className={loading ? "spin" : ""} /> Refresh
+          </button>
+        </div>
+      </div>
 
       <Panel className="recentComparisonsPanel">
         {!runs.length ? (
