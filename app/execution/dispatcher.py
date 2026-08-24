@@ -2,8 +2,6 @@ from datetime import datetime, timezone
 import logging
 from typing import Any
 
-from app.connectors.manager import ConnectorManager
-
 from app.execution.models import (
     ExecutionTask,
     ExecutionResult,
@@ -13,14 +11,16 @@ from app.execution.models import (
 
 from app.execution.spark_executor import SparkExecutor
 from app.execution.duckdb_executor import DuckDBExecutor
+from app.comparators.duckdb_field import DuckDBFieldComparator
+from app.comparators.duckdb_levels import DUCKDB_COMPARATORS
 
 
 logger = logging.getLogger(__name__)
 
-
-# ============================================================
-# EXECUTION DISPATCHER
-# ============================================================
+# L4 has a stricter contract than L3: only a one-to-one business-key match is
+# eligible for hashing/field comparison. Keep the registry override here so the
+# executor continues to own loading, normalization and runtime metadata.
+DUCKDB_COMPARATORS["L4"] = DuckDBFieldComparator()
 
 
 class ExecutionDispatcher:
@@ -34,9 +34,6 @@ class ExecutionDispatcher:
         self.connector_manager = connector_manager
         self.persistence_repository = persistence_repository
 
-        # One SparkExecutor spans the execution plan so the Spark
-        # session, datasets, statistics and PK reconciliation can
-        # be reused across L1-L6.
         self.spark_executor = SparkExecutor(
             connector_manager=self.connector_manager
         )
@@ -49,33 +46,21 @@ class ExecutionDispatcher:
         self.spark_executor.close()
         self.duckdb_executor.close()
 
-    # ========================================================
-    # PUBLIC DISPATCH
-    # ========================================================
-
     def dispatch(
         self,
         task: ExecutionTask,
         attempt_number: int = 1,
     ) -> ExecutionResult:
 
-        started_at = datetime.now(
-            timezone.utc
-        )
-
+        started_at = datetime.now(timezone.utc)
         execution_location = self._resolve_execution_location(task)
 
         try:
-
             raw_result = self._execute(
                 task=task,
                 execution_location=execution_location,
             )
-
-            finished_at = datetime.now(
-                timezone.utc
-            )
-
+            finished_at = datetime.now(timezone.utc)
             return self._build_success_result(
                 task=task,
                 attempt_number=attempt_number,
@@ -86,18 +71,13 @@ class ExecutionDispatcher:
             )
 
         except Exception as exc:
-
             logger.exception(
                 "Task execution failed task_id=%s level=%s engine=%s",
                 task.task_id,
                 task.comparison_level.value,
                 execution_location.value,
             )
-
-            finished_at = datetime.now(
-                timezone.utc
-            )
-
+            finished_at = datetime.now(timezone.utc)
             return self._build_failure_result(
                 task=task,
                 attempt_number=attempt_number,
@@ -107,16 +87,11 @@ class ExecutionDispatcher:
                 error=str(exc),
             )
 
-    # ========================================================
-    # EXECUTION ROUTING
-    # ========================================================
-
     def _execute(
         self,
         task: ExecutionTask,
         execution_location: ExecutionLocation,
     ) -> Any:
-
         if execution_location == ExecutionLocation.SPARK:
             return self._execute_spark(task)
         if execution_location == ExecutionLocation.DUCKDB:
@@ -125,21 +100,10 @@ class ExecutionDispatcher:
             f"Unsupported execution location: {execution_location.value}"
         )
 
-    # ========================================================
-    # SPARK EXECUTION
-    # ========================================================
-
-    def _execute_spark(
-        self,
-        task: ExecutionTask,
-    ) -> Any:
-
+    def _execute_spark(self, task: ExecutionTask) -> Any:
         return self.spark_executor.execute(task)
 
-    def _execute_duckdb(
-        self,
-        task: ExecutionTask,
-    ) -> Any:
+    def _execute_duckdb(self, task: ExecutionTask) -> Any:
         return self.duckdb_executor.execute(task)
 
     @staticmethod
@@ -159,10 +123,6 @@ class ExecutionDispatcher:
                 f"Invalid execution location '{value}' for {task.task_id}"
             ) from error
 
-    # ========================================================
-    # SUCCESS RESULT
-    # ========================================================
-
     def _build_success_result(
         self,
         task: ExecutionTask,
@@ -178,96 +138,35 @@ class ExecutionDispatcher:
         runtime_context: dict[str, Any] = {}
 
         if isinstance(raw_result, dict):
+            metrics = raw_result.get("metrics", {})
+            evidence = raw_result.get("evidence", {})
+            runtime_context = raw_result.get("runtime_context", {})
 
-            metrics = raw_result.get(
-                "metrics",
-                {},
-            )
-
-            evidence = raw_result.get(
-                "evidence",
-                {},
-            )
-
-            runtime_context = raw_result.get(
-                "runtime_context",
-                {},
-            )
-
-            if (
-                raw_result.get(
-                    "execution_location"
-                )
-                and not metrics.get(
-                    "execution_location"
-                )
-            ):
-
+            raw_execution_location = raw_result.get("execution_location")
+            if raw_execution_location and not metrics.get("execution_location"):
                 metrics = {
                     **metrics,
-                    "execution_location": raw_result[
-                        "execution_location"
-                    ],
-                }
-
-            # ------------------------------------------------
-            # Preserve executor metadata separately.
-            # ------------------------------------------------
-
-            raw_execution_location = (
-                raw_result.get(
-                    "execution_location"
-                )
-            )
-
-            if (
-                raw_execution_location
-                and not metrics.get(
-                    "execution_location"
-                )
-            ):
-
-                metrics = {
-                    **metrics,
-                    "execution_location": (
-                        raw_execution_location
-                    ),
+                    "execution_location": raw_execution_location,
                 }
 
         duration_ms = int(
-            (
-                finished_at
-                - started_at
-            ).total_seconds()
-            * 1000
+            (finished_at - started_at).total_seconds() * 1000
         )
 
         return ExecutionResult(
             task_id=task.task_id,
-            comparator_name=(
-                task.comparator_name
-            ),
-            status=(
-                ExecutionResultStatus.SUCCESS
-            ),
+            comparator_name=task.comparator_name,
+            status=ExecutionResultStatus.SUCCESS,
             attempt_number=attempt_number,
             started_at=started_at,
             finished_at=finished_at,
             duration_ms=duration_ms,
-            execution_mode=(
-                task.execution_mode
-            ),
-            execution_location=(
-                execution_location
-            ),
+            execution_mode=task.execution_mode,
+            execution_location=execution_location,
             metrics=metrics,
             evidence=evidence,
             runtime_context=runtime_context,
         )
-
-    # ========================================================
-    # FAILURE RESULT
-    # ========================================================
 
     def _build_failure_result(
         self,
@@ -280,31 +179,19 @@ class ExecutionDispatcher:
     ) -> ExecutionResult:
 
         duration_ms = int(
-            (
-                finished_at
-                - started_at
-            ).total_seconds()
-            * 1000
+            (finished_at - started_at).total_seconds() * 1000
         )
 
         return ExecutionResult(
             task_id=task.task_id,
-            comparator_name=(
-                task.comparator_name
-            ),
-            status=(
-                ExecutionResultStatus.FAILED
-            ),
+            comparator_name=task.comparator_name,
+            status=ExecutionResultStatus.FAILED,
             attempt_number=attempt_number,
             started_at=started_at,
             finished_at=finished_at,
             duration_ms=duration_ms,
-            execution_mode=(
-                task.execution_mode
-            ),
-            execution_location=(
-                execution_location
-            ),
+            execution_mode=task.execution_mode,
+            execution_location=execution_location,
             error=error,
-            runtime_context={}
+            runtime_context={},
         )
