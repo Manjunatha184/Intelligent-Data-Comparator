@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from app.connectors.manager import ConnectorManager
@@ -12,6 +13,9 @@ from app.execution.models import (
 
 from app.execution.spark_executor import SparkExecutor
 from app.execution.duckdb_executor import DuckDBExecutor
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -82,6 +86,13 @@ class ExecutionDispatcher:
             )
 
         except Exception as exc:
+
+            logger.exception(
+                "Task execution failed task_id=%s level=%s engine=%s",
+                task.task_id,
+                task.comparison_level.value,
+                execution_location.value,
+            )
 
             finished_at = datetime.now(
                 timezone.utc
