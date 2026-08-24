@@ -636,6 +636,8 @@ class DuckDBRecordComparator:
     def _secondary_sample(host, row, source, target, keys, group_aliases):
         source_record = host.record_from_row(row, source, "source__")
         target_record = host.record_from_row(row, target, "target__")
+        source_values = source_record or {}
+        target_values = target_record or {}
         status = row["status"]
         reasons = {
             "MISSING_BUSINESS_KEY": (
@@ -655,18 +657,18 @@ class DuckDBRecordComparator:
             "group_key": [row[alias] for alias in group_aliases],
             "source_key": json.dumps(
                 {
-                    item["source_column"]: source_record.get(item["source_column"])
+                    item["source_column"]: source_values.get(item["source_column"])
                     for item in keys
-                    if source_record.get(item["source_column"]) is not None
+                    if source_values.get(item["source_column"]) is not None
                 },
                 separators=(",", ":"),
                 default=str,
             ),
             "target_key": json.dumps(
                 {
-                    item["target_column"]: target_record.get(item["target_column"])
+                    item["target_column"]: target_values.get(item["target_column"])
                     for item in keys
-                    if target_record.get(item["target_column"]) is not None
+                    if target_values.get(item["target_column"]) is not None
                 },
                 separators=(",", ":"),
                 default=str,
@@ -1052,8 +1054,6 @@ class DuckDBFieldComparator:
                 ),
                 "missing_record_count": reconciliation["counts"]["missing"],
                 "extra_record_count": reconciliation["counts"]["extra"],
-                # L4 only evaluates authoritative matched pairs. Spark's L4
-                # contract reports no ambiguous pairs; L3 owns null-key counts.
                 "ambiguous_record_count": 0,
                 "source_duplicate_key_count": source_stats["duplicate_key_count"],
                 "target_duplicate_key_count": target_stats["duplicate_key_count"],
@@ -1533,9 +1533,6 @@ class DuckDBGroupComparator:
     """Group-only L3 entry point; full fallback is added by record matching."""
 
     def execute(self, host, source, target, configuration):
-        # Group reconciliation is intentionally implemented through aggregate
-        # rules in a follow-up helper. Refuse incomplete configuration rather
-        # than returning engine-dependent results.
         groups = configuration.get("grouping_attributes", []) or []
         aggregates = configuration.get("aggregation_columns", []) or []
         if not groups:
