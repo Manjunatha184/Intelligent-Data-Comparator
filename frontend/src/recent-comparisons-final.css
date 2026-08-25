@@ -1,6 +1,4 @@
-/* Final Recent Comparisons geometry.
-   The app shell owns the viewport. This page uses the same shared header and
-   remaining-space layout contract as Connection Manager. */
+/* Recent Comparisons uses the same viewport contract as Rule Repository. */
 @media (min-width: 900px) {
   .body:has(.recentComparisonsPage) {
     height: 100% !important;
@@ -23,14 +21,22 @@
     overflow: hidden !important;
   }
 
-  /* Header geometry comes from the shared wizardFooter/pageTitle/actionRow
-     rules. Do not give Recent Comparisons a second header implementation. */
   .recentComparisonsPage > .wizardFooter {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+    margin: 0 !important;
   }
 
-  .recentComparisonsPage > .recentComparisonsPanel {
+  /* Equivalent to Rule Repository's rulesRepositorySections container. */
+  .recentComparisonsPage > .recentComparisonsSections {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+  }
+
+  .recentComparisonsSections > .recentComparisonsPanel {
     width: 100% !important;
     height: 100% !important;
     min-width: 0 !important;
@@ -40,6 +46,7 @@
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+    border-radius: 0 !important;
   }
 
   .recentComparisonsTableShell {
@@ -53,12 +60,14 @@
     overflow: hidden !important;
   }
 
+  /* Only the run rows scroll. Header and pagination remain visible. */
   .recentComparisonsRowsScroll {
     flex: 1 1 0 !important;
     width: 100% !important;
     min-width: 0 !important;
     min-height: 0 !important;
-    overflow: auto !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
     overscroll-behavior: contain !important;
     scrollbar-gutter: stable !important;
   }
@@ -115,9 +124,11 @@
     overflow: visible !important;
   }
 
+  .recentComparisonsSections,
   .recentComparisonsPanel {
+    height: auto !important;
     margin-top: 12px !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   .recentComparisonsRowsScroll {
@@ -140,8 +151,7 @@
   transform: none !important;
 }
 
-/* Results page layering.
-   The comparison overview is the visual ceiling for all L1-L6 evidence. */
+/* Results page layering. */
 html body #root .app .resultsConsole .resultsPage > .levelSummaryPanel {
   position: sticky !important;
   top: 0 !important;
