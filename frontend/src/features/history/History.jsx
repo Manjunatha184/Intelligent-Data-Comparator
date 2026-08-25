@@ -137,9 +137,9 @@ export function History({ onOpenRun, notify }) {
   const pageRuns = filteredRuns.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
-    <div className="recentComparisonsPage">
+    <div className="stack recentComparisonsPage">
       <div className="wizardFooter recentComparisonsHeader">
-        <h1 className="pageTitle">Recent comparisons</h1>
+        <h1 className="pageTitle" style={{ margin: 0 }}>Recent comparisons</h1>
         <div className="actionRow">
           <button type="button" className="secondary" onClick={loadRuns}>
             <RefreshCw size={14} className={loading ? "spin" : ""} /> Refresh
@@ -147,81 +147,83 @@ export function History({ onOpenRun, notify }) {
         </div>
       </div>
 
-      <Panel className="recentComparisonsPanel">
-        {!runs.length ? (
-          <Empty
-            icon={Activity}
-            title="No history found"
-            text="Run your first comparison to see it here."
-          />
-        ) : (
-          <div className="recentComparisonsTableShell">
-            <div className="recentComparisonsRowsScroll">
-              <table className="dataTable recentComparisonsTable">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Run ID</th>
-                    <th><HeaderFilter label="Status" value={statusFilter} setValue={setStatusFilter} options={statusOptions} /></th>
-                    <th><HeaderFilter label="Result" value={resultFilter} setValue={setResultFilter} options={resultOptions} /></th>
-                    <th>Duration</th>
-                    <th>Started</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageRuns.map((run) => {
-                    const runId = run?.run_id;
-                    const startedValue = run?.started_at || run?.created_at;
-                    const startedAt = startedValue ? new Date(startedValue) : null;
-                    const startedLabel = startedAt && !Number.isNaN(startedAt.getTime())
-                      ? startedAt.toLocaleString()
-                      : "Not available";
-                    const name = configurationName(run?.configuration_id, configurationMap);
+      <div className="recentComparisonsSections">
+        <Panel className="recentComparisonsPanel">
+          {!runs.length ? (
+            <Empty
+              icon={Activity}
+              title="No history found"
+              text="Run your first comparison to see it here."
+            />
+          ) : (
+            <div className="recentComparisonsTableShell">
+              <div className="recentComparisonsRowsScroll">
+                <table className="dataTable recentComparisonsTable">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Run ID</th>
+                      <th><HeaderFilter label="Status" value={statusFilter} setValue={setStatusFilter} options={statusOptions} /></th>
+                      <th><HeaderFilter label="Result" value={resultFilter} setValue={setResultFilter} options={resultOptions} /></th>
+                      <th>Duration</th>
+                      <th>Started</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageRuns.map((run) => {
+                      const runId = run?.run_id;
+                      const startedValue = run?.started_at || run?.created_at;
+                      const startedAt = startedValue ? new Date(startedValue) : null;
+                      const startedLabel = startedAt && !Number.isNaN(startedAt.getTime())
+                        ? startedAt.toLocaleString()
+                        : "Not available";
+                      const name = configurationName(run?.configuration_id, configurationMap);
 
-                    return (
-                      <tr key={runId} onClick={() => onOpenRun(runId)} className="clickable">
-                        <td className="comparisonNameCell" title={name}><b>{name}</b></td>
-                        <td className="codeCell" title={runId}>{runId || "Unknown run"}</td>
-                        <td><Status status={run.status} /></td>
-                        <td><Status status={run.comparison_status} /></td>
-                        <td className="durationCell">{formatDuration(run?.started_at, run?.finished_at)}</td>
-                        <td>{startedLabel}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="iconButton dangerIcon"
-                            onClick={(event) => deleteRun(runId, event)}
-                            title="Delete Run"
-                            disabled={!runId || deletingRunId === runId}
-                          >
-                            {deletingRunId === runId ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      return (
+                        <tr key={runId} onClick={() => onOpenRun(runId)} className="clickable">
+                          <td className="comparisonNameCell" title={name}><b>{name}</b></td>
+                          <td className="codeCell" title={runId}>{runId || "Unknown run"}</td>
+                          <td><Status status={run.status} /></td>
+                          <td><Status status={run.comparison_status} /></td>
+                          <td className="durationCell">{formatDuration(run?.started_at, run?.finished_at)}</td>
+                          <td>{startedLabel}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="iconButton dangerIcon"
+                              onClick={(event) => deleteRun(runId, event)}
+                              title="Delete Run"
+                              disabled={!runId || deletingRunId === runId}
+                            >
+                              {deletingRunId === runId ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <footer className="tablePagination recentComparisonsPagination">
+                <span>
+                  {filteredRuns.length
+                    ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filteredRuns.length)} of ${filteredRuns.length} runs`
+                    : "No runs match the selected filters"}
+                </span>
+                {totalPages > 1 && (
+                  <div className="tablePaginationActions">
+                    <button type="button" className="pageBtn" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>Previous</button>
+                    <span>Page {safePage} of {totalPages}</span>
+                    <button type="button" className="pageBtn" disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)}>Next</button>
+                  </div>
+                )}
+              </footer>
             </div>
-
-            <footer className="tablePagination recentComparisonsPagination">
-              <span>
-                {filteredRuns.length
-                  ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filteredRuns.length)} of ${filteredRuns.length} runs`
-                  : "No runs match the selected filters"}
-              </span>
-              {totalPages > 1 && (
-                <div className="tablePaginationActions">
-                  <button type="button" className="pageBtn" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>Previous</button>
-                  <span>Page {safePage} of {totalPages}</span>
-                  <button type="button" className="pageBtn" disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)}>Next</button>
-                </div>
-              )}
-            </footer>
-          </div>
-        )}
-      </Panel>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }
