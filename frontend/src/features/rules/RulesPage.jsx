@@ -261,6 +261,7 @@ function RuleModal({ existingRule, initialRuleType, sourceSchema, targetSchema, 
           delete payloadToSave.check;
           delete payloadToSave.transformation;
         }
+        delete payloadToSave._raw_allowed_values;
 
         delete payloadToSave.column;
 
@@ -384,7 +385,7 @@ function RuleModal({ existingRule, initialRuleType, sourceSchema, targetSchema, 
               </Field>
               {String(payload.rule_type).toUpperCase() === "PATTERN" && <Field label="Regex Pattern" required><input value={payload.regex || ""} onChange={e => setPayload({ ...payload, regex: e.target.value })} required /></Field>}
               {String(payload.rule_type).toUpperCase() === "VALIDITY" && <>
-                <Field label="Allowed values"><input value={(payload.allowed_values || []).join(", ")} onChange={e => setPayload({ ...payload, allowed_values: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })} /></Field>
+                <Field label="Allowed values"><input value={payload._raw_allowed_values ?? (payload.allowed_values || []).join(", ")} onChange={e => setPayload({ ...payload, _raw_allowed_values: e.target.value, allowed_values: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })} /></Field>
                 <div className="grid2"><Field label="Minimum"><input type="number" value={payload.min ?? ""} onChange={e => setPayload({ ...payload, min: e.target.value === "" ? undefined : Number(e.target.value) })} /></Field><Field label="Maximum"><input type="number" value={payload.max ?? ""} onChange={e => setPayload({ ...payload, max: e.target.value === "" ? undefined : Number(e.target.value) })} /></Field></div>
                 <Field label="Regex"><input value={payload.regex || ""} onChange={e => setPayload({ ...payload, regex: e.target.value })} /></Field>
               </>}

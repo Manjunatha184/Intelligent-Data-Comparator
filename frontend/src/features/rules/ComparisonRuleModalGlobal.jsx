@@ -156,6 +156,7 @@ function ComparisonRuleModal({
           if (!String(payloadToSave.regex || "").trim()) delete payloadToSave.regex;
           if (!Array.isArray(payloadToSave.allowed_values) || !payloadToSave.allowed_values.length) delete payloadToSave.allowed_values;
         }
+        delete payloadToSave._raw_allowed_values;
 
         if (applyTo === "SOURCE") delete payloadToSave.target_column;
         if (applyTo === "TARGET") delete payloadToSave.source_column;
@@ -274,7 +275,7 @@ function ComparisonRuleModal({
               {String(payload.rule_type).toUpperCase() === "VALIDITY" && (
                 <>
                   <Field label="Allowed values">
-                    <input value={(payload.allowed_values || []).join(", ")} onChange={(event) => setPayload({ ...payload, allowed_values: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} />
+                    <input value={payload._raw_allowed_values ?? (payload.allowed_values || []).join(", ")} onChange={(event) => setPayload({ ...payload, _raw_allowed_values: event.target.value, allowed_values: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} />
                   </Field>
                   <div className="grid2">
                     <Field label="Minimum"><input type="number" value={payload.min ?? ""} onChange={(event) => setPayload({ ...payload, min: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>

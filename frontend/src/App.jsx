@@ -254,7 +254,7 @@ export default function App() {
 function Footer() {
   return (
     <footer className="globalFooter">
-      <div className="footerLeft">Lumera Corporation © 2026</div>
+      <div className="footerLeft">Data Comparator © 2026</div>
       <div className="footerRight"><span>Terms of Service</span><span>Privacy Policy</span><span>v1.0.0</span></div>
     </footer>
   );
@@ -313,10 +313,9 @@ function TopNav({ onOpenRun, notify }) {
   return (
     <header className="topnav">
       <div className="topnavBrand">
-        <div className="brandLogoIcon"><span>L</span></div>
         <div className="brandName">Lumera</div>
         <div className="brandDivider">|</div>
-        <div className="brandApp">VALIDATION<br/>CONSOLE</div>
+        <div className="brandApp">DATA<br/>COMPARATOR</div>
       </div>
       <div className="topnavSearchSlot">
         <div className="topnavSearch">
@@ -381,9 +380,9 @@ function Dashboard({ connections, onNewComparison, onConnections }) {
   const connectedCount = connections.filter((connection) => connection.status === "CONNECTED").length;
   return (
     <div className="stack">
-      <div className="dashboardIntro">
-        <div><span className="sectionEyebrow">DATA QUALITY WORKSPACE</span><h1>Comparison control center</h1><p>Monitor connections, configure validation, and review evidence.</p></div>
-        <button className="primary" onClick={onNewComparison}><Plus size={15} /> New comparison</button>
+      <div className="wizardFooter">
+        <h1 className="pageTitle" style={{ margin: 0 }}>Comparison control center</h1>
+        <button className="primary" onClick={onNewComparison}><Plus size={14} /> New comparison</button>
       </div>
       <div className="stats">
         <Metric label="Authenticated connections" value={connections.length} sub={`${connectedCount} currently connected`} icon={Link2} />

@@ -163,11 +163,8 @@ export function SavedComparisons({ onNew, onEdit, onRunComplete, notify }) {
 
   return (
     <div className="stack savedComparisonsPage">
-      <div className="wizardFooter">
-        <div>
-          <h1 className="pageTitle" style={{ margin: 0 }}>Comparisons</h1>
-          <p className="helper savedComparisonsSubtitle">Reusable comparison configurations and drafts.</p>
-        </div>
+      <div className="wizardFooter savedComparisonsHeader">
+        <h1 className="pageTitle" style={{ margin: 0 }}>Comparisons</h1>
         <div className="actionRow">
           <button type="button" className="secondary" onClick={loadConfigurations} disabled={loading}>
             <RefreshCw size={14} className={loading ? "spin" : ""} /> Refresh

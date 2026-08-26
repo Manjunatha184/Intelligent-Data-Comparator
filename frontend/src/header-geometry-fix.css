@@ -40,17 +40,17 @@
   top: 0 !important;
   z-index: 40 !important;
 
-  width: calc(100% + (var(--app-page-gutter) * 2)) !important;
+  width: 100% !important;
   max-width: none !important;
   min-height: var(--app-header-height) !important;
   height: var(--app-header-height) !important;
 
   margin-top: 0 !important;
-  margin-left: calc(var(--app-page-gutter) * -1) !important;
-  margin-right: calc(var(--app-page-gutter) * -1) !important;
-  margin-bottom: 4px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-bottom: 24px !important;
 
-  padding: 0 var(--app-page-gutter) !important;
+  padding: 0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -65,17 +65,15 @@
   overflow: visible !important;
 }
 
-/* Keep every title on the exact same left edge and scale. */
-.historyPage > .wizardFooter .pageTitle,
-.recentComparisonsPage > .wizardFooter .pageTitle,
-.connectionManagerPage > .wizardFooter .pageTitle,
-.rulesRepositoryPage > .wizardFooter .pageTitle,
-.body > .stack > .wizardFooter .pageTitle,
+/* Keep every title on the exact same scale and font weight. */
+.wizardFooter .pageTitle,
+.wizardFooter h1,
 .comparisonBuilder > .wizardHeader h1 {
   margin: 0 !important;
-  color: var(--page-header-title) !important;
-  font-size: 20px !important;
-  line-height: 1.08 !important;
+  color: #14231f !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
   letter-spacing: -0.03em !important;
 }
 
@@ -161,6 +159,44 @@
 .recentComparisonsPage > .wizardFooter > button {
   flex: 0 0 auto !important;
   margin-left: auto !important;
+}
+
+/* 
+ * UNIFY HIERARCHY TEXT ACROSS ALL PAGES 
+ * Ensures sub-headers, table headers, and card titles have the same size and weight everywhere.
+ */
+
+/* 1. Section & Panel Headers */
+.panelHead h3,
+.panelHeader h3,
+.scopeSectionIntro h2 {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #283731 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+}
+
+/* 2. Table Headers (Connections, Comparisons, Rules) */
+.dataTable thead th,
+.connectionTable > .thead > span,
+.evidenceSection table thead th,
+.rowDataTable thead th {
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  color: #72807a !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+}
+
+/* 3. Card Titles */
+.connectorCard > .grow > b {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #283731 !important;
+  margin-bottom: 2px !important;
+  display: block !important;
 }
 
 @media (max-width: 1099px) {

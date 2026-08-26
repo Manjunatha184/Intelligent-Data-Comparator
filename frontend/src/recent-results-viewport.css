@@ -1,95 +1,330 @@
-/* Recent Comparisons viewport behavior.
-   Mirrors Connection Manager: page chrome stays fixed, only rows scroll. */
+/* ============================================================
+   RECENT COMPARISONS — VIEWPORT / LAYOUT
+   ------------------------------------------------------------
+   Goal:
+   - Behave like Connection Manager / Rule Repository.
+   - Header remains at the top.
+   - Results card fills the available page height.
+   - Only the comparison rows scroll vertically.
+   - Table header remains sticky.
+   - Pagination remains visible at the bottom.
+   - Works correctly in fullscreen and resized windows.
+   ============================================================ */
+
+
+/* ============================================================
+   DESKTOP / TABLET
+   ============================================================ */
 
 @media (min-width: 900px) {
-  /* The app shell already defines the usable viewport. Do not recalculate it. */
+
+  /* ----------------------------------------------------------
+     APP BODY
+
+     The application shell already calculates the available
+     viewport below the global top navigation.
+
+     Do NOT use calc(100vh - ...) here.
+     ---------------------------------------------------------- */
+
   .body:has(.recentComparisonsPage) {
     height: 100% !important;
     min-height: 0 !important;
+
     overflow: hidden !important;
+
     box-sizing: border-box !important;
     padding-bottom: 18px !important;
   }
 
+
+  /* ----------------------------------------------------------
+     RECENT COMPARISONS PAGE
+
+     Row 1 = page header
+     Row 2 = comparison content/card
+
+     minmax(0, 1fr) is important because it allows the second
+     row to shrink when the browser window becomes shorter.
+     ---------------------------------------------------------- */
+
   .recentComparisonsPage {
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) !important;
-    gap: 12px !important;
-  }
-
-  .recentComparisonsPage > .wizardFooter {
-    min-height: 0 !important;
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-  }
-
-  /* This card owns all remaining vertical space. */
-  .recentComparisonsPage > .recentComparisonsPanel {
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .recentComparisonsTableShell {
+    width: 100% !important;
     flex: 1 1 auto !important;
     height: 100% !important;
     min-height: 0 !important;
+
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+
+    gap: 12px !important;
+
     overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
+    box-sizing: border-box !important;
   }
 
-  /* ONLY the table rows region scrolls. It may shrink in short windows. */
+
+
+
+  /* ----------------------------------------------------------
+     CONTENT WRAPPER
+
+     History.jsx now contains:
+
+     recentComparisonsPage
+       ├── wizardFooter
+       └── recentComparisonsSections
+             └── recentComparisonsPanel
+
+     This wrapper MUST receive the available grid height.
+     ---------------------------------------------------------- */
+
+  .recentComparisonsPage>.recentComparisonsSections {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+
+    box-sizing: border-box !important;
+  }
+
+
+  /* ----------------------------------------------------------
+     MAIN RESULTS PANEL
+
+     Panel fills the complete remaining page area.
+     ---------------------------------------------------------- */
+
+  .recentComparisonsSections>.recentComparisonsPanel {
+    width: 100% !important;
+
+    flex: 1 1 auto !important;
+
+    height: 100% !important;
+    min-height: 0 !important;
+
+    margin: 0 !important;
+    /* Do NOT set padding: 0 here; we want the standard Panel padding */
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+
+    box-sizing: border-box !important;
+    border-radius: 0 !important; /* To match Connection Manager's full-width panel */
+  }
+
+
+  /* ----------------------------------------------------------
+     TABLE SHELL
+
+     Contains:
+       1. scrollable rows area
+       2. pagination
+     ---------------------------------------------------------- */
+
+  .recentComparisonsTableShell {
+    width: 100% !important;
+
+    flex: 1 1 auto !important;
+
+    height: 100% !important;
+    min-height: 0 !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+
+    box-sizing: border-box !important;
+
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+  }
+
+
+  /* ----------------------------------------------------------
+     SCROLLABLE TABLE AREA
+
+     THIS is the only element on this page that should scroll
+     vertically.
+
+     Do not set height: 100% here because pagination also needs
+     space inside recentComparisonsTableShell.
+     ---------------------------------------------------------- */
+
   .recentComparisonsRowsScroll {
-    flex: 1 1 0 !important;
-    height: 0 !important;
+    width: 100% !important;
+
+    flex: 1 1 auto !important;
+
+    height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
+
     overflow-y: auto !important;
     overflow-x: auto !important;
+
     overscroll-behavior: contain !important;
     scrollbar-gutter: stable !important;
+
+    box-sizing: border-box !important;
   }
+
+
+  /* ----------------------------------------------------------
+     TABLE
+     ---------------------------------------------------------- */
 
   .recentComparisonsTable {
     width: 100% !important;
+
     margin: 0 !important;
+
+    border-collapse: collapse;
+
+    box-sizing: border-box !important;
+  }
+
+
+  /* ----------------------------------------------------------
+     STICKY TABLE HEADER
+
+     When many comparison runs exist, only rows move.
+     Column headings stay visible.
+     ---------------------------------------------------------- */
+
+  .recentComparisonsTable thead {
+    position: sticky !important;
+    top: 0 !important;
+
+    z-index: 5 !important;
   }
 
   .recentComparisonsTable thead th {
     position: sticky !important;
     top: 0 !important;
+
     z-index: 5 !important;
+
     background: #eef2ef !important;
   }
 
-  /* Pagination always remains visible at the bottom of the card. */
+
+  /* ----------------------------------------------------------
+     PAGINATION
+
+     Pagination must never shrink or disappear.
+
+     Table rows consume remaining space above this section.
+     ---------------------------------------------------------- */
+
   .recentComparisonsPagination {
-    flex: 0 0 auto !important;
-    min-height: 42px !important;
+    width: 100% !important;
+
+    flex: 0 0 46px !important;
+
+    height: 46px !important;
+    min-height: 46px !important;
+
     margin: 0 !important;
-    background: #fbfcfb !important;
-    border-top: 1px solid var(--border) !important;
+
     position: relative !important;
     z-index: 6 !important;
+
+    background: #fbfcfb !important;
+
+    border-top: 1px solid var(--line) !important;
+
+    box-sizing: border-box !important;
+    padding: 0 14px !important;
+  }
+  
+  .recentComparisonsPagination .tablePaginationActions {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    white-space: nowrap !important;
   }
 }
 
+
+/* ============================================================
+   MOBILE / SMALL WINDOWS
+   ------------------------------------------------------------
+   Do not force desktop viewport behavior.
+   Allow the normal document/page to scroll.
+   ============================================================ */
+
 @media (max-width: 899px) {
-  .body:has(.recentComparisonsPage),
-  .recentComparisonsPage,
-  .recentComparisonsPage > .recentComparisonsPanel,
-  .recentComparisonsTableShell,
+
+  .body:has(.recentComparisonsPage) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+
+    overflow: visible !important;
+  }
+
+
+  .recentComparisonsPage {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+
+    display: block !important;
+
+    overflow: visible !important;
+  }
+
+
+  .recentComparisonsPage>.recentComparisonsSections {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+
+    overflow: visible !important;
+  }
+
+
+  .recentComparisonsSections>.recentComparisonsPanel {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+
+    overflow: visible !important;
+  }
+
+
+  .recentComparisonsTableShell {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+
+    overflow: visible !important;
+  }
+
+
   .recentComparisonsRowsScroll {
     height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
-    overflow: visible !important;
+
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+  }
+
+
+  .recentComparisonsPagination {
+    height: auto !important;
+    min-height: 46px !important;
+
+    flex: none !important;
   }
 }

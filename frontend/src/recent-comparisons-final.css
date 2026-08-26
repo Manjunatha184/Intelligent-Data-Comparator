@@ -1,144 +1,3 @@
-/* Recent Comparisons uses the same viewport contract as Rule Repository. */
-@media (min-width: 900px) {
-  .body:has(.recentComparisonsPage) {
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    padding-bottom: 18px !important;
-    box-sizing: border-box !important;
-  }
-
-  .recentComparisonsPage {
-    width: 100% !important;
-    height: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) !important;
-    gap: 12px !important;
-    overflow: hidden !important;
-  }
-
-  .recentComparisonsPage > .wizardFooter {
-    margin: 0 !important;
-  }
-
-  /* Equivalent to Rule Repository's rulesRepositorySections container. */
-  .recentComparisonsPage > .recentComparisonsSections {
-    min-width: 0 !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    overflow: hidden !important;
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    align-items: stretch !important;
-  }
-
-  .recentComparisonsSections > .recentComparisonsPanel {
-    width: 100% !important;
-    height: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-    border-radius: 0 !important;
-  }
-
-  .recentComparisonsTableShell {
-    flex: 1 1 auto !important;
-    width: 100% !important;
-    height: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-  }
-
-  /* Only the run rows scroll. Header and pagination remain visible. */
-  .recentComparisonsRowsScroll {
-    flex: 1 1 0 !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    overflow-y: auto !important;
-    overflow-x: auto !important;
-    overscroll-behavior: contain !important;
-    scrollbar-gutter: stable !important;
-  }
-
-  .recentComparisonsTable {
-    width: 100% !important;
-    min-width: 980px !important;
-    margin: 0 !important;
-    table-layout: auto !important;
-  }
-
-  .recentComparisonsTable thead th {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 5 !important;
-    background: #eef2ef !important;
-  }
-
-  .recentComparisonsPagination {
-    flex: 0 0 46px !important;
-    width: 100% !important;
-    height: 46px !important;
-    min-height: 46px !important;
-    margin: 0 !important;
-    padding: 0 14px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 14px !important;
-    background: #fbfcfb !important;
-    border-top: 1px solid var(--border) !important;
-    overflow: hidden !important;
-  }
-
-  .recentComparisonsPagination .tablePaginationActions {
-    flex: 0 0 auto !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    white-space: nowrap !important;
-  }
-}
-
-@media (max-width: 899px) {
-  .body:has(.recentComparisonsPage) {
-    overflow: auto !important;
-  }
-
-  .recentComparisonsPage {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-    display: block !important;
-    overflow: visible !important;
-  }
-
-  .recentComparisonsSections,
-  .recentComparisonsPanel {
-    height: auto !important;
-    margin-top: 12px !important;
-    overflow: visible !important;
-  }
-
-  .recentComparisonsRowsScroll {
-    overflow: auto !important;
-  }
-
-  .recentComparisonsPagination {
-    min-height: 48px !important;
-  }
-}
 
 /* Old generic result tables, retained for any non-evidence tables. */
 .dataTable:not(.recentComparisonsTable) thead,
@@ -194,4 +53,86 @@ html body #root .app .resultsConsole .resultsPage .evidenceTable thead th,
 html body #root .app .resultsConsole .resultsPage .evidenceSection table thead th {
   background: #eef2ef !important;
   background-clip: padding-box !important;
+}
+
+/* FORCE ABSOLUTE FLEX STRETCHING FOR RECENT COMPARISONS */
+@media (min-width: 900px) {
+  /* 1. Ensure body and results console stretch down */
+  .body:has(.recentComparisonsPage),
+  .resultsConsole:has(.recentComparisonsPage) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* 2. Page wrapper uses flex column instead of grid for reliable stretching */
+  .recentComparisonsPage {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    gap: 12px !important;
+    overflow: hidden !important;
+  }
+
+  /* 3. Header cannot shrink */
+  .recentComparisonsPage > .wizardFooter {
+    flex: 0 0 auto !important;
+  }
+
+  /* 4. Sections wrapper stretches */
+  .recentComparisonsSections {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* 5. Panel stretches and is made borderless to act as a pure shell */
+  .recentComparisonsSections > .recentComparisonsPanel {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* 6. Table Shell stretches to fill the Panel and provides the rounded border */
+  .recentComparisonsTableShell {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    background: var(--panel) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+  }
+
+  /* 7. Scroll area consumes all remaining space */
+  .recentComparisonsRowsScroll {
+    flex: 1 1 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+  }
+
+  /* 8. Pagination pinned to bottom */
+  .recentComparisonsPagination {
+    flex: 0 0 auto !important;
+  }
 }

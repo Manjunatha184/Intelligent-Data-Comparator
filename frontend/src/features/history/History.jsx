@@ -56,7 +56,7 @@ export function History({ onOpenRun, notify }) {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [resultFilter, setResultFilter] = useState("ALL");
   const [page, setPage] = useState(1);
-  const pageSize = 9;
+  const pageSize = 25;
 
   async function loadRuns() {
     setLoading(true);
