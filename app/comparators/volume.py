@@ -49,8 +49,6 @@ class SparkVolumeComparator:
             }
 
         # Null counts use the same source -> target column mapping as L1/L4.
-        # This avoids false failures for renamed fields such as
-        # Email -> Target_Email.
         source_nulls = source_stats["null_counts"]
         target_nulls = target_stats["null_counts"]
         column_mappings = host._maps(configuration)
@@ -67,7 +65,6 @@ class SparkVolumeComparator:
             if target_column in ignored:
                 continue
 
-            # Schema-only missing/unexpected columns belong to L1.
             if target_column not in target_nulls:
                 continue
 
@@ -94,8 +91,6 @@ class SparkVolumeComparator:
             "available": True,
         }
 
-        # filtered_rows and partition_rows are execution diagnostics, not
-        # independent business validations.
         validation_names = [
             "total_rows",
             "distinct_key_count",
@@ -121,15 +116,30 @@ class SparkVolumeComparator:
             - source_stats["distinct_key_count"]
         )
 
-        # A one-row change in a multi-million-row dataset rounds to 0.00%.
-        # Preserve the fact that a real change occurred instead of presenting
-        # it as 0%, which is misleading in the results UI.
+        def tiny_rate_display(
+            count: int | None,
+            total: int | None,
+        ) -> float | str | None:
+            rate = safe_rate_pct(count, total)
+            if count not in (None, 0) and rate == 0.0:
+                return "<0.01%"
+            return rate
+
         distinct_key_percent_display: float | str | None = distinct_key_percent_change
         if (
             distinct_key_difference not in (None, 0)
             and distinct_key_percent_change == 0.0
         ):
             distinct_key_percent_display = "<0.01%"
+
+        source_duplicate_rate = tiny_rate_display(
+            source_stats["duplicate_key_count"],
+            source_stats["total_rows"],
+        )
+        target_duplicate_rate = tiny_rate_display(
+            target_stats["duplicate_key_count"],
+            target_stats["total_rows"],
+        )
 
         return {
             "metrics": {
@@ -156,14 +166,8 @@ class SparkVolumeComparator:
                 ),
                 "distinct_key_percent_change": distinct_key_percent_display,
                 "distinct_key_percent_change_raw": distinct_key_percent_change,
-                "source_duplicate_key_rate_pct": safe_rate_pct(
-                    source_stats["duplicate_key_count"],
-                    source_stats["total_rows"],
-                ),
-                "target_duplicate_key_rate_pct": safe_rate_pct(
-                    target_stats["duplicate_key_count"],
-                    target_stats["total_rows"],
-                ),
+                "source_duplicate_key_rate_pct": source_duplicate_rate,
+                "target_duplicate_key_rate_pct": target_duplicate_rate,
             },
             "evidence": {
                 "checks": checks,
