@@ -33,14 +33,10 @@ export function rowsEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-export function defaultMappedPair(sourceSchema, targetSchema) {
-  const sourceColumns = getSchemaColumnNames(sourceSchema);
-  const targetColumns = getSchemaColumnNames(targetSchema);
-  const sourceColumn = sourceColumns[0] || "";
-  const targetColumn = targetColumns.includes(sourceColumn)
-    ? sourceColumn
-    : targetColumns[0] || "";
-  return { source_column: sourceColumn, target_column: targetColumn };
+// A business key is semantic configuration and must be explicitly selected.
+// Never infer it from schema column order.
+export function defaultMappedPair() {
+  return { source_column: "", target_column: "" };
 }
 
 export function isNumericMapping(mapping, sourceSchema, targetSchema) {
