@@ -729,6 +729,7 @@ function L2DetailsClean({ level }) {
 }
 
 function getRecordKey(r) {
+  if (r.business_key !== undefined && r.business_key !== null) return r.business_key;
   if (r.key) {
     try {
       const parsed = JSON.parse(r.key);
@@ -737,13 +738,7 @@ function getRecordKey(r) {
       return r.key;
     }
   }
-  const rec = r.record || r.source_record || r.target_record || (r.source_records ? r.source_records[0] : null) || (r.target_records ? r.target_records[0] : null);
-  if (!rec) return r.key || r.signature || r.record_key || r.id || "N/A";
-  const keys = ["id", "key", "ID", "Key", "uid", "uuid", "name", "Name", "email", "Email", "customer_id", "Customer_ID"];
-  for (let k of keys) {
-    if (rec[k] !== undefined) return rec[k];
-  }
-  return r.key || r.signature || r.record_key || Object.values(rec)[0] || "N/A";
+  return r.business_key ?? r.key ?? r.signature ?? r.record_key ?? "N/A";
 }
 
 function extractRecord(r) {
@@ -1154,14 +1149,9 @@ function L6DetailsClean({ level }) {
     <EvidenceTable title="Failed DQ Records" rows={failedRecords}
       columns={[
         {
-          key: "record", label: "Record Key", render: r => {
-            if (!r.record) return "Row Data";
-            const keys = ["id", "key", "ID", "Key", "uid", "uuid", "name", "Name", "email", "Email", "customer_id", "Customer_ID"];
-            for (let k of keys) {
-              if (r.record[k] !== undefined) return <CopyableKey text={r.record[k]} />;
-            }
-            return <CopyableKey text={Object.values(r.record)[0] || "Row Data"} />;
-          }
+          key: "business_key", label: "Business Key", render: r => (
+            <CopyableKey text={r.business_key ?? "Not available"} />
+          )
         },
         { key: "column", label: "Column", render: r => <b>{r.column}</b> },
         { key: "value", label: "Value", render: r => <span className="diffSource">{renderVal(r.value)}</span> },

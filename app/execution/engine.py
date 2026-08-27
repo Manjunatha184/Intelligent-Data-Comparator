@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import logging
+import os
 from time import perf_counter
 
 from app.execution.models import (
@@ -27,6 +28,11 @@ from app.persistence.repository import PostgresRepository
 
 
 logger = logging.getLogger(__name__)
+
+EXECUTION_MEMORY_CAPACITY_MB = int(os.getenv("EXECUTION_MEMORY_CAPACITY_MB", "4096"))
+EXECUTION_DEFAULT_CPU_UNITS = int(os.getenv("EXECUTION_DEFAULT_CPU_UNITS", "1"))
+EXECUTION_DEFAULT_MEMORY_MB = int(os.getenv("EXECUTION_DEFAULT_MEMORY_MB", "256"))
+EXECUTION_DEFAULT_WORKERS = int(os.getenv("EXECUTION_DEFAULT_WORKERS", "1"))
 
 
 class ExecutionEngine:
@@ -202,7 +208,7 @@ class ExecutionEngine:
         self.resource_manager = ResourceManager(
             ResourceCapacity(
                 cpu_units=max_workers,
-                memory_mb=4096,
+                memory_mb=EXECUTION_MEMORY_CAPACITY_MB,
                 workers=max_workers,
             )
         )
@@ -573,28 +579,28 @@ class ExecutionEngine:
 
         if not raw_requirement:
             return ResourceRequirement(
-                cpu_units=1,
-                memory_mb=256,
-                workers=1,
+                cpu_units=EXECUTION_DEFAULT_CPU_UNITS,
+                memory_mb=EXECUTION_DEFAULT_MEMORY_MB,
+                workers=EXECUTION_DEFAULT_WORKERS,
             )
 
         return ResourceRequirement(
             cpu_units=int(
                 raw_requirement.get(
                     "cpu_units",
-                    1,
+                    EXECUTION_DEFAULT_CPU_UNITS,
                 )
             ),
             memory_mb=int(
                 raw_requirement.get(
                     "memory_mb",
-                    256,
+                    EXECUTION_DEFAULT_MEMORY_MB,
                 )
             ),
             workers=int(
                 raw_requirement.get(
                     "workers",
-                    1,
+                    EXECUTION_DEFAULT_WORKERS,
                 )
             ),
         )

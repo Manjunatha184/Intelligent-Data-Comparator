@@ -4,7 +4,7 @@ import { ArrowRight, Check, Loader2, Plus, Trash2, X, Zap } from "lucide-react";
 import { apiRequest } from "../../api/client";
 import { Empty, Field, Loading, Panel, SelectField } from "../../components/ui";
 import { COMPARISON_LEVELS, COMPARISON_LEVEL_ICONS, CONNECTORS } from "../../constants/app";
-import { defaultMappedPair, findSchemaColumn, getColumnType, getSchemaColumnNames, isNumericColumn, isNumericMapping, rowsEqual } from "../../utils/schema";
+import { findSchemaColumn, getColumnType, getSchemaColumnNames, isNumericColumn, isNumericMapping, rowsEqual } from "../../utils/schema";
 import { normalizeAggregateRulePayload, normalizeDqRulePayload } from "../../utils/rules";
 
 const LOCAL_COMPARISON_DRAFT_KEY = "lumera.comparison.workspace.v1";
@@ -232,8 +232,8 @@ export function ComparisonBuilder({
           targetColumns.includes(key.target_column)
       );
       const next = validPairs.length
-        ? [validPairs[0]]
-        : [defaultMappedPair(sourceSchema, targetSchema)];
+        ? validPairs
+        : [{ source_column: "", target_column: "" }];
 
       return rowsEqual(current, next) ? current : next;
     });
@@ -420,7 +420,6 @@ export function ComparisonBuilder({
     ]));
 
     const comparisonKeyPayload = (comparisonKeys || [])
-      .slice(0, 1)
       .filter((key) => key.source_column && key.target_column)
       .map((key) => ({
         source_column: key.source_column,
@@ -520,12 +519,6 @@ export function ComparisonBuilder({
         : "ROW_LEVEL",
       grouping_attributes: groupingAttributes,
       aggregation_columns: aggregationColumns,
-      strategy_policy: {
-        max_exact_rows: 100000,
-        max_exact_bytes: 50000000,
-        sampling_min_rows: 1000000,
-        allow_sampling: false,
-      },
     };
 
     setRunning(true);

@@ -1,4 +1,5 @@
 from typing import Any
+import os
 import re
 
 from pydantic import BaseModel, Field, model_validator
@@ -210,10 +211,10 @@ class DQRule(BaseModel):
         return bool(self.source_column and self.target_column)
 
 class StrategyPolicy(BaseModel):
-    max_exact_rows: int
-    max_exact_bytes: int
-    sampling_min_rows: int
-    allow_sampling: bool = False
+    max_exact_rows: int = Field(default_factory=lambda: int(os.getenv("STRATEGY_MAX_EXACT_ROWS", "100000")))
+    max_exact_bytes: int = Field(default_factory=lambda: int(os.getenv("STRATEGY_MAX_EXACT_BYTES", "50000000")))
+    sampling_min_rows: int = Field(default_factory=lambda: int(os.getenv("STRATEGY_SAMPLING_MIN_ROWS", "1000000")))
+    allow_sampling: bool = Field(default_factory=lambda: os.getenv("STRATEGY_ALLOW_SAMPLING", "false").strip().lower() in {"1", "true", "yes", "on"})
 
 class RuntimeConfiguration(BaseModel):
     configuration_id: int

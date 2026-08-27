@@ -58,7 +58,7 @@ class ComparisonRequest(BaseModel):
     grouping_attributes: list[ComparisonKey] = Field(default_factory=list)
     aggregation_columns: list[dict[str, str]] = Field(default_factory=list)
 
-    strategy_policy: StrategyPolicy
+    strategy_policy: StrategyPolicy = Field(default_factory=StrategyPolicy)
 
 
 class ComparisonStartResponse(BaseModel):
