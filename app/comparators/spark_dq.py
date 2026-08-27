@@ -22,6 +22,28 @@ class SparkDQComparator:
         rules_by_side = {"SOURCE": [], "TARGET": []}
         ignored = set(configuration.get("ignored_columns", []))
 
+        comparison_keys = configuration.get("comparison_keys", []) or []
+
+        def business_key_for_record(record: dict[str, Any], side: str) -> Any:
+            key_values = []
+            key_names = []
+            key_field = "source_column" if side == "SOURCE" else "target_column"
+            for mapping in comparison_keys:
+                column = mapping.get(key_field)
+                if not column:
+                    continue
+                key_names.append(column)
+                key_values.append(record.get(column))
+
+            if not key_values:
+                return None
+            if len(key_values) == 1:
+                return key_values[0]
+            return " | ".join(
+                f"{name}={value if value not in (None, '') else '[NULL]'}"
+                for name, value in zip(key_names, key_values)
+            )
+
         for rule in configuration.get("dq_rules", []):
             if DQComparator._uses_ignored_column(rule, ignored):
                 continue
@@ -107,9 +129,17 @@ class SparkDQComparator:
                     records = []
                     for row in failed_rows:
                         record = row.asDict(recursive=True)
+                        business_key = business_key_for_record(record, side)
+                        display_record = dict(record)
+                        # Results.jsx currently prefers `id` when choosing the
+                        # first-column key. Put the configured business key there
+                        # until all result consumers use the explicit field below.
+                        if business_key is not None:
+                            display_record = {"id": business_key, **display_record}
                         records.append(
                             {
-                                "record": record,
+                                "business_key": business_key,
+                                "record": display_record,
                                 "column": column,
                                 "value": record.get(column),
                                 "rule": {
