@@ -109,6 +109,28 @@ class SparkVolumeComparator:
         ]
         failed = [name for name in applicable if not checks[name]["matched"]]
 
+        distinct_key_percent_change = safe_percent_change(
+            source_stats["distinct_key_count"],
+            target_stats["distinct_key_count"],
+        )
+        distinct_key_difference = (
+            None
+            if source_stats["distinct_key_count"] is None
+            or target_stats["distinct_key_count"] is None
+            else target_stats["distinct_key_count"]
+            - source_stats["distinct_key_count"]
+        )
+
+        # A one-row change in a multi-million-row dataset rounds to 0.00%.
+        # Preserve the fact that a real change occurred instead of presenting
+        # it as 0%, which is misleading in the results UI.
+        distinct_key_percent_display: float | str | None = distinct_key_percent_change
+        if (
+            distinct_key_difference not in (None, 0)
+            and distinct_key_percent_change == 0.0
+        ):
+            distinct_key_percent_display = "<0.01%"
+
         return {
             "metrics": {
                 "status": "PASS" if not failed else "FAIL",
@@ -119,6 +141,7 @@ class SparkVolumeComparator:
                 "total_rows_target": target_stats["total_rows"],
                 "distinct_key_count_source": source_stats["distinct_key_count"],
                 "distinct_key_count_target": target_stats["distinct_key_count"],
+                "distinct_key_difference": distinct_key_difference,
                 "duplicate_key_count_source": source_stats["duplicate_key_count"],
                 "duplicate_key_count_target": target_stats["duplicate_key_count"],
                 "row_count_percent_change": safe_percent_change(
@@ -131,10 +154,8 @@ class SparkVolumeComparator:
                         100.0 if target_stats["total_rows"] == 0 else None
                     ),
                 ),
-                "distinct_key_percent_change": safe_percent_change(
-                    source_stats["distinct_key_count"],
-                    target_stats["distinct_key_count"],
-                ),
+                "distinct_key_percent_change": distinct_key_percent_display,
+                "distinct_key_percent_change_raw": distinct_key_percent_change,
                 "source_duplicate_key_rate_pct": safe_rate_pct(
                     source_stats["duplicate_key_count"],
                     source_stats["total_rows"],
