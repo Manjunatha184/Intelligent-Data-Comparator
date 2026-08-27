@@ -21,7 +21,6 @@ class SparkDQComparator:
         output = []
         rules_by_side = {"SOURCE": [], "TARGET": []}
         ignored = set(configuration.get("ignored_columns", []))
-
         comparison_keys = configuration.get("comparison_keys", []) or []
 
         def business_key_for_record(record: dict[str, Any], side: str) -> Any:
@@ -129,17 +128,10 @@ class SparkDQComparator:
                     records = []
                     for row in failed_rows:
                         record = row.asDict(recursive=True)
-                        business_key = business_key_for_record(record, side)
-                        display_record = dict(record)
-                        # Results.jsx currently prefers `id` when choosing the
-                        # first-column key. Put the configured business key there
-                        # until all result consumers use the explicit field below.
-                        if business_key is not None:
-                            display_record = {"id": business_key, **display_record}
                         records.append(
                             {
-                                "business_key": business_key,
-                                "record": display_record,
+                                "business_key": business_key_for_record(record, side),
+                                "record": record,
                                 "column": column,
                                 "value": record.get(column),
                                 "rule": {
