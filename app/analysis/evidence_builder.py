@@ -39,8 +39,6 @@ class L7EvidenceBuilder:
             if result:
                 levels[level] = self._build_level(level, result)
 
-        correlations = self._correlations(levels)
-
         payload = {
             "privacy_policy": {
                 "raw_client_records_included": False,
@@ -50,7 +48,6 @@ class L7EvidenceBuilder:
                 "only_derived_structural_and_statistical_evidence": True,
             },
             "levels": levels,
-            "cross_level_correlations": correlations,
         }
         self.assert_privacy_safe(payload)
         return payload
@@ -217,59 +214,6 @@ class L7EvidenceBuilder:
             "metrics": self._safe_metrics(metrics),
             "quality_rule_statistics": rules,
         }
-
-    def _correlations(self, levels: dict[str, Any]) -> list[dict[str, Any]]:
-        out = []
-        l2, l3 = levels.get("L2"), levels.get("L3")
-        if l2 and l3 and "record_count" in l2.get("statistics", {}):
-            rc = l2["statistics"]["record_count"]
-            rp = l3.get("record_population", {})
-            if rc.get("difference") is not None:
-                vol_delta = rc["difference"]
-                missing = rp.get("missing", 0)
-                extra = rp.get("extra", 0)
-                reconciles = vol_delta == -missing + extra
-                out.append({
-                    "type": "VOLUME_RECORD_RECONCILIATION",
-                    "levels": ["L2", "L3"],
-                    "volume_difference": vol_delta,
-                    "missing_record_count": missing,
-                    "extra_record_count": extra,
-                    "reconciles": reconciles,
-                    "interpretation": "L2 volume change is exactly reconciled by L3 missing/extra population." if reconciles else "L2 volume change is not fully reconciled by L3 missing/extra population.",
-                })
-        l1, l4 = levels.get("L1"), levels.get("L4")
-        if l1 and l4:
-            # We intentionally use counts here; no raw schema items cross the boundary.
-            if l1.get("structural_differences", {}).get("length_mismatches", 0) or l1.get("structural_differences", {}).get("data_type_mismatches", 0):
-                out.append({
-                    "type": "SCHEMA_FIELD_INTERACTION",
-                    "levels": ["L1", "L4"],
-                    "schema_difference_count": l1.get("metrics", {}).get("mismatch_count", 0),
-                    "field_mismatch_count": l4.get("metrics", {}).get("mismatch_count", 0),
-                    "interpretation": "Schema differences coexist with field-level differences; the available evidence does not prove causality.",
-                })
-        l4, l5 = levels.get("L4"), levels.get("L5")
-        if l4 and l5:
-            field_delta = defaultdict(float)
-            for item in l4.get("field_statistics", []):
-                if item.get("numeric_delta_sum") is not None:
-                    field_delta[item["field"]] += item["numeric_delta_sum"]
-            for agg in l5.get("aggregate_statistics", []):
-                col = agg.get("source_column") or agg.get("target_column")
-                ad = agg.get("difference")
-                if col and ad is not None and col in field_delta:
-                    fd = field_delta[col]
-                    out.append({
-                        "type": "FIELD_AGGREGATE_RECONCILIATION",
-                        "levels": ["L4", "L5"],
-                        "field": col,
-                        "field_numeric_delta": fd,
-                        "aggregate_difference": ad,
-                        "reconciles": abs(fd - ad) < 1e-9,
-                        "interpretation": "Observed numeric field deltas fully reconcile the aggregate difference." if abs(fd - ad) < 1e-9 else "Observed numeric field deltas only partially or do not reconcile the aggregate difference.",
-                    })
-        return out
 
     @staticmethod
     def _normalize(level_results: dict[str, Any]) -> dict[str, dict[str, Any]]:
