@@ -178,12 +178,9 @@ class GroqL7Analyzer:
             evidence,
         )
 
-        normalized[
-            "cross_level_analysis"
-        ] = self._normalize_correlations(
-            raw.get("cross_level_analysis"),
-            evidence,
-        )
+        # Cross-level correlation is intentionally omitted from the user-facing
+        # L7 report. L1-L6 remain independent deterministic validations.
+        normalized["cross_level_analysis"] = []
 
         # These speculative sections are intentionally excluded from the
         # enterprise report. Keep empty compatibility fields for older clients.

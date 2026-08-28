@@ -28,15 +28,6 @@ Return this exact JSON shape:
       "recommended_actions": [],
       "related_levels": ["L1"]
     }
-  ],
-  "cross_level_analysis": [
-    {
-      "correlation_id": "C-001",
-      "title": "Short correlation title",
-      "levels": ["L2", "L3"],
-      "evidence": ["Plain-language statement containing the exact metrics being compared."],
-      "conclusion": "Clearly state whether the numbers fully reconcile, partly reconcile, do not reconcile, or provide insufficient evidence."
-    }
   ]
 }
 
