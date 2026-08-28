@@ -1,0 +1,46 @@
+name: Remove remaining L7 correlation evidence
+on:
+  push:
+    branches: [agent/spark-executor-cleanup]
+    paths: [.github/workflows/chatgpt-remove-evidence-correlations.yml]
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/spark-executor-cleanup
+      - name: Remove correlation evidence generation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/analysis/evidence_builder.py')
+          s = p.read_text()
+
+          s = s.replace('''\n        correlations = self._correlations(levels)\n\n''', '\n')
+          s = s.replace('''            "levels": levels,\n            "cross_level_correlations": correlations,\n''', '''            "levels": levels,\n''')
+
+          start = s.find('    def _correlations(self, levels: dict[str, Any]) -> list[dict[str, Any]]:')
+          end = s.find('    @staticmethod\n    def _normalize(', start)
+          if start == -1 or end == -1:
+              raise SystemExit('Correlation method block not found')
+          s = s[:start] + s[end:]
+          p.write_text(s)
+
+          # One-time workflow only.
+          Path('.github/workflows/chatgpt-remove-evidence-correlations.yml').unlink()
+          PY
+
+          python3 -m compileall app/analysis
+          ! grep -R 'cross_level_correlations' -n app/analysis
+          ! grep -R 'VOLUME_RECORD_RECONCILIATION' -n app/analysis
+          ! grep -R 'FIELD_AGGREGATE_RECONCILIATION' -n app/analysis
+
+          git config user.name 'ChatGPT'
+          git config user.email 'chatgpt@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor: remove cross-level correlation evidence'
+          git push origin HEAD:agent/spark-executor-cleanup
