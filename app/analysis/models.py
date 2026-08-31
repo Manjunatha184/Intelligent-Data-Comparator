@@ -26,6 +26,7 @@ class L7Report(BaseModel):
     generated_at: str
     overall_status: str
     overall_validation_percentage: float | None = None
+    overall_data_match_percentage: float | None = None
     severity: Severity
     executive_summary: str
     overall_assessment: str
