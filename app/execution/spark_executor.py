@@ -531,7 +531,9 @@ class SparkExecutor:
         fields = []
         for column in CSVMetadataProvider().get_schema(dataset).columns:
             if column.data_type == "DECIMAL":
-                data_type = DecimalType(column.precision or 38, column.scale or 18)
+                scale = column.scale if column.scale is not None else 18
+                scale = min(scale, 38)
+                data_type = DecimalType(38, scale)
             else:
                 data_type = type_map.get(column.data_type, StringType)()
             fields.append(StructField(column.name, data_type, column.nullable))

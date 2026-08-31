@@ -518,29 +518,24 @@ class CSVMetadataProvider(
         if not values:
             return None, None
 
-        max_precision = 0
+        max_integer_digits = 0
         max_scale = 0
 
         for value in values:
-
             decimal_value = Decimal(value)
 
-            digits = decimal_value.as_tuple().digits
-            exponent = decimal_value.as_tuple().exponent
+            sign, digits, exponent = decimal_value.as_tuple()
 
-            if exponent < 0:
-                scale = abs(exponent)
-            else:
+            if exponent >= 0:
+                integer_digits = len(digits) + exponent
                 scale = 0
+            else:
+                scale = -exponent
+                integer_digits = max(len(digits) - scale, 0)
 
-            precision = max(
-                len(digits),
-                scale,
-            )
-
-            max_precision = max(
-                max_precision,
-                precision,
+            max_integer_digits = max(
+                max_integer_digits,
+                integer_digits,
             )
 
             max_scale = max(
@@ -548,4 +543,6 @@ class CSVMetadataProvider(
                 scale,
             )
 
-        return max_precision, max_scale
+        precision = max_integer_digits + max_scale
+
+        return precision, max_scale
