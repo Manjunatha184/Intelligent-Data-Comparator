@@ -31,6 +31,23 @@ function findEngine(data) {
   return "N/A";
 }
 
+function formatDurationMs(milliseconds) {
+  const value = Number(milliseconds);
+  if (!Number.isFinite(value) || value < 0) return "N/A";
+  if (value < 1000) return `${Math.round(value)}ms`;
+
+  const totalSeconds = value / 1000;
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(totalSeconds < 10 ? 1 : 0)}s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.round(totalSeconds % 60);
+  if (minutes < 60) return `${minutes}m ${seconds}s`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
 function findDuration(data) {
   const milliseconds =
     data?.duration_ms ??
@@ -40,17 +57,23 @@ function findDuration(data) {
     data?.metadata?.total_ms;
 
   if (milliseconds !== undefined && milliseconds !== null && milliseconds !== "") {
-    const value = Number(milliseconds);
-    if (Number.isFinite(value)) {
-      if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)}s`;
-      return `${value.toFixed(0)}ms`;
-    }
+    return formatDurationMs(milliseconds);
   }
 
   const seconds = data?.duration_seconds ?? data?.metadata?.duration_seconds;
   if (seconds !== undefined && seconds !== null && seconds !== "") {
     const value = Number(seconds);
-    if (Number.isFinite(value)) return `${value.toFixed(value >= 10 ? 1 : 2)}s`;
+    if (Number.isFinite(value)) return formatDurationMs(value * 1000);
+  }
+
+  const startedAt = data?.started_at;
+  const finishedAt = data?.finished_at;
+  if (startedAt && finishedAt) {
+    const started = new Date(startedAt).getTime();
+    const finished = new Date(finishedAt).getTime();
+    if (Number.isFinite(started) && Number.isFinite(finished) && finished >= started) {
+      return formatDurationMs(finished - started);
+    }
   }
 
   return "N/A";
@@ -59,6 +82,9 @@ function findDuration(data) {
 function percentage(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "N/A";
+
+  // Do not round a very-high-but-imperfect data match to a misleading 100.00%.
+  if (number > 99.99 && number < 100) return `${number.toFixed(6)}%`;
   return `${number.toFixed(2)}%`;
 }
 
@@ -77,48 +103,83 @@ function validationPercentage(data) {
   return (passed / deterministicLevels.length) * 100;
 }
 
+function firstFinite(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return null;
+}
+
 function dataMatchPercentage(data) {
-  const l4 = (data?.levels || []).find(
-    (level) => String(level?.level || "").toUpperCase() === "L4"
-  );
-  const metrics = l4?.metrics || {};
-
-  const direct =
-    metrics.conformity_percentage ??
-    metrics.match_percentage ??
-    metrics.match_rate_percentage ??
-    metrics.match_rate;
-  if (direct !== undefined && direct !== null && direct !== "") {
-    const value = Number(direct);
-    if (Number.isFinite(value)) return value <= 1 ? value * 100 : value;
-  }
-
-  const compared = Number(
-    metrics.compared_field_values ??
-    metrics.compared_values ??
-    metrics.total_field_comparisons
-  );
-  const mismatches = Number(
-    metrics.mismatch_count ??
-    metrics.field_mismatch_count ??
-    0
-  );
-  if (Number.isFinite(compared) && compared > 0 && Number.isFinite(mismatches)) {
-    return Math.max(0, ((compared - mismatches) / compared) * 100);
-  }
-
   const l3 = (data?.levels || []).find(
     (level) => String(level?.level || "").toUpperCase() === "L3"
   );
+  const l4 = (data?.levels || []).find(
+    (level) => String(level?.level || "").toUpperCase() === "L4"
+  );
+
+  // Record coverage: how much of the actual source/target row population can
+  // be aligned. Missing, extra, duplicate/ambiguous records reduce this score.
   const l3Metrics = l3?.metrics || {};
-  const matched = Number(l3Metrics.matched_key_count ?? l3Metrics.primary_matched_count);
-  const missing = Number(l3Metrics.missing_count ?? l3Metrics.missing_key_count ?? 0);
-  const extra = Number(l3Metrics.extra_count ?? l3Metrics.extra_key_count ?? 0);
-  if (Number.isFinite(matched) && matched >= 0 && Number.isFinite(missing) && Number.isFinite(extra)) {
-    const population = matched + missing + extra;
-    if (population > 0) return (matched / population) * 100;
+  const sourceRecords = firstFinite(
+    l3Metrics.source_record_count,
+    l3Metrics.total_rows_source,
+    data?.datasets?.source?.records
+  );
+  const targetRecords = firstFinite(
+    l3Metrics.target_record_count,
+    l3Metrics.total_rows_target,
+    data?.datasets?.target?.records
+  );
+  const matchedRecords = firstFinite(
+    l3Metrics.matched_record_count,
+    l3Metrics.primary_matched_record_count,
+    l3Metrics.matched_key_count,
+    l3Metrics.primary_matched_count
+  );
+
+  let recordMatch = null;
+  if (
+    sourceRecords !== null && sourceRecords >= 0 &&
+    targetRecords !== null && targetRecords >= 0 &&
+    matchedRecords !== null && matchedRecords >= 0
+  ) {
+    const population = Math.max(sourceRecords, targetRecords);
+    if (population > 0) recordMatch = Math.min(1, matchedRecords / population);
   }
 
+  // Field conformity: use raw counts rather than a pre-rounded percentage.
+  // This prevents 11 mismatches in millions of comparisons being displayed as
+  // an exact 100% match.
+  const l4Metrics = l4?.metrics || {};
+  const matchedFields = firstFinite(l4Metrics.matched_field_count);
+  const mismatchedFields = firstFinite(
+    l4Metrics.mismatch_count,
+    l4Metrics.field_mismatch_count
+  );
+  const comparedFields = firstFinite(
+    l4Metrics.compared_field_values,
+    l4Metrics.compared_field_count,
+    l4Metrics.total_field_comparisons
+  );
+
+  let fieldMatch = null;
+  if (matchedFields !== null && matchedFields >= 0 && mismatchedFields !== null && mismatchedFields >= 0) {
+    const total = matchedFields + mismatchedFields;
+    if (total > 0) fieldMatch = Math.min(1, matchedFields / total);
+  } else if (comparedFields !== null && comparedFields > 0 && mismatchedFields !== null && mismatchedFields >= 0) {
+    fieldMatch = Math.max(0, Math.min(1, (comparedFields - mismatchedFields) / comparedFields));
+  }
+
+  // Data Match is intentionally based on the data population, not the number
+  // of validation levels that passed. Record coverage and field conformity
+  // represent different data defects, so combine them multiplicatively.
+  if (recordMatch !== null && fieldMatch !== null) {
+    return Math.max(0, Math.min(100, recordMatch * fieldMatch * 100));
+  }
+  if (fieldMatch !== null) return fieldMatch * 100;
+  if (recordMatch !== null) return recordMatch * 100;
   return null;
 }
 
@@ -175,10 +236,16 @@ export function ResultsConsole(props) {
     if (!runId) return;
 
     let cancelled = false;
-    apiRequest(`/comparisons/${runId}/results`, { method: "GET" })
-      .then((data) => {
+    Promise.all([
+      apiRequest(`/comparisons/${runId}/results`, { method: "GET" }),
+      apiRequest("/comparisons", { method: "GET" }).catch(() => []),
+    ])
+      .then(([data, runs]) => {
         if (cancelled) return;
-        setMeta(data);
+        const timing = Array.isArray(runs)
+          ? runs.find((item) => item?.run_id === runId)
+          : null;
+        setMeta(timing ? { ...data, started_at: timing.started_at, finished_at: timing.finished_at } : data);
         setActiveLevel(firstAvailableLevel(data));
       })
       .catch((error) => {
