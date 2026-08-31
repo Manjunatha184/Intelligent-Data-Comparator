@@ -28,6 +28,41 @@ def _evidence_fingerprint(evidence: dict[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _comparison_percentages(evidence: dict[str, Any]) -> tuple[float | None, float | None]:
+    """Return deterministic validation coverage and data-match percentages.
+
+    Validation percentage is the percentage of executed L1-L6 validations that
+    passed. Data match percentage uses L4 field conformity when available because
+    L4 measures the actual compared field values. If L4 was not executed, L3
+    business-key coverage is used as a conservative fallback.
+    """
+    levels = evidence.get("levels", {})
+    statuses = [
+        str(value.get("status", "")).upper()
+        for value in levels.values()
+        if isinstance(value, dict)
+        and str(value.get("status", "")).upper() not in {"", "NOT_APPLICABLE", "NOT RUN", "UNKNOWN"}
+    ]
+    validation_percentage = None
+    if statuses:
+        validation_percentage = round(
+            (sum(status == "PASS" for status in statuses) / len(statuses)) * 100,
+            2,
+        )
+
+    l4_metrics = levels.get("L4", {}).get("metrics", {}) if isinstance(levels.get("L4"), dict) else {}
+    field_conformity = l4_metrics.get("field_conformity_pct")
+    if isinstance(field_conformity, (int, float)):
+        return validation_percentage, round(max(0.0, min(100.0, float(field_conformity))), 4)
+
+    l3_metrics = levels.get("L3", {}).get("metrics", {}) if isinstance(levels.get("L3"), dict) else {}
+    source_coverage = l3_metrics.get("source_record_coverage_pct")
+    target_coverage = l3_metrics.get("target_record_coverage_pct")
+    coverages = [float(value) for value in (source_coverage, target_coverage) if isinstance(value, (int, float))]
+    data_match_percentage = round(min(coverages), 4) if coverages else None
+    return validation_percentage, data_match_percentage
+
+
 class L7AnalysisEngine:
     """Build sanitized evidence locally, then use Groq for reasoning."""
 
@@ -56,6 +91,9 @@ class L7AnalysisEngine:
             # later run from mutating the cached version when run metadata changes.
             _L7_REPORT_CACHE[fingerprint] = report.model_copy(deep=True)
 
+        validation_percentage, data_match_percentage = _comparison_percentages(evidence)
+        report.overall_validation_percentage = validation_percentage
+        report.overall_data_match_percentage = data_match_percentage
         report.technical_evidence = {
             "sanitized_evidence": evidence,
             "privacy_boundary": evidence["privacy_policy"],
