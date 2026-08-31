@@ -56,6 +56,72 @@ function findDuration(data) {
   return "N/A";
 }
 
+function percentage(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "N/A";
+  return `${number.toFixed(2)}%`;
+}
+
+function validationPercentage(data) {
+  const deterministicLevels = (data?.levels || []).filter((level) => {
+    const code = String(level?.level || "").toUpperCase();
+    const status = String(level?.status || "").toUpperCase();
+    return ["L1", "L2", "L3", "L4", "L5", "L6"].includes(code)
+      && !["NOT_APPLICABLE", "NOT RUN"].includes(status);
+  });
+
+  if (!deterministicLevels.length) return null;
+  const passed = deterministicLevels.filter(
+    (level) => String(level?.status || "").toUpperCase() === "PASS"
+  ).length;
+  return (passed / deterministicLevels.length) * 100;
+}
+
+function dataMatchPercentage(data) {
+  const l4 = (data?.levels || []).find(
+    (level) => String(level?.level || "").toUpperCase() === "L4"
+  );
+  const metrics = l4?.metrics || {};
+
+  const direct =
+    metrics.conformity_percentage ??
+    metrics.match_percentage ??
+    metrics.match_rate_percentage ??
+    metrics.match_rate;
+  if (direct !== undefined && direct !== null && direct !== "") {
+    const value = Number(direct);
+    if (Number.isFinite(value)) return value <= 1 ? value * 100 : value;
+  }
+
+  const compared = Number(
+    metrics.compared_field_values ??
+    metrics.compared_values ??
+    metrics.total_field_comparisons
+  );
+  const mismatches = Number(
+    metrics.mismatch_count ??
+    metrics.field_mismatch_count ??
+    0
+  );
+  if (Number.isFinite(compared) && compared > 0 && Number.isFinite(mismatches)) {
+    return Math.max(0, ((compared - mismatches) / compared) * 100);
+  }
+
+  const l3 = (data?.levels || []).find(
+    (level) => String(level?.level || "").toUpperCase() === "L3"
+  );
+  const l3Metrics = l3?.metrics || {};
+  const matched = Number(l3Metrics.matched_key_count ?? l3Metrics.primary_matched_count);
+  const missing = Number(l3Metrics.missing_count ?? l3Metrics.missing_key_count ?? 0);
+  const extra = Number(l3Metrics.extra_count ?? l3Metrics.extra_key_count ?? 0);
+  if (Number.isFinite(matched) && matched >= 0 && Number.isFinite(missing) && Number.isFinite(extra)) {
+    const population = matched + missing + extra;
+    if (population > 0) return (matched / population) * 100;
+  }
+
+  return null;
+}
+
 function RunMetaStrip({ data }) {
   if (!data) return null;
 
@@ -63,6 +129,8 @@ function RunMetaStrip({ data }) {
   const result = String(data.comparison_status || data.result || "N/A").toUpperCase();
   const engine = findEngine(data);
   const duration = findDuration(data);
+  const validationScore = validationPercentage(data);
+  const dataMatch = dataMatchPercentage(data);
 
   return (
     <div className="runMetaStrip">
@@ -73,6 +141,14 @@ function RunMetaStrip({ data }) {
       <div className="runMetaItem">
         <span>RESULT</span>
         <strong className={`meta-${result.toLowerCase()}`}>{result}</strong>
+      </div>
+      <div className="runMetaItem">
+        <span>VALIDATION SCORE</span>
+        <strong>{percentage(validationScore)}</strong>
+      </div>
+      <div className="runMetaItem">
+        <span>DATA MATCH</span>
+        <strong>{percentage(dataMatch)}</strong>
       </div>
       <div className="runMetaItem">
         <span>ENGINE</span>
