@@ -15,8 +15,10 @@ import App from "./App";
 // 1. styles.css          -> base/global component styles
 // 2. enterprise-theme.css -> Lumera visual theme
 // 3. lumera-ui.css       -> feature/page presentation modules in cascade order
+// 4. percentage-summary.css -> keep result percentages visible above evidence
 import "./styles.css";
 import "./enterprise-theme.css";
 import "./lumera-ui.css";
+import "./percentage-summary.css";
 
 createRoot(document.getElementById("root")).render(<App />);
