@@ -1,0 +1,35 @@
+/* Keep the comparison percentage summary visible in the normal Results view. */
+.resultsConsole > .runMetaStrip {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 58px !important;
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+  margin: 0 0 10px !important;
+  background: #f8faf8 !important;
+  border: 1px solid var(--lc-line, #c9d2ce) !important;
+  box-sizing: border-box !important;
+}
+
+.resultsConsole > .runMetaStrip > .runMetaItem {
+  min-width: 0 !important;
+  min-height: 58px !important;
+}
+
+@media (max-width: 1100px) {
+  .resultsConsole > .runMetaStrip {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .resultsConsole > .runMetaStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
