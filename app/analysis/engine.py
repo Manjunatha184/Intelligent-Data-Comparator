@@ -28,20 +28,40 @@ def _evidence_fingerprint(evidence: dict[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _comparison_percentages(evidence: dict[str, Any]) -> tuple[float | None, float | None]:
-    """Return deterministic validation coverage and data-match percentages.
+def _number(*values: Any) -> float | None:
+    for value in values:
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            if value is not None and value != "":
+                return float(value)
+        except (TypeError, ValueError):
+            pass
+    return None
 
-    Validation percentage is the percentage of executed L1-L6 validations that
-    passed. Data match percentage uses L4 field conformity when available because
-    L4 measures the actual compared field values. If L4 was not executed, L3
-    business-key coverage is used as a conservative fallback.
+
+def _comparison_percentages(evidence: dict[str, Any]) -> tuple[float | None, float | None]:
+    """Return validation-level score and a data-population match percentage.
+
+    The validation score is intentionally level based: passed executed L1-L6
+    validations divided by executed validations.
+
+    Data Match is intentionally NOT level based. It measures the actual data:
+    record coverage from L3 and, where raw comparison counts are available,
+    field-value conformity from L4. Independent record and field defects are
+    combined multiplicatively so either kind of data difference lowers the
+    score. A tiny mismatch in a large dataset therefore remains very close to
+    100%, but is not represented as a perfect match.
     """
     levels = evidence.get("levels", {})
     statuses = [
         str(value.get("status", "")).upper()
         for value in levels.values()
         if isinstance(value, dict)
-        and str(value.get("status", "")).upper() not in {"", "NOT_APPLICABLE", "NOT RUN", "UNKNOWN"}
+        and str(value.get("status", "")).upper()
+        not in {"", "NOT_APPLICABLE", "NOT RUN", "UNKNOWN"}
     ]
     validation_percentage = None
     if statuses:
@@ -50,17 +70,76 @@ def _comparison_percentages(evidence: dict[str, Any]) -> tuple[float | None, flo
             2,
         )
 
-    l4_metrics = levels.get("L4", {}).get("metrics", {}) if isinstance(levels.get("L4"), dict) else {}
-    field_conformity = l4_metrics.get("field_conformity_pct")
-    if isinstance(field_conformity, (int, float)):
-        return validation_percentage, round(max(0.0, min(100.0, float(field_conformity))), 4)
+    l3_metrics = (
+        levels.get("L3", {}).get("metrics", {})
+        if isinstance(levels.get("L3"), dict)
+        else {}
+    )
+    source_records = _number(
+        l3_metrics.get("source_record_count"),
+        l3_metrics.get("total_rows_source"),
+    )
+    target_records = _number(
+        l3_metrics.get("target_record_count"),
+        l3_metrics.get("total_rows_target"),
+    )
+    matched_records = _number(
+        l3_metrics.get("matched_record_count"),
+        l3_metrics.get("primary_matched_record_count"),
+        l3_metrics.get("matched_key_count"),
+        l3_metrics.get("primary_matched_count"),
+    )
 
-    l3_metrics = levels.get("L3", {}).get("metrics", {}) if isinstance(levels.get("L3"), dict) else {}
-    source_coverage = l3_metrics.get("source_record_coverage_pct")
-    target_coverage = l3_metrics.get("target_record_coverage_pct")
-    coverages = [float(value) for value in (source_coverage, target_coverage) if isinstance(value, (int, float))]
-    data_match_percentage = round(min(coverages), 4) if coverages else None
-    return validation_percentage, data_match_percentage
+    record_ratio = None
+    if (
+        source_records is not None
+        and source_records >= 0
+        and target_records is not None
+        and target_records >= 0
+        and matched_records is not None
+        and matched_records >= 0
+    ):
+        population = max(source_records, target_records)
+        if population > 0:
+            record_ratio = max(0.0, min(1.0, matched_records / population))
+
+    l4_metrics = (
+        levels.get("L4", {}).get("metrics", {})
+        if isinstance(levels.get("L4"), dict)
+        else {}
+    )
+    matched_fields = _number(l4_metrics.get("matched_field_count"))
+    mismatched_fields = _number(
+        l4_metrics.get("mismatch_count"),
+        l4_metrics.get("field_mismatch_count"),
+    )
+    compared_fields = _number(
+        l4_metrics.get("compared_field_values"),
+        l4_metrics.get("compared_field_count"),
+        l4_metrics.get("total_field_comparisons"),
+    )
+
+    field_ratio = None
+    if matched_fields is not None and matched_fields >= 0 and mismatched_fields is not None and mismatched_fields >= 0:
+        total = matched_fields + mismatched_fields
+        if total > 0:
+            field_ratio = max(0.0, min(1.0, matched_fields / total))
+    elif compared_fields is not None and compared_fields > 0 and mismatched_fields is not None and mismatched_fields >= 0:
+        field_ratio = max(0.0, min(1.0, (compared_fields - mismatched_fields) / compared_fields))
+
+    if record_ratio is not None and field_ratio is not None:
+        data_match_percentage = record_ratio * field_ratio * 100
+    elif field_ratio is not None:
+        data_match_percentage = field_ratio * 100
+    elif record_ratio is not None:
+        data_match_percentage = record_ratio * 100
+    else:
+        data_match_percentage = None
+
+    return (
+        validation_percentage,
+        round(data_match_percentage, 6) if data_match_percentage is not None else None,
+    )
 
 
 class L7AnalysisEngine:
