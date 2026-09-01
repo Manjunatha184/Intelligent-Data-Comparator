@@ -60,3 +60,5 @@ docker-compose.override.yml
 
 .agents
 .codex
+
+data/

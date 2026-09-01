@@ -196,8 +196,8 @@ export function Results({ runId, onOpenRun, onBack, onOpenAnalysis, notify }) {
             }
             onOpenAnalysis(runId);
           }}>
-              <FileText size={14} />
-              Analysis report
+            <FileText size={14} />
+            Analysis report
           </button>
           <button className="secondary small" onClick={() => setShowRawJson(true)}>
             <FileText size={14} />
@@ -480,45 +480,6 @@ export function L7AnalysisReportView({
           )) : <div className="analysisEmpty">No key findings were reported for this run.</div>}
         </div>
       </AnalysisReportSection>
-
-      <AnalysisReportSection title="How the validation levels relate" count={correlations.length}>
-        {correlations.length === 0 ? (
-          <div className="analysisEmpty">No cross-level correlations were established.</div>
-        ) : (
-          <div className="analysisCorrelationList">
-            {correlations.map((item, index) => (
-              <article className="analysisCorrelationCard" key={index}>
-                <div className="analysisFindingTop">
-                  <div>
-                    <h4>{item.title || item.type || `Cross-level comparison ${index + 1}`}</h4>
-                  </div>
-                </div>
-                <p>{item.conclusion || item.interpretation || "The supplied evidence shows a relationship between these validation levels."}</p>
-                {(item.evidence || []).length > 0 && (
-                  <ul className="analysisBulletList">
-                    {item.evidence.map((evidenceItem, evidenceIndex) => (
-                      <li key={evidenceIndex}>{readableEvidence(evidenceItem)}</li>
-                    ))}
-                  </ul>
-                )}
-                <ul className="analysisBulletList">
-                  {Object.entries(item)
-                    .filter(([k]) => !["correlation_id", "title", "type", "conclusion", "interpretation", "evidence", "levels"].includes(k))
-                    .map(([k, v]) => (
-                      <li key={k}>{k.replace(/_/g, " ")}: {readableEvidence(v)}</li>
-                    ))}
-                </ul>
-                <div className="analysisLevelLinks" style={{ marginTop: "12px" }}>
-                  {(item.levels || []).map((level) => (
-                    <span key={level}>{level}</span>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </AnalysisReportSection>
-
       <AnalysisReportSection title="Privacy">
         <p className="analysisLead" style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
           Privacy-safe analysis: raw client records, matched pairs, record keys and raw field values were not provided to the LLM.
